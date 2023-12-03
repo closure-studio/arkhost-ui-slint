@@ -535,6 +535,7 @@ impl Controller {
                 .await?;
         let captcha_token = match auth_result {
             AuthResult::ArkHostCaptchaTokenReCaptcha { token, .. } => token,
+            AuthResult::ArkHostCaptchaTokenGeeTest { token, .. } => token,
             _ => {
                 return Err(anyhow!("unexpected auth result: {auth_result:?}").into());
             }
