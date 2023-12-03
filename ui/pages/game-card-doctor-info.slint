@@ -1,0 +1,114 @@
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
+import { GameInfo, GameState } from "../game-info.slint";
+
+component GameStatusBadge inherits VerticalLayout {
+    in property <GameInfo> info;
+    private property <brush> status-color;
+    private property <string> status-text;
+    private property <image> status-icon;
+
+    Rectangle {
+        background: status-color;
+        border-radius: self.height * 0.32;
+        max-width: 160px;
+        max-height: 36px;
+
+        animate background { duration: 200ms; }
+
+        HorizontalBox {
+            spacing: 10px;
+            alignment: start;
+
+            Image {
+                source: status-icon;
+                colorize: white;
+                width: 24px;
+                max-height: 24px;
+            }
+
+            Text {
+                text: status-text;
+                font-size: 16px;
+                color: whitesmoke;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                min-width: 96px;
+            }
+        }
+    }
+
+    states [
+        logging when info.game-state == GameState.Logging: {
+            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-text: @tr("登陆中");
+            status-icon: @image-url("../images/game_status_logging.svg");
+        }
+        running when info.game-state == GameState.Running: {
+            status-color: @linear-gradient(15deg, #59b72a 0%, #5db813 100%);
+            status-text: @tr("运行中");
+            status-icon: @image-url("../images/game_status_running.svg");
+        }
+        faulted when info.game-state == GameState.Faulted: {
+            status-color: @linear-gradient(15deg, #dd4f24 0%, #db4321 100%);
+            status-text: @tr("游戏错误");
+            status-icon: @image-url("../images/game_status_faulted.svg");
+        }
+        stopped when info.game-state == GameState.Stopped: {
+            status-color: #494949;
+            status-text: @tr("已停止");
+            status-icon: @image-url("../images/game_status_stopped.svg");
+        }
+        captcha when info.game-state == GameState.Captcha: {
+            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-text: @tr("需要人机验证");
+            status-icon: @image-url("../images/game_status_captcha.svg");
+        }
+    ]
+}
+export component GameCardDoctorInfo inherits Rectangle {
+    in property <GameInfo> info;
+
+    VerticalLayout {
+        alignment: start;
+
+        HorizontalBox {
+            alignment: space-between;
+
+            VerticalLayout {
+                alignment: start;
+
+                Rectangle {
+                    doctor-name := Text {
+                        text: info.doctor-name;
+                        font-size: 36px;
+                    }
+                    border-radius: self.width * 0.05;
+    
+                    max-width: 120px;
+                    max-height: 40px;
+                }
+    
+                doctor-serial := Text {
+                    text: info.doctor-serial;
+                    font-size: 18px;
+                    font-italic: true;
+                    color: StyleMetrics.default-text-color.transparentize(60%);
+    
+                    vertical-alignment: bottom;
+                }
+            }
+
+            GameStatusBadge {
+                info: info;
+            }
+        }
+
+        GridBox {
+            Text { text: @tr("理智：") + info.ap; font-size: 14px; row: 0; col: 0; }
+            Text { text: @tr("作战关卡：") + info.battle-map; font-size: 14px; row: 1; col: 0; }
+            Text { text: @tr("可露希尔当前为技术预览版本，停止游戏功能和更改游戏设置功能暂不可用，感谢您的理解和耐心等待。"); font-size: 14px; row: 2; col: 0; }
+        }
+        
+        min-width: 150px;
+    }
+}

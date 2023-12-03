@@ -1,0 +1,149 @@
+import { VerticalBox, HorizontalBox , LineEdit, Button, StyleMetrics , Spinner} from "std-widgets.slint";
+
+export enum LoginState {
+    Unlogged,
+    LoggingIn,
+    Errored,
+    Logged
+}
+
+export component LoginWindow {
+    width: 360px;
+    vertical-stretch: 0;
+    in-out property <LoginState> login-state;
+    in-out property <string> login-status-text: "";
+
+    private property <bool> logging;
+    callback login-requested(string, string);
+    callback register-requested <=> register.clicked;
+
+    vbox := VerticalBox {
+        alignment: start;
+
+        HorizontalBox {
+            alignment: start;
+            
+            register := Button {
+                text: @tr("注册...");
+                icon: StyleMetrics.dark-color-scheme
+                    ? @image-url("images/ext_link.svg")
+                    : @image-url("images/ext_link_light.svg");
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            Rectangle {
+                clip: true;
+                border-radius: 15px;
+
+                Image {
+                    source: @image-url("images/closure_logo.png");
+
+                    width: 120px;
+                    height: 120px;
+                }
+
+                width: 100px;
+                height: 100px;
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            Text {
+                font-size: 24px;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+
+                text: @tr("登陆可露希尔通行证");
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            account := LineEdit {
+                enabled: !logging;
+                width: parent.width - 40px;
+                height: 42px;
+                horizontal-alignment: left;
+
+                placeholder-text: @tr("账号");
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            password := LineEdit {
+                enabled: !logging;
+                width: parent.width - 40px;
+                height: 42px;
+                horizontal-alignment: left;
+                input-type: InputType.password;
+
+                placeholder-text: @tr("密码");
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            Button {
+                enabled: !logging;
+                text: @tr("登陆");
+                width: parent.width - 40px;
+                clicked => {
+                    login-requested(account.text, password.text)
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+
+            login-spinner := Spinner {
+                visible: logging;
+                indeterminate: true;
+                width: self.visible ? 40px : 0px;
+            }
+
+            Text {
+                vertical-alignment: center;
+
+                text: login-status-text;
+                wrap: word-wrap;
+            }
+        }
+
+        Rectangle {
+            height: 40px;
+        }
+
+        Rectangle {
+            height: 24px;
+
+            Text {
+                text: @tr("可露希尔云托管 https://arknights.host");
+            }
+        }
+    }
+
+    states [
+        unlogged when login-state == LoginState.Unlogged: {
+            logging: false;
+        }
+        logging when login-state == LoginState.LoggingIn: {
+            logging: true;
+        }
+        errored when login-state == LoginState.Errored: {
+            logging: false;
+        }
+        logged when login-state == LoginState.Logged: {
+            logging: false;
+        }
+    ]
+}

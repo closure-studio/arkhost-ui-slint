@@ -1,0 +1,65 @@
+export enum GameState {
+    Logging,
+    Running,
+    Faulted,
+    Stopped,
+    Captcha
+}
+
+export enum GameOperationRequestState {
+    Idle,
+    Requesting
+}
+
+export enum GameLogLoadState {
+    NotLoaded,
+    Loading,
+    Loaded,
+}
+
+export enum GameLogLoadRequestType {
+    Later,
+    Former
+}
+
+export struct GameLogEntry {
+    timestamp: string,
+    content: string,
+}
+
+export enum GameOptionSaveState {
+    Idle,
+    Saving
+}
+
+export struct GameOptions {
+    battle-maps: [string],
+    enable-building-arrange: bool,
+    enable-auto-battle: bool,
+    ap-reserve: int,
+    recruit-ignore-robot: bool,
+    recruit-reserve: int,
+}
+
+export enum GameInfoViewType {
+    DoctorInfo,
+    Details,
+    Settings,
+    Logs,
+}
+
+export struct GameInfo {
+    id: string,
+    doctor-name: string,
+    doctor-level: string,
+    doctor-serial: string,
+    ap: string,
+    battle-map: string,
+    game-state: GameState,
+    options: GameOptions,
+    log-loaded: GameLogLoadState,
+    logs: [GameLogEntry],
+    request-state: GameOperationRequestState,
+    save-state: GameOptionSaveState,
+    active-view: GameInfoViewType
+}

@@ -1,0 +1,107 @@
+import { GridBox, Switch, ScrollView, VerticalBox, LineEdit, HorizontalBox, SpinBox, Button, Spinner} from "std-widgets.slint";
+import { GameOptions, GameInfo, GameOptionSaveState } from "../game-info.slint";
+
+export component GameCardOptions inherits ScrollView {
+    in property <GameInfo> info;
+    in-out property <GameOptions> options;
+    private property <int> ap-reserve-saved: options.ap-reserve;
+    private property <int> recruit-reserve-saved: options.recruit-reserve;
+    private property <bool> saving;
+    callback save-options(string);
+    
+    VerticalBox {
+        alignment: start;
+        spacing: 10px;
+
+        Text {
+            text: @tr("游戏设置");
+            font-size: 20px;
+            height: 24px;
+        }
+        
+        enable-building-arrange := Switch {
+            enabled: !saving;
+            text: @tr("启用基建换班");
+            checked: options.enable-building-arrange;
+        }
+
+        enable-auto-battle := Switch {
+            enabled: !saving;
+            text: @tr("启用自动战斗");
+            checked: options.enable-auto-battle;
+        }
+
+        recruit-ignore-robot := Switch {
+            enabled: !saving;
+            text: @tr("公招忽略小车");
+            checked: options.recruit-ignore-robot;
+        }
+
+        Text {
+            text: @tr("保留理智") + " (" + @tr("当前: ") + options.ap-reserve + ")";
+        }
+
+        ap-reserve := SpinBox {
+            enabled: !saving;
+            maximum: 135;
+            value: ap-reserve-saved;
+            edited => { ap-reserve-saved = self.value }
+        }
+
+        Text {
+            text: @tr("保留公招券") + " (" + @tr("当前: ") + options.recruit-reserve + ")";
+        }
+
+        recruit-reserve := SpinBox {
+            enabled: !saving;
+            value: recruit-reserve-saved;
+            edited => { recruit-reserve-saved = self.value }
+        }
+
+        HorizontalLayout {
+            spacing: 10px;
+
+            Button {
+                enabled: !saving;
+                text: @tr("保存");
+                clicked => { 
+                    options.enable-building-arrange = enable-building-arrange.checked;
+                    options.enable-auto-battle = enable-auto-battle.checked;
+                    options.recruit-ignore-robot = recruit-ignore-robot.checked;
+
+                    options.ap-reserve = ap-reserve-saved;
+                    options.recruit-reserve = recruit-reserve-saved;
+                    save-options(info.id);
+                }
+            }
+            Button {
+                enabled: !saving;
+                text: @tr("取消");
+                clicked => { 
+                    enable-building-arrange.checked = options.enable-building-arrange;
+                    enable-auto-battle.checked = options.enable-auto-battle;
+                    recruit-ignore-robot.checked = options.recruit-ignore-robot;
+
+                    ap-reserve-saved = options.ap-reserve;
+                    recruit-reserve-saved = options.recruit-reserve;
+                    ap-reserve.value = ap-reserve-saved;
+                    recruit-reserve.value = recruit-reserve-saved;
+                }
+            }
+            Spinner {
+                visible: saving;
+                indeterminate: true;
+                width: parent.height;
+            }
+        }
+    }
+
+    states [
+        idle when info.save-state == GameOptionSaveState.Idle: {
+            saving: false;
+        }
+        saving when info.save-state == GameOptionSaveState.Saving: {
+            saving: true;
+        }
+    ]
+}

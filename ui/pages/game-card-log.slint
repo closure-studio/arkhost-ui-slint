@@ -1,0 +1,76 @@
+import { GameOptions, GameInfo, GameLogLoadRequestType, GameLogLoadState } from "../game-info.slint";
+import { ListView , HorizontalBox, StyleMetrics , Button, ScrollView, VerticalBox, Spinner} from "std-widgets.slint";
+
+component GameCardLogEntry {
+    in property <string> timestamp;
+    in property <string> content;
+
+    HorizontalLayout {
+        spacing: 5px;
+        alignment: start;
+
+        Text {
+            text: timestamp;
+            height: 18px;
+            min-width: 96px;
+            font-size: 14px;
+            color: StyleMetrics.default-text-color.transparentize(50%);
+            horizontal-alignment: left;
+        }
+
+        Text {
+            text: content;
+            font-size: 14px;
+            horizontal-alignment: left;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component GameCardLog inherits VerticalLayout {
+    in property <GameInfo> info;
+    private property <bool> log-loading: false;
+
+    callback load-logs(string, GameLogLoadRequestType);
+
+    HorizontalBox {
+        load-button := Button {
+            enabled: !log-loading;
+            clicked => {
+                if (info.log-loaded == GameLogLoadState.NotLoaded) {
+                    load-logs(info.id, GameLogLoadRequestType.Later);
+                } else if (info.log-loaded == GameLogLoadState.Loaded) {
+                    load-logs(info.id, GameLogLoadRequestType.Former);
+                }
+            }
+        }
+
+        load-spinner := Spinner {
+            visible: log-loading;
+            indeterminate: true;
+            width: parent.height;
+        }
+    }
+
+    ListView {
+        for log-entry in info.logs: GameCardLogEntry {
+            timestamp: log-entry.timestamp;
+            content: log-entry.content;
+        }
+    }
+
+    states [
+        not-loaded when info.log-loaded == GameLogLoadState.NotLoaded: {
+            load-button.text: @tr("加载日志");
+            log-loading: false;
+        }
+        loading when info.log-loaded == GameLogLoadState.Loading: {
+            load-button.text: @tr("正在加载日志……");
+            log-loading: true;
+        }
+        loaded when info.log-loaded == GameLogLoadState.Loaded: {
+            load-button.text: @tr("加载更早的日志");
+            log-loading: false;
+        }
+    ]
+}

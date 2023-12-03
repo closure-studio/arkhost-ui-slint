@@ -1,0 +1,56 @@
+import { ScrollView , AboutSlint, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
+export component AboutPage {
+    ScrollView {
+        VerticalBox {
+            alignment: start;
+            spacing: 24px;
+
+            HorizontalBox {
+                alignment: center;
+                spacing: 24px;
+    
+                Rectangle {
+                    clip: true;
+                    border-radius: 15px;
+
+                    Image {
+                        source: @image-url("../images/closure_logo_ferris.png");
+
+                        width: 100px;
+                        height: 100px;
+                    }
+
+                    width: 100px;
+                    height: 100px;
+                }
+            }
+
+            HorizontalBox {
+                alignment: center;
+                spacing: 24px;
+
+                Text {
+                    font-size: 18px;
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+    
+                    text: "Closure Studio <github.com/closure-studio> 2023";
+                }
+            }
+
+            Rectangle {
+                height: 20px;
+            }
+
+            HorizontalBox {
+                alignment: center;
+                spacing: 24px;
+
+                AboutSlint {
+                    width: 128px;
+                    height: 128px;
+                }
+            }
+        }
+    }
+}
