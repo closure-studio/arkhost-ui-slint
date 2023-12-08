@@ -1,0 +1,2 @@
+#define RT_MANIFEST 24
+000_app_icon ICON icon.ico
