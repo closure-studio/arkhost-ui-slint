@@ -1,0 +1,72 @@
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
+import { GameInfo, GameState } from "../game-info.slint";
+
+export component GameStatusBadge inherits VerticalLayout {
+    in property <GameInfo> info;
+    in property <bool> omit-text;
+    private property <brush> status-color;
+    private property <string> status-text;
+    private property <image> status-icon;
+    private property <length> horz-padding: omit-text
+        ? 0px
+        : 15px;
+
+    Rectangle {
+        background: status-color;
+        border-radius: self.height * 0.32;
+        max-height: 32px;
+
+        animate background { duration: 200ms; }
+
+        HorizontalBox {
+            alignment: space-around;
+            padding-left: horz-padding;
+            padding-right: horz-padding;
+            spacing: 15px;
+
+            Image {
+                source: status-icon;
+                colorize: white;
+                width: 25px;
+                height: 25px;
+            }
+
+            if !omit-text : Text {
+                text: status-text;
+                font-size: 15px;
+                color: whitesmoke;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                min-width: 96px;
+            }
+        }
+    }
+
+    states [
+        logging when info.game-state == GameState.Logging: {
+            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-text: @tr("登陆中");
+            status-icon: @image-url("../images/game_status_logging.svg");
+        }
+        running when info.game-state == GameState.Running: {
+            status-color: @linear-gradient(15deg, #59b72a 0%, #5db813 100%);
+            status-text: @tr("运行中");
+            status-icon: @image-url("../images/game_status_running.svg");
+        }
+        faulted when info.game-state == GameState.Faulted: {
+            status-color: @linear-gradient(15deg, #dd4f24 0%, #db4321 100%);
+            status-text: @tr("游戏错误") + info.status-text;
+            status-icon: @image-url("../images/game_status_faulted.svg");
+        }
+        stopped when info.game-state == GameState.Stopped: {
+            status-color: #494949;
+            status-text: @tr("已停止");
+            status-icon: @image-url("../images/game_status_stopped.svg");
+        }
+        captcha when info.game-state == GameState.Captcha: {
+            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-text: @tr("需要人机验证");
+            status-icon: @image-url("../images/game_status_captcha.svg");
+        }
+    ]
+}

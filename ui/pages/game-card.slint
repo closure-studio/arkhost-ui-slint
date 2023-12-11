@@ -4,6 +4,7 @@ import { GameCardDoctorInfo } from "game-card-doctor-info.slint";
 import { GameCardOptions } from "game-card-options.slint";
 import { GameCardLog } from "game-card-log.slint";
 import { GameCardOperationShortcutPanel } from "game-card-operation-shotcut-panel.slint";
+import { GameStatusBadge } from "game-status-badge.slint";
 
 component GameCardTab inherits Rectangle {
     in property <int> active-tab;
@@ -27,21 +28,22 @@ component GameCardTabSwitch inherits Rectangle {
     in property <image> icon;
     in property <int> active-tab;
     in property <int> current-active-tab;
+    private property <bool> selected: current-active-tab == active-tab;
 
-    height: 50px;
-    width: 50px;
+    height: 36px;
+    width: 36px;
     callback clicked <=> touch-area.clicked;
 
     Image {
         source: icon;
-        width: root.width * 0.5;
-        height: root.height * 0.5;
-        colorize: current-active-tab == active-tab
+        width: root.width * 0.75;
+        height: root.height * 0.75;
+        colorize: selected
             ? StyleMetrics.default-text-color
             : StyleMetrics.default-text-color.transparentize(60%);
 
         animate colorize {
-             duration: 0.125s;
+             duration: 0.25s;
              easing: ease;
         }
     }
@@ -91,7 +93,6 @@ export component GameCard inherits Rectangle {
                     current-active-tab: current-active-tab;
                     options := GameCardOptions {
                         info: info;
-                        options: info.options;
                     }
                     height: 500px;
                 }
@@ -112,50 +113,69 @@ export component GameCard inherits Rectangle {
                 }
             }
 
-            HorizontalLayout {
+            VerticalLayout {
+                alignment: end;
                 shortcut-panel := GameCardOperationShortcutPanel { 
                     info: info; 
-                    width: 400px;
+                    min-width: 400px;
                 }
-                alignment: start;
-                horizontal-stretch: 0;
             }
         }
 
         VerticalLayout {
-            spacing: 3px;
-            alignment: stretch;
+            alignment: space-between;
 
-            GameCardTabSwitch {
-                active-tab: 0;
-                current-active-tab: current-active-tab;
-                icon: @image-url("../images/game_card_tab_user.svg");
-                clicked => { 
-                    current-active-tab = 0; 
-                    current-tab-height = doctor-tab.height;
-                    view-changed(info.id, GameInfoViewType.DoctorInfo);
+            VerticalBox {
+                alignment: start;
+
+                GameCardTabSwitch {
+                    active-tab: 0;
+                    current-active-tab: current-active-tab;
+                    icon: @image-url("../images/game_card_tab_user.svg");
+                    clicked => { 
+                        current-active-tab = 0; 
+                        current-tab-height = doctor-tab.height;
+                        view-changed(info.id, GameInfoViewType.DoctorInfo);
+                    }
+                }
+    
+                GameCardTabSwitch {
+                    active-tab: 1;
+                    current-active-tab: current-active-tab;
+                    icon: @image-url("../images/game_card_tab_options.svg");
+                    clicked => { 
+                        current-active-tab = 1; 
+                        current-tab-height = settings-tab.height;
+                        view-changed(info.id, GameInfoViewType.Settings);
+                    }
+                }
+    
+                GameCardTabSwitch {
+                    active-tab: 2;
+                    current-active-tab: current-active-tab;
+                    icon: @image-url("../images/game_card_tab_log.svg");
+                    clicked => { 
+                        current-active-tab = 2; 
+                        current-tab-height = log-tab.height;                    
+                        view-changed(info.id, GameInfoViewType.Logs);
+                    }
                 }
             }
 
-            GameCardTabSwitch {
-                active-tab: 1;
-                current-active-tab: current-active-tab;
-                icon: @image-url("../images/game_card_tab_options.svg");
-                clicked => { 
-                    current-active-tab = 1; 
-                    current-tab-height = settings-tab.height;
-                    view-changed(info.id, GameInfoViewType.Settings);
-                }
-            }
+            VerticalLayout {
+                alignment: end;
 
-            GameCardTabSwitch {
-                active-tab: 2;
-                current-active-tab: current-active-tab;
-                icon: @image-url("../images/game_card_tab_log.svg");
-                clicked => { 
-                    current-active-tab = 2; 
-                    current-tab-height = log-tab.height;                    
-                    view-changed(info.id, GameInfoViewType.Logs);
+                GameStatusBadge {
+                    info: info;
+                    omit-text: true;
+                    opacity: current-active-tab != 0
+                        ? 100%
+                        : 0%;
+                
+                    animate opacity {
+                        easing: ease;
+                        duration: 0.125s;
+                    }
                 }
             }
         }

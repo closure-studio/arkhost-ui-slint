@@ -3,11 +3,9 @@ import { GameOptions, GameInfo, GameOptionSaveState } from "../game-info.slint";
 
 export component GameCardOptions inherits ScrollView {
     in property <GameInfo> info;
-    in-out property <GameOptions> options;
-    private property <int> ap-reserve-saved: options.ap-reserve;
-    private property <int> recruit-reserve-saved: options.recruit-reserve;
+    private property <GameOptions> options: info.options;
     private property <bool> saving;
-    callback save-options(string);
+    callback save-options(string, GameOptions);
     
     VerticalBox {
         alignment: start;
@@ -22,30 +20,30 @@ export component GameCardOptions inherits ScrollView {
         enable-building-arrange := Switch {
             enabled: !saving;
             text: @tr("启用基建换班");
-            checked: options.enable-building-arrange;
+            checked: info.options.enable-building-arrange;
         }
 
         enable-auto-battle := Switch {
             enabled: !saving;
             text: @tr("启用自动战斗");
-            checked: options.enable-auto-battle;
+            checked: info.options.enable-auto-battle;
         }
 
         recruit-ignore-robot := Switch {
             enabled: !saving;
             text: @tr("公招忽略小车");
-            checked: options.recruit-ignore-robot;
+            checked: info.options.recruit-ignore-robot;
         }
 
         Text {
-            text: @tr("保留理智") + " (" + @tr("当前: ") + options.ap-reserve + ")";
+            text: @tr("保留理智") + " (" + @tr("当前: ") + info.options.ap-reserve + ")";
         }
 
         ap-reserve := SpinBox {
             enabled: !saving;
             maximum: 135;
-            value: ap-reserve-saved;
-            edited => { ap-reserve-saved = self.value }
+            value: info.options.ap-reserve;
+            edited => { options.ap-reserve = self.value }
         }
 
         Text {
@@ -54,8 +52,8 @@ export component GameCardOptions inherits ScrollView {
 
         recruit-reserve := SpinBox {
             enabled: !saving;
-            value: recruit-reserve-saved;
-            edited => { recruit-reserve-saved = self.value }
+            value: info.options.recruit-reserve;
+            edited => { options.recruit-reserve = self.value }
         }
 
         HorizontalLayout {
@@ -68,10 +66,7 @@ export component GameCardOptions inherits ScrollView {
                     options.enable-building-arrange = enable-building-arrange.checked;
                     options.enable-auto-battle = enable-auto-battle.checked;
                     options.recruit-ignore-robot = recruit-ignore-robot.checked;
-
-                    options.ap-reserve = ap-reserve-saved;
-                    options.recruit-reserve = recruit-reserve-saved;
-                    save-options(info.id);
+                    save-options(info.id, options);
                 }
             }
             Button {
@@ -81,11 +76,8 @@ export component GameCardOptions inherits ScrollView {
                     enable-building-arrange.checked = options.enable-building-arrange;
                     enable-auto-battle.checked = options.enable-auto-battle;
                     recruit-ignore-robot.checked = options.recruit-ignore-robot;
-
-                    ap-reserve-saved = options.ap-reserve;
-                    recruit-reserve-saved = options.recruit-reserve;
-                    ap-reserve.value = ap-reserve-saved;
-                    recruit-reserve.value = recruit-reserve-saved;
+                    ap-reserve.value = info.options.ap-reserve;
+                    recruit-reserve.value = info.options.recruit-reserve;
                 }
             }
             Spinner {

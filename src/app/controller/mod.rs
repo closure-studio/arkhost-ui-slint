@@ -170,13 +170,13 @@ impl Controller {
             let app_weak = app.as_weak();
             let tx_api_controller = tx_api_controller.clone();
             
-            app.on_save_options(move |id| {
+            app.on_save_options(move |id, options| {
                 let app = app_weak.clone().unwrap();
                 let game_info_list = app.get_game_info_list();
                 match Controller::find_game_by_id(&game_info_list, &id) {
                     Some((i, mut game_info)) => {
                         game_info.save_state = GameOptionSaveState::Saving;
-                        let config_fields = GameOptionsRepresent::from_ui(&game_info.options).to_game_options();
+                        let config_fields = GameOptionsRepresent::from_ui(&options).to_game_options();
                         game_info_list.set_row_data(i, game_info);
 
                         tokio::task::spawn(Controller::update_game_settings(
@@ -206,7 +206,7 @@ impl Controller {
                             GameInfoViewType::Details => todo!(),
                             GameInfoViewType::Settings => {}
                             GameInfoViewType::Logs => {
-                                if game_info.log_loaded == GameLogLoadState::NotLoaded {
+                                if game_info.log_loaded != GameLogLoadState::Loading {
                                     game_info.log_loaded = GameLogLoadState::Loading;
                                     tokio::task::spawn(Controller::retrieve_logs(
                                         app_weak.clone(),
@@ -301,6 +301,7 @@ impl Controller {
             let app_weak = app_weak.clone();
             slint::invoke_from_event_loop(move || {
                 let app = app_weak.unwrap();
+                app.set_login_state(LoginState::LoggingIn);
                 app.set_login_status_text("自动登陆中……".into());
             })
             .unwrap();
@@ -694,9 +695,6 @@ impl Controller {
         Ok(())
     }
 
-    ///
-    /// * T: 返回类型
-    ///
     async fn send_request<T>(
         command: ApiCommand,
         tx: mpsc::Sender<ApiCommand>,

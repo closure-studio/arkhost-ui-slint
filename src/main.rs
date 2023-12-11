@@ -1,7 +1,10 @@
+// TODO: 添加用户界面报错后隐藏命令行输出
+// #![windows_subsystem = "windows"]
+
 mod app;
 
-use app::auth_controller::AuthController;
 use app::auth_controller::ipc::IpcAuthController;
+use app::auth_controller::AuthController;
 use app::ui::*;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
 use app::{api_controller::Controller as ApiController, controller::Controller};
@@ -9,7 +12,7 @@ use arkhost_api::clients::common::UserState;
 use std::sync::{Arc, RwLock};
 use tokio::{self, sync::mpsc};
 
-async fn run_app_window() -> Result<(), slint::PlatformError> {
+async fn run_app() -> Result<(), slint::PlatformError> {
     let mut user_state =
         UserStateFileStorage::new(UserStateFileStoreSetting::HomeDirWithCurrentDirFallback);
     user_state.load_from_file();
@@ -33,10 +36,18 @@ async fn run_app_window() -> Result<(), slint::PlatformError> {
     if user_state_loaded {
         tokio::task::spawn(Controller::auth(ui.as_weak(), tx_api_command.clone()));
     }
-    ui.window().set_size(slint::WindowSize::Logical(slint::LogicalSize { width: 1280., height: 720. } ));
+    ui.window()
+        .set_size(slint::WindowSize::Logical(slint::LogicalSize {
+            width: 1280.,
+            height: 720.,
+        }));
     ui.run()?;
-    let _ = tx_api_command.send(app::api_controller::Command::Stop {  }).await;
-    let _ = tx_auth_command.send(app::auth_controller::Command::Stop {  }).await;
+    let _ = tx_api_command
+        .send(app::api_controller::Command::Stop {})
+        .await;
+    let _ = tx_auth_command
+        .send(app::auth_controller::Command::Stop {})
+        .await;
     Ok(())
 }
 
@@ -47,6 +58,6 @@ async fn main() -> anyhow::Result<()> {
         result?;
         return Ok(());
     }
-    run_app_window().await?;
+    run_app().await?;
     Ok(())
 }

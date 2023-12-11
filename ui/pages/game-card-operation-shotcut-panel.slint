@@ -26,6 +26,7 @@ export component GameCardOperationShortcutPanel inherits HorizontalLayout {
         text: @tr("启动");
         clicked => { start-game(info.id); }
     }
+
     stop := GameOperationShortcutButton {
         enabled: can-stop;
         icon: StyleMetrics.dark-color-scheme 
@@ -34,6 +35,7 @@ export component GameCardOperationShortcutPanel inherits HorizontalLayout {
         text: @tr("停止");
         clicked => { stop-game(info.id); }
     }
+
     // restart := GameOperationShortcutButton {
     //     enabled: can-restart;
     //     icon: StyleMetrics.dark-color-scheme 
@@ -42,6 +44,7 @@ export component GameCardOperationShortcutPanel inherits HorizontalLayout {
     //     text: @tr("重启");
     //     clicked => { restart-game(info.id); }
     // }
+
     request-spinner := Spinner {
         width: self.visible ? root.height : 0px;
         indeterminate: true;
