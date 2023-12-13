@@ -35,7 +35,6 @@ impl GameInfoRepresent {
     pub fn create_game_info(&self) -> GameInfo {
         let mut game_info = GameInfo::default();
         self.mutate(&mut game_info, true);
-        game_info.log_loaded = GameLogLoadState::NotLoaded;
         game_info.request_state = GameOperationRequestState::Idle;
         game_info.save_state = GameOptionSaveState::Idle;
         game_info
@@ -44,14 +43,11 @@ impl GameInfoRepresent {
     pub fn mutate(&self, game_info: &mut GameInfo, refresh_logs: bool) {
         game_info.ap = self.game_info.info.status.ap.to_string().into();
         // TODO：从静态数据里面拿关卡名
-        game_info.battle_map = self
-            .game_info
-            .info
-            .game_config
-            .map_id
-            .as_ref()
-            .map_or("无".to_string(), |x| x.clone())
-            .into();
+        game_info.battle_map = match self.game_info.info.game_config.map_id {
+            Some(ref map) if map != "" => map,
+            _ => "无",
+        }
+        .into();
         game_info.doctor_level = match self.game_info.info.status.level {
             0 => "-".to_string(),
             val => val.to_string(),
@@ -63,7 +59,7 @@ impl GameInfoRepresent {
         }
         .into();
         // 未实现玩家编号#1234，使用账号代替
-        // 需要码掉手机号“G199····8888”，mask为中文标点"·"
+        // 需要码掉手机号“G199······88”，mask为中文标点"·"
         // 邮箱能码但是不完全能码
         game_info.doctor_serial = utils::mask_account(&self.game_info.info.status.account).into();
         game_info.game_state = match self.game_info.info.status.code {
@@ -76,6 +72,10 @@ impl GameInfoRepresent {
             api_arkhost::GameStatus::Running => GameState::Running,
             api_arkhost::GameStatus::Error => GameState::Faulted,
         };
+        if game_info.game_state == GameState::Faulted {
+            game_info.status_text = self.game_info.info.status.text.clone().into();
+        }
+
         game_info.id = self.game_info.info.status.account.clone().into();
         if refresh_logs {
             let log_represent =
@@ -155,7 +155,7 @@ impl GameOptionsRepresent {
                 recruit_ignore_robot: Some(options.recruit_ignore_robot),
                 recruit_reserve: Some(options.recruit_reserve),
                 is_stopped: None,
-                map_id: None
+                map_id: None,
             },
         }
     }
@@ -186,7 +186,7 @@ mod utils {
     pub fn mask_account(account: &str) -> String {
         const MASK: char = '·';
         const PREFIX_LEN: usize = 1; // [GB]前缀
-        const MASK_LEN: usize = 4;
+        const MASK_LEN: usize = 6;
         let account_len = account.len();
         if account_len < PREFIX_LEN + MASK_LEN + 2 {
             // 最少剩前缀+前后两位

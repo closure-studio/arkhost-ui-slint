@@ -55,7 +55,7 @@ export component GameStatusBadge inherits VerticalLayout {
         }
         faulted when info.game-state == GameState.Faulted: {
             status-color: @linear-gradient(15deg, #dd4f24 0%, #db4321 100%);
-            status-text: @tr("游戏错误") + info.status-text;
+            status-text: info.status-text;
             status-icon: @image-url("../images/game_status_faulted.svg");
         }
         stopped when info.game-state == GameState.Stopped: {
