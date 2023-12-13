@@ -59,7 +59,7 @@ impl GameInfoRepresent {
         .into();
         game_info.doctor_name = match self.game_info.info.status.nick_name.as_str() {
             "" => "未登录".to_string(),
-            nickname => format!("Dr.{}", nickname),
+            nickname => format!("Dr. {}", nickname),
         }
         .into();
         // 未实现玩家编号#1234，使用账号代替
