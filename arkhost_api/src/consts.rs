@@ -1,7 +1,8 @@
 pub static CLIENT_IDENTIFIER: &str = "arkhost-ui-slint";
+pub static CLIENT_USER_AGENT: &str = "ArkHostApp/1.0";
 
 pub mod passport {
-    pub static API_BASE_URL: &str = "https://passport.arknights.host";
+    pub static API_BASE_URL: &str = "https://passport.closure.setonink.com";
     pub mod api {
         pub mod v1 {
             pub static LOGIN: &str = "/api/v1/login";

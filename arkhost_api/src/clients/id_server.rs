@@ -25,6 +25,10 @@ impl AuthClient {
             "X-Platform",
             reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_IDENTIFIER),
         );
+        headers.insert(
+            "User-Agent",
+            reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_USER_AGENT),
+        );
 
         Self {
             base_url: Url::parse(base_url).unwrap(),
