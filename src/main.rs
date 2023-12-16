@@ -36,19 +36,23 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     if user_state_loaded {
         tokio::task::spawn(Controller::auth(ui.as_weak(), tx_api_command.clone()));
     }
+    ui.show().unwrap();
     ui.window()
         .set_size(slint::WindowSize::Logical(slint::LogicalSize {
             width: 1280.,
             height: 720.,
         }));
-    ui.run()?;
+
+    let result = ui.run();
+
     let _ = tx_api_command
         .send(app::api_controller::Command::Stop {})
         .await;
     let _ = tx_auth_command
         .send(app::auth_controller::Command::Stop {})
         .await;
-    Ok(())
+
+    result
 }
 
 #[tokio::main()]
@@ -58,6 +62,9 @@ async fn main() -> anyhow::Result<()> {
         result?;
         return Ok(());
     }
-    run_app().await?;
+
+    let app_window_result = run_app().await;
+
+    app_window_result?;
     Ok(())
 }
