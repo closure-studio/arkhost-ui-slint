@@ -3,10 +3,12 @@ import { GameInfo } from "game-info.slint";
 import { LoginWindow, LoginState } from "login-window.slint";
 import { GameInfoPage } from "pages/game-info-page.slint";
 import { AboutPage } from "pages/about-page.slint";
+import { Callbacks } from "callbacks.slint";
+import { ClosureStudioLogoSingleRow } from "components/closure-studio-logo.slint";
 
 export component AppWindow inherits Window {
     title: @tr("Closure Studio");
-    icon: @image-url("images/closure_logo_ferris.png");
+    icon: @image-url("images/closure_drone.png");
 
     in property <[GameInfo]> game-info-list;
     in-out property <LoginState> login-state;
@@ -16,34 +18,37 @@ export component AppWindow inherits Window {
     callback register-requested <=> login-window.register-requested;
     callback open-ext-link(string);
 
-    callback start-game <=> game-info-page.start-game;
-    callback stop-game <=> game-info-page.stop-game;
-    callback restart-game <=> game-info-page.restart-game;
-    callback save-options <=> game-info-page.save-options;
-    callback load-logs <=> game-info-page.load-logs;
-    callback view-changed <=> game-info-page.view-changed;
+    callback start-game <=> Callbacks.start-game;
+    callback stop-game <=> Callbacks.stop-game;
+    callback restart-game <=> Callbacks.restart-game;
+    callback save-options <=> Callbacks.save-options;
+    callback load-logs <=> Callbacks.load-logs;
+    callback view-changed <=> Callbacks.view-changed;
 
     preferred-height: 1080px;
     preferred-width: 1920px;
 
-    TabWidget {
+    VerticalLayout {
         visible: login-state == LoginState.Logged;
-        Tab {
-            title: @tr("账号管理");
 
-            VerticalLayout {
-                game-info-page := GameInfoPage {
-                    game-info-list: game-info-list;
+        TabWidget {
+            Tab {
+                title: @tr("账号管理");
+    
+                VerticalLayout {
+                    game-info-page := GameInfoPage {
+                        game-info-list: game-info-list;
+                    }
                 }
             }
-        }
-
-        Tab {
-            title: @tr("关于");
-
-            VerticalLayout {
-                AboutPage {
-                    
+    
+            Tab {
+                title: @tr("关于");
+    
+                VerticalLayout {
+                    AboutPage {
+                        
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
+import { FontGlobals } from "../font-globals.slint";
 import { GameStatusBadge } from "game-status-badge.slint";
 
 export component GameCardDoctorInfo inherits Rectangle {
@@ -17,6 +18,7 @@ export component GameCardDoctorInfo inherits Rectangle {
                 Rectangle {
                     doctor-name := Text {
                         text: info.doctor-name;
+                        font-family: FontGlobals.alphanumeric-text-sans;
                         font-size: 36px;
                     }
                     border-radius: self.width * 0.05;
@@ -27,6 +29,7 @@ export component GameCardDoctorInfo inherits Rectangle {
     
                 doctor-serial := Text {
                     text: info.doctor-serial;
+                    font-family: FontGlobals.alphanumeric-text-sans;
                     font-size: 18px;
                     font-italic: true;
                     color: StyleMetrics.default-text-color.transparentize(60%);

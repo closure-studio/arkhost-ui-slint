@@ -1,4 +1,6 @@
 import { VerticalBox, HorizontalBox , LineEdit, Button, StyleMetrics , Spinner} from "std-widgets.slint";
+import { ClosureStudioLogoStacked } from "./components/closure-studio-logo.slint";
+import { FontGlobals } from "./font-globals.slint";
 
 export enum LoginState {
     Unlogged,
@@ -31,34 +33,19 @@ export component LoginWindow {
             }
         }
 
-        HorizontalBox {
-            alignment: center;
-
-            Rectangle {
-                clip: true;
-                border-radius: 15px;
-
-                Image {
-                    source: @image-url("images/closure_logo.png");
-
-                    width: 120px;
-                    height: 120px;
-                }
-
-                width: 100px;
-                height: 100px;
-            }
+        ClosureStudioLogoStacked {
+            single-row-size: 60px;
         }
 
         HorizontalBox {
             alignment: center;
 
             Text {
-                font-size: 24px;
+                font-size: 18px;
                 vertical-alignment: center;
                 horizontal-alignment: left;
 
-                text: @tr("登陆可露希尔通行证");
+                text: @tr("登录可露希尔通行证");
             }
         }
 
@@ -94,7 +81,7 @@ export component LoginWindow {
 
             Button {
                 enabled: !logging;
-                text: @tr("登陆");
+                text: @tr("登录");
                 width: parent.width - 40px;
                 clicked => {
                     login-requested(account.text, password.text)
@@ -126,8 +113,18 @@ export component LoginWindow {
         Rectangle {
             height: 24px;
 
-            Text {
-                text: @tr("可露希尔云托管 https://arknights.host");
+            VerticalBox {
+
+                Text {
+                    text: @tr("可露希尔云托管");
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("https://arknights.host");
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    horizontal-alignment: center;
+                }
             }
         }
     }

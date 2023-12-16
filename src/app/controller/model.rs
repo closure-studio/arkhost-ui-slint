@@ -45,7 +45,7 @@ impl GameInfoRepresent {
         // TODO：从静态数据里面拿关卡名
         game_info.battle_map = match self.game_info.info.game_config.map_id {
             Some(ref map) if map != "" => map,
-            _ => "无",
+            _ => "【作战未开始】",
         }
         .into();
         game_info.doctor_level = match self.game_info.info.status.level {
@@ -59,9 +59,9 @@ impl GameInfoRepresent {
         }
         .into();
         // 未实现玩家编号#1234，使用账号代替
-        // 需要码掉手机号“G199······88”，mask为中文标点"·"
+        // 需要码掉手机号“G199------88”，mask为"-"
         // 邮箱能码但是不完全能码
-        game_info.doctor_serial = utils::mask_account(&self.game_info.info.status.account).into();
+        game_info.doctor_serial = utils::redact_account(&self.game_info.info.status.account).into();
         game_info.game_state = match self.game_info.info.status.code {
             api_arkhost::GameStatus::Logging if self.game_info.info.captcha_info.created != 0 => {
                 GameState::Captcha
@@ -183,8 +183,8 @@ impl GameOptionsRepresent {
 }
 
 mod utils {
-    pub fn mask_account(account: &str) -> String {
-        const MASK: char = '·';
+    pub fn redact_account(account: &str) -> String {
+        const MASK: char = '-';
         const PREFIX_LEN: usize = 1; // [GB]前缀
         const MASK_LEN: usize = 6;
         let account_len = account.len();

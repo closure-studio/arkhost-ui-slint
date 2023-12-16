@@ -1,0 +1,10 @@
+import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
+
+export global Callbacks {
+    callback start-game(string);
+    callback stop-game(string);
+    callback restart-game(string);
+    callback save-options(string, GameOptions);
+    callback load-logs(string, GameLogLoadRequestType);
+    callback view-changed(string, GameInfoViewType);
+}

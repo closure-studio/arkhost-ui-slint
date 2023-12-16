@@ -1,0 +1,8 @@
+import "./fonts/Raleway-Bold.ttf";
+import "./fonts/RethinkSans-VariableFont_wght.ttf";
+
+export global FontGlobals {
+    in-out property <string> closure-studio-logo: "Raleway";
+    in-out property <string> alphanumeric-text-sans: "Rethink Sans";
+    // CJK字体会显著增大打包大小和内存占用，所以使用系统默认
+}

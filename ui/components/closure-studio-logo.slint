@@ -1,0 +1,79 @@
+import { HorizontalBox } from "std-widgets.slint";
+import { FontGlobals } from "../font-globals.slint";
+
+export component ClosureStudioLogoSingleRow inherits HorizontalBox {
+    in property <length> single-row-size: 48px;
+    in property <image> logo: @image-url("../images/closure_drone.png");
+    in property <bool> omit-text: false;
+    alignment: space-around;
+    
+    VerticalLayout {
+        alignment: start;
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: single-row-size * 10%;
+    
+            VerticalLayout {
+                alignment: center;
+    
+                Image {
+                    source: logo;
+    
+                    width: single-row-size;
+                    height: single-row-size;
+                }
+            }
+    
+            if !omit-text: Text {
+                font-family: FontGlobals.closure-studio-logo;
+                font-size: single-row-size * 85%;
+                height: single-row-size;
+                text: "CLOSURE STUDIO";
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+export component ClosureStudioLogoStacked inherits HorizontalBox {
+    in property <length> single-row-size: 64px;
+    in property <image> logo: @image-url("../images/closure_drone.png");
+    alignment: space-around;
+
+    VerticalLayout {
+        alignment: start;
+
+        Text {
+            font-family: FontGlobals.closure-studio-logo;
+            font-size: single-row-size * 85%;
+            height: single-row-size;
+            text: "CLOSURE";
+            vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: single-row-size * 3%;
+
+            Text {
+                font-family: FontGlobals.closure-studio-logo;
+                font-size: single-row-size * 85%;
+                height: single-row-size;
+                text: "STUDIO";
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: start;
+
+                Image {
+                    source: logo;
+    
+                    width: single-row-size * 85%;
+                    height: single-row-size * 85%;
+                }
+            }
+        }
+    }
+}

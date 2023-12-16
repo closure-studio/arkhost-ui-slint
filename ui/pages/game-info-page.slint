@@ -1,15 +1,9 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
+import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
 import { ScrollView , VerticalBox} from "std-widgets.slint";
 
 export component GameInfoPage {
-    callback start-game(string);
-    callback stop-game(string);
-    callback restart-game(string);
-    callback save-options(string, GameOptions);
-    callback load-logs(string, GameLogLoadRequestType);
-    callback view-changed(string, GameInfoViewType);
-
     in property <[GameInfo]> game-info-list;
 
     ScrollView {
@@ -19,12 +13,12 @@ export component GameInfoPage {
             for game-info in game-info-list: GameCard {
                 info: game-info;
 
-                start-game(id) => { start-game(id); }
-                stop-game(id) => { stop-game(id); }
-                restart-game(id) => { restart-game(id); }
-                save-options(id, options) => { save-options(id, options); }
-                load-logs(id, type) => { load-logs(id, type); }
-                view-changed(id, type) => { view-changed(id, type); }
+                start-game(id) => { Callbacks.start-game(id); }
+                stop-game(id) => { Callbacks.stop-game(id); }
+                restart-game(id) => { Callbacks.restart-game(id); }
+                save-options(id, options) => { Callbacks.save-options(id, options); }
+                load-logs(id, type) => { Callbacks.load-logs(id, type); }
+                view-changed(id, type) => { Callbacks.view-changed(id, type); }
             }
         }
     }

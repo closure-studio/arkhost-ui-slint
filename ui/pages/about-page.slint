@@ -1,4 +1,7 @@
 import { ScrollView , AboutSlint, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
+import { ClosureStudioLogoStacked } from "../components/closure-studio-logo.slint";
+import { FontGlobals } from "../font-globals.slint";
+
 export component AboutPage {
     ScrollView {
         VerticalBox {
@@ -6,22 +9,10 @@ export component AboutPage {
             spacing: 24px;
 
             HorizontalBox {
-                alignment: center;
                 spacing: 24px;
-    
-                Rectangle {
-                    clip: true;
-                    border-radius: 15px;
 
-                    Image {
-                        source: @image-url("../images/closure_logo_ferris.png");
-
-                        width: 100px;
-                        height: 100px;
-                    }
-
-                    width: 100px;
-                    height: 100px;
+                ClosureStudioLogoStacked {
+                    single-row-size: 60px;
                 }
             }
 
@@ -29,27 +20,41 @@ export component AboutPage {
                 alignment: center;
                 spacing: 24px;
 
+                VerticalLayout {
+                    alignment: space-around;
+
+                    Rectangle {
+                        width: 72px;
+                        height: 72px;
+    
+                        clip: true;
+                        border-radius: 15px;
+                        Image {
+                            source: @image-url("../images/closure_logo_ferris.png");
+    
+                            width: 72px;
+                            height: 72px;
+                        }
+                    }
+                }
+
                 Text {
-                    font-size: 18px;
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 16px;
                     vertical-alignment: center;
                     horizontal-alignment: left;
     
-                    text: "Closure Studio <github.com/closure-studio> 2023";
+                    text: "(c) 2023 Closure Studio <github.com/closure-studio>";
                 }
-            }
 
-            Rectangle {
-                height: 20px;
+                AboutSlint {
+                    width: 128px;
+                }
             }
 
             HorizontalBox {
                 alignment: center;
                 spacing: 24px;
-
-                AboutSlint {
-                    width: 128px;
-                    height: 128px;
-                }
             }
         }
     }
