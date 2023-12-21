@@ -3,7 +3,10 @@
 
 mod app;
 
+use app::app_state::AppState;
+#[cfg(feature = "desktop-app")]
 use app::auth_controller::ipc::IpcAuthController;
+
 use app::auth_controller::AuthController;
 use app::ui::*;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
@@ -13,8 +16,10 @@ use std::sync::{Arc, RwLock};
 use tokio::{self, sync::mpsc};
 
 async fn run_app() -> Result<(), slint::PlatformError> {
+    #[cfg(feature = "desktop-app")]
     let mut user_state =
         UserStateFileStorage::new(UserStateFileStoreSetting::HomeDirWithCurrentDirFallback);
+
     user_state.load_from_file();
     let user_state_loaded = user_state.get_login_state().is_some();
 
@@ -24,24 +29,22 @@ async fn run_app() -> Result<(), slint::PlatformError> {
         api_controller.run(rx_api_command).await;
     });
 
+    #[cfg(feature = "desktop-app")]
     let mut auth_controller = IpcAuthController::new();
+
     let (tx_auth_command, rx_auth_command) = mpsc::channel(16);
     tokio::task::spawn(async move {
         auth_controller.run(rx_auth_command).await;
     });
 
     let ui = AppWindow::new()?;
-    let mut controller = Controller::new();
-    controller.attach(&ui, tx_api_command.clone(), tx_auth_command.clone());
+    let controller = Arc::new(Controller::new(AppState::new(ui.as_weak())));
+    controller
+        .clone()
+        .attach(&ui, tx_api_command.clone(), tx_auth_command.clone());
     if user_state_loaded {
-        tokio::task::spawn(Controller::auth(ui.as_weak(), tx_api_command.clone()));
+        tokio::task::spawn(controller.clone().auth(tx_api_command.clone()));
     }
-    ui.show().unwrap();
-    ui.window()
-        .set_size(slint::WindowSize::Logical(slint::LogicalSize {
-            width: 1280.,
-            height: 720.,
-        }));
 
     let result = ui.run();
 

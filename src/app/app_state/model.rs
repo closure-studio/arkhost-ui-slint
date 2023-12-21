@@ -5,7 +5,7 @@ use crate::app::ui::*;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields};
 use slint::{ModelRc, SharedString, VecModel};
 
-pub struct GameInfoRepresent {
+pub struct GameInfoModel {
     pub game_info: ApiGameInfo,
 }
 
@@ -25,7 +25,7 @@ GameInfo {
     save_state: (),
 }
 */
-impl GameInfoRepresent {
+impl GameInfoModel {
     pub fn from(game_info: &ApiGameInfo) -> Self {
         Self {
             game_info: game_info.clone(),
@@ -78,21 +78,21 @@ impl GameInfoRepresent {
 
         game_info.id = self.game_info.info.status.account.clone().into();
         if refresh_logs {
-            let log_represent =
-                GameLogRepresent::from(&self.game_info.logs, self.game_info.log_cursor_back);
-            log_represent.mutate(game_info);
+            let log_model =
+                GameLogModel::from(&self.game_info.logs, self.game_info.log_cursor_back);
+            log_model.mutate(game_info);
         }
-        let options_represent = GameOptionsRepresent::from(&self.game_info.info.game_config);
-        options_represent.mutate(&mut game_info.options);
+        let options_model = GameOptionsModel::from(&self.game_info.info.game_config);
+        options_model.mutate(&mut game_info.options);
     }
 }
 
-pub struct GameLogRepresent {
+pub struct GameLogModel {
     logs: Vec<api_arkhost::LogEntry>,
     log_cursor: u64,
 }
 
-impl GameLogRepresent {
+impl GameLogModel {
     pub fn from(logs: &Vec<api_arkhost::LogEntry>, log_cursor: u64) -> Self {
         Self {
             logs: logs.clone(),
@@ -123,7 +123,7 @@ impl GameLogRepresent {
     }
 }
 
-pub struct GameOptionsRepresent {
+pub struct GameOptionsModel {
     options: api_arkhost::GameConfigFields,
 }
 
@@ -138,7 +138,7 @@ GameOptions {
 }
 */
 
-impl GameOptionsRepresent {
+impl GameOptionsModel {
     pub fn from(options: &api_arkhost::GameConfigFields) -> Self {
         Self {
             options: options.clone(),

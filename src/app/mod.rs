@@ -4,6 +4,8 @@ pub mod api_controller;
 pub mod auth_controller;
 /// Controller，用于在Rust运行时和UI组件之间传输数据和执行操作
 pub mod controller;
+/// AppState，UI状态
+pub mod app_state;
 /// 工具类
 pub mod utils;
 

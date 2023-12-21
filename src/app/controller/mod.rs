@@ -1,7 +1,7 @@
-mod model;
 extern crate alloc;
 
-use self::model::{GameInfoRepresent, GameOptionsRepresent};
+use super::app_state::model::{GameInfoModel, GameOptionsModel};
+use super::app_state::AppState;
 
 use super::api_controller::{Command as ApiCommand, RetrieveLogSpec};
 use super::auth_controller::Command as AuthCommand;
@@ -12,9 +12,9 @@ use super::webview::auth::AuthResult;
 use anyhow::anyhow;
 use arkhost_api::clients::common::ApiResult;
 use arkhost_api::models::api_arkhost::GameConfigFields;
-use slint::{Model, ModelRc, VecModel, Weak};
+use slint::Model;
 use std::fmt::Debug;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -38,16 +38,18 @@ where
 }
 
 pub struct Controller {
-    timers: Vec<slint::Timer>,
+    app_state: Arc<Mutex<AppState>>,
 }
 
 impl Controller {
-    pub fn new() -> Self {
-        Self { timers: vec![] }
+    pub fn new(app_state: AppState) -> Self {
+        Self {
+            app_state: Arc::new(Mutex::new(app_state)),
+        }
     }
 
     pub fn attach(
-        &mut self,
+        self: Arc<Self>,
         app: &AppWindow,
         tx_api_controller: mpsc::Sender<ApiCommand>,
         tx_auth_controller: mpsc::Sender<AuthCommand>,
@@ -61,9 +63,9 @@ impl Controller {
         {
             let app_weak = app.as_weak();
             let send = tx_api_controller.clone();
+            let this = self.clone();
 
             app.on_login_requested(move |account, password| {
-                let app_weak = app_weak.clone();
                 let send = send.clone();
                 let app = app_weak.clone().unwrap();
 
@@ -82,35 +84,25 @@ impl Controller {
                 app.set_login_status_text("正在登陆……".into());
                 app.set_login_state(LoginState::LoggingIn);
 
-                tokio::task::spawn(async move {
-                    Controller::login(
-                        app_weak.clone(),
-                        account.into(),
-                        password.into(),
-                        send.clone(),
-                    )
-                    .await;
-                });
+                tokio::task::spawn(this.to_owned().login(
+                    account.into(),
+                    password.into(),
+                    send.clone(),
+                ));
             });
         }
 
         {
-            let app_weak = app.as_weak();
             let send = tx_api_controller.clone();
+            let this = self.clone();
 
             app.on_load_logs(move |id, load_spec| {
-                let app = app_weak.clone().unwrap();
-                let game_info_list = app.get_game_info_list();
-                match Controller::find_game_by_id(&game_info_list, &id) {
-                    Some((i, mut game_info)) => {
-                        game_info.log_loaded = GameLogLoadState::Loading;
-                        game_info_list.set_row_data(i, game_info);
-                    }
-                    None => eprintln!("Game with id {id} not found in game info list"),
-                }
+                this.app_state
+                    .lock()
+                    .unwrap()
+                    .set_log_load_state(id.clone().into(), GameLogLoadState::Loading);
 
-                tokio::task::spawn(Controller::retrieve_logs(
-                    app_weak.clone(),
+                tokio::task::spawn(this.to_owned().retrieve_logs(
                     id.into(),
                     load_spec,
                     send.clone(),
@@ -119,23 +111,16 @@ impl Controller {
         }
 
         {
-            let app_weak = app.as_weak();
             let tx_api_controller = tx_api_controller.clone();
             let tx_auth_controller = tx_auth_controller.clone();
+            let this = self.clone();
 
             app.on_start_game(move |id| {
-                let app = app_weak.clone().unwrap();
-                let game_info_list = app.get_game_info_list();
-                match Controller::find_game_by_id(&game_info_list, &id) {
-                    Some((i, mut game_info)) => {
-                        game_info.request_state = GameOperationRequestState::Requesting;
-                        game_info_list.set_row_data(i, game_info);
-                    }
-                    None => eprintln!("Game with id {id} not found in game info list"),
-                }
-
-                tokio::task::spawn(Controller::start_game(
-                    app_weak.clone(),
+                this.app_state.lock().unwrap().set_game_request_state(
+                    id.clone().into(),
+                    GameOperationRequestState::Requesting,
+                );
+                tokio::task::spawn(this.to_owned().start_game(
                     id.into(),
                     tx_api_controller.clone(),
                     tx_auth_controller.clone(),
@@ -144,62 +129,51 @@ impl Controller {
         }
 
         {
-            let app_weak = app.as_weak();
             let tx_api_controller = tx_api_controller.clone();
+            let this = self.clone();
 
             app.on_stop_game(move |id| {
-                let app = app_weak.clone().unwrap();
-                let game_info_list = app.get_game_info_list();
-                match Controller::find_game_by_id(&game_info_list, &id) {
-                    Some((i, mut game_info)) => {
-                        game_info.request_state = GameOperationRequestState::Requesting;
-                        game_info_list.set_row_data(i, game_info);
-                    }
-                    None => eprintln!("Game with id {id} not found in game info list"),
-                }
-
-                tokio::task::spawn(Controller::stop_game(
-                    app_weak.clone(),
-                    id.into(),
-                    tx_api_controller.clone(),
-                ));
+                this.app_state.lock().unwrap().set_game_request_state(
+                    id.clone().into(),
+                    GameOperationRequestState::Requesting,
+                );
+                tokio::task::spawn(
+                    this.to_owned()
+                        .stop_game(id.into(), tx_api_controller.clone()),
+                );
             });
         }
 
         {
-            let app_weak = app.as_weak();
             let tx_api_controller = tx_api_controller.clone();
-            
-            app.on_save_options(move |id, options| {
-                let app = app_weak.clone().unwrap();
-                let game_info_list = app.get_game_info_list();
-                match Controller::find_game_by_id(&game_info_list, &id) {
-                    Some((i, mut game_info)) => {
-                        game_info.save_state = GameOptionSaveState::Saving;
-                        let config_fields = GameOptionsRepresent::from_ui(&options).to_game_options();
-                        game_info_list.set_row_data(i, game_info);
+            let this = self.clone();
 
-                        tokio::task::spawn(Controller::update_game_settings(
-                            app_weak.clone(),
-                            id.into(),
-                            config_fields,
-                            tx_api_controller.clone(),
-                        ));
-                    }
-                    None => eprintln!("Game with id {id} not found in game info list"),
-                }
+            app.on_save_options(move |id, options| {
+                this.app_state
+                    .lock()
+                    .unwrap()
+                    .set_game_save_state(id.clone().into(), GameOptionSaveState::Saving);
+
+                let config_fields = GameOptionsModel::from_ui(&options).to_game_options();
+
+                tokio::task::spawn(this.to_owned().update_game_settings(
+                    id.into(),
+                    config_fields,
+                    tx_api_controller.clone(),
+                ));
             })
         }
 
         {
-            let app_weak = app.as_weak();
             let send = tx_api_controller.clone();
+            let this = self.clone();
 
             app.on_view_changed(move |id, view| {
-                let app = app_weak.clone().unwrap();
-                let game_info_list = app.get_game_info_list();
-                match Controller::find_game_by_id(&game_info_list, &id) {
-                    Some((i, mut game_info)) => {
+                let send = send.clone();
+                let this = this.to_owned();
+                this.clone().app_state.lock().unwrap().get_game_by_id(
+                    id.clone().into(),
+                    move |game_info_list, i, mut game_info| {
                         game_info.active_view = view;
                         match view {
                             GameInfoViewType::DoctorInfo => {}
@@ -208,8 +182,7 @@ impl Controller {
                             GameInfoViewType::Logs => {
                                 if game_info.log_loaded != GameLogLoadState::Loading {
                                     game_info.log_loaded = GameLogLoadState::Loading;
-                                    tokio::task::spawn(Controller::retrieve_logs(
-                                        app_weak.clone(),
+                                    tokio::task::spawn(this.retrieve_logs(
                                         id.into(),
                                         GameLogLoadRequestType::Later,
                                         send.clone(),
@@ -218,15 +191,15 @@ impl Controller {
                             }
                         }
                         game_info_list.set_row_data(i, game_info);
-                    }
-                    None => eprintln!("Game with id {id} not found in game info list"),
-                }
+                    },
+                );
             })
         }
 
         {
             let app_weak = app.as_weak();
             let send = tx_api_controller.clone();
+            let this = self.clone();
 
             let timer = slint::Timer::default();
             timer.start(
@@ -235,140 +208,120 @@ impl Controller {
                 move || {
                     let app_weak = app_weak.clone();
                     let send = send.clone();
+                    let this = this.clone();
                     slint::invoke_from_event_loop(move || {
                         let app = app_weak.unwrap();
                         if app.get_login_state() != LoginState::Logged {
                             return;
                         }
 
-                        tokio::task::spawn(Controller::refresh_games(
-                            app_weak,
-                            send,
-                            RefreshLogsCondition::OnLogsViewOpened,
-                        ));
+                        tokio::task::spawn(
+                            this.to_owned()
+                                .refresh_games(send, RefreshLogsCondition::OnLogsViewOpened),
+                        );
                     })
                     .unwrap();
                 },
             );
-            self.timers.push(timer);
+            self.app_state.lock().unwrap().refresh_game_timer = timer;
         }
     }
 
     pub async fn login(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         account: String,
         password: String,
         tx: mpsc::Sender<ApiCommand>,
     ) {
         let (resp, rx) = oneshot::channel();
+        match Controller::send_request(
+            ApiCommand::Login {
+                email: account.into(),
+                password: password.into(),
+                resp,
+            },
+            tx.clone(),
+            rx,
+        )
+        .await
         {
-            let app_weak = app_weak.clone();
-            match Controller::send_request(
-                ApiCommand::Login {
-                    email: account.into(),
-                    password: password.into(),
-                    resp,
-                },
-                tx.clone(),
-                rx,
-            )
-            .await
-            {
-                Ok(user) => {
-                    println!("[Controller] Logged in: {} {}", user.user_email, user.uuid);
-                    slint::invoke_from_event_loop(move || {
-                        let app = app_weak.unwrap();
-                        app.set_login_status_text("登陆成功".into());
-                        app.set_login_state(LoginState::Logged);
-                    })
-                    .unwrap();
-                }
-                Err(e) => {
-                    slint::invoke_from_event_loop(move || {
-                        let app = app_weak.unwrap();
-                        app.set_login_status_text(format!("{:?}", e).into());
-                        app.set_login_state(LoginState::Errored);
-                    })
-                    .unwrap();
-                }
+            Ok(user) => {
+                println!("[Controller] Logged in: {} {}", user.user_email, user.uuid);
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .set_login_state(LoginState::Logged, "登陆成功".into());
+            }
+            Err(e) => {
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .set_login_state(LoginState::Errored, format!("{:?}", e).into());
             }
         }
-        Controller::refresh_games(app_weak, tx, RefreshLogsCondition::OnLogsViewOpened).await;
+        self.refresh_games(tx, RefreshLogsCondition::Never).await;
     }
 
-    pub async fn auth(app_weak: Weak<AppWindow>, tx: mpsc::Sender<ApiCommand>) {
-        {
-            let app_weak = app_weak.clone();
-            slint::invoke_from_event_loop(move || {
-                let app = app_weak.unwrap();
-                app.set_login_state(LoginState::LoggingIn);
-                app.set_login_status_text("自动登陆中……".into());
-            })
-            .unwrap();
-        }
+    pub async fn auth(self: Arc<Self>, tx: mpsc::Sender<ApiCommand>) {
+        self.app_state
+            .lock()
+            .unwrap()
+            .set_login_state(LoginState::LoggingIn, "自动登录中……".into());
         let (resp, rx) = oneshot::channel();
-        {
-            let app_weak = app_weak.clone();
-            match Controller::send_request(ApiCommand::Auth { resp }, tx.clone(), rx).await {
-                Ok(user) => {
-                    println!(
-                        "[Controller] Auth success: {} {}",
-                        user.user_email, user.uuid
-                    );
-                    slint::invoke_from_event_loop(move || {
-                        let app = app_weak.unwrap();
-                        app.set_login_status_text("登陆成功".into());
-                        app.set_login_state(LoginState::Logged);
-                    })
-                    .unwrap();
-                }
-                Err(e) => {
-                    slint::invoke_from_event_loop(move || {
-                        let app = app_weak.unwrap();
-                        app.set_login_status_text(
-                            format!("登陆认证已失效，请重新登陆\n{:?}", e).into(),
-                        );
-                        app.set_login_state(LoginState::Errored);
-                    })
-                    .unwrap();
-                }
+        match Controller::send_request(ApiCommand::Auth { resp }, tx.clone(), rx).await {
+            Ok(user) => {
+                println!(
+                    "[Controller] Auth success: {} {}",
+                    user.user_email, user.uuid
+                );
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .set_login_state(LoginState::Logged, "登录成功".into());
+            }
+            Err(e) => {
+                self.app_state.lock().unwrap().set_login_state(
+                    LoginState::Errored,
+                    format!("登陆认证已失效，请重新登陆\n{:?}", e).into(),
+                );
             }
         }
-        Controller::refresh_games(app_weak, tx, RefreshLogsCondition::OnLogsViewOpened).await;
+        self.refresh_games(tx, RefreshLogsCondition::OnLogsViewOpened)
+            .await;
     }
 
     pub async fn refresh_games(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         tx: mpsc::Sender<ApiCommand>,
         refresh_log_cond: RefreshLogsCondition,
     ) {
         let (resp, rx) = oneshot::channel();
         match Controller::send_request(ApiCommand::RetrieveGames { resp }, tx.clone(), rx).await {
             Ok(games) => {
-                let mut game_list: Vec<(i32, String, GameInfoRepresent)> = Vec::new();
+                let mut game_list: Vec<(i32, String, GameInfoModel)> = Vec::new();
                 for game_ref in games.read().await.values() {
                     let game_info = game_ref.info.read().await;
                     game_list.push((
                         game_ref.order,
                         game_info.info.status.account.clone(),
-                        GameInfoRepresent::from(&game_info),
+                        GameInfoModel::from(&game_info),
                     ));
                 }
                 game_list.sort_by_key(|(order, _, _)| *order);
 
-                slint::invoke_from_event_loop(move || {
-                    let app = app_weak.clone().unwrap();
-                    Controller::refresh_game_views(app, &game_list, false);
-                    game_list.iter().for_each(|(_, id, _)| {
-                        Controller::refresh_logs_if_needed(
-                            app_weak.clone(),
-                            id.clone(),
-                            refresh_log_cond.clone(),
-                            tx.clone(),
-                        );
-                    })
-                })
-                .unwrap();
+                let game_ids: Vec<String> = game_list.iter().map(|(_, id, _)| id.clone()).collect();
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .update_game_views(game_list, false);
+                for id in game_ids {
+                    let this = self.clone();
+                    tokio::task::spawn(this.refresh_logs_if_needed(
+                        id.into(),
+                        refresh_log_cond.clone(),
+                        tx.clone(),
+                    ));
+                }
             }
             Err(e) => {
                 println!("[Controller] Error retrieving games {}", e);
@@ -377,7 +330,7 @@ impl Controller {
     }
 
     pub async fn retrieve_logs(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         id: String,
         load_spec: GameLogLoadRequestType,
         tx: mpsc::Sender<ApiCommand>,
@@ -400,18 +353,24 @@ impl Controller {
         {
             Ok(game_ref) => {
                 let game = &game_ref.info.read().await;
-                let game_represent = GameInfoRepresent::from(game);
-                Controller::refresh_game_view(app_weak, id, Some(game_represent), true);
+                let model = GameInfoModel::from(game);
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .update_game_view(id, Some(model), true);
             }
             Err(e) => {
                 eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
-                Controller::refresh_game_view(app_weak, id, None, true);
+                self.app_state
+                    .lock()
+                    .unwrap()
+                    .update_game_view(id, None, true);
             }
         }
     }
 
     pub async fn start_game(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         account: String,
         tx_api_controller: mpsc::Sender<ApiCommand>,
         tx_auth_controller: mpsc::Sender<AuthCommand>,
@@ -437,14 +396,15 @@ impl Controller {
         ];
 
         for (auth_command, rx) in auth_methods {
-            match Controller::try_start_game(
-                account.clone(),
-                auth_command,
-                tx_api_controller.clone(),
-                tx_auth_controller.clone(),
-                rx,
-            )
-            .await
+            match self
+                .try_start_game(
+                    account.clone(),
+                    auth_command,
+                    tx_api_controller.clone(),
+                    tx_auth_controller.clone(),
+                    rx,
+                )
+                .await
             {
                 Ok(_) => {
                     success = true;
@@ -453,17 +413,21 @@ impl Controller {
                 Err(e) => println!("[Controller] failed attempting to start game {account}: {e}"),
             }
         }
-        _ = tx_auth_controller.send(AuthCommand::HideWindow {  }).await;
+        _ = tx_auth_controller.send(AuthCommand::HideWindow {}).await;
 
         if !success {
             eprintln!("[Controller] all attempts to start game {account} failed");
         }
-        Controller::reset_game_request_state(app_weak.clone(), account.clone());
-        Controller::refresh_games(app_weak, tx_api_controller, RefreshLogsCondition::Never).await;
+        self.app_state
+            .lock()
+            .unwrap()
+            .set_game_request_state(account.clone(), GameOperationRequestState::Idle);
+        self.refresh_games(tx_api_controller, RefreshLogsCondition::Never)
+            .await;
     }
 
     pub async fn stop_game(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         account: String,
         tx_api_controller: mpsc::Sender<ApiCommand>,
     ) {
@@ -479,21 +443,21 @@ impl Controller {
         .await
         {
             Ok(_) => {
-                Controller::refresh_games(
-                    app_weak.clone(),
-                    tx_api_controller,
-                    RefreshLogsCondition::Never,
-                )
-                .await
+                self.clone()
+                    .refresh_games(tx_api_controller, RefreshLogsCondition::Never)
+                    .await
             }
             Err(e) => eprintln!("[Controller] Error stopping game {e}"),
         }
 
-        Controller::reset_game_request_state(app_weak.clone(), account.clone());
+        self.app_state
+            .lock()
+            .unwrap()
+            .set_game_request_state(account.clone(), GameOperationRequestState::Idle);
     }
 
     pub async fn update_game_settings(
-        app_weak: Weak<AppWindow>,
+        self: Arc<Self>,
         account: String,
         config_fields: GameConfigFields,
         tx_api_controller: mpsc::Sender<ApiCommand>,
@@ -511,29 +475,33 @@ impl Controller {
         .await
         {
             Ok(_) => {
-                Controller::refresh_games(
-                    app_weak.clone(),
-                    tx_api_controller,
-                    RefreshLogsCondition::Never,
-                )
-                .await
+                self.clone()
+                    .refresh_games(tx_api_controller, RefreshLogsCondition::Never)
+                    .await
             }
             Err(e) => eprintln!("[Controller] Error stopping game {e}"),
         }
 
-        Controller::reset_game_save_state(app_weak.clone(), account.clone());
+        self.app_state
+            .lock()
+            .unwrap()
+            .set_game_save_state(account.clone(), GameOptionSaveState::Idle);
     }
 
     async fn try_start_game(
+        &self,
         account: String,
         auth_command: AuthCommand,
         tx_api_controller: mpsc::Sender<ApiCommand>,
         tx_auth_controller: mpsc::Sender<AuthCommand>,
         rx_auth_controller: oneshot::Receiver<anyhow::Result<AuthResult>>,
     ) -> anyhow::Result<()> {
-        let auth_result =
-            Controller::send_auth_request(auth_command, tx_auth_controller.clone(), rx_auth_controller)
-                .await?;
+        let auth_result = Controller::send_auth_request(
+            auth_command,
+            tx_auth_controller.clone(),
+            rx_auth_controller,
+        )
+        .await?;
         let captcha_token = match auth_result {
             AuthResult::ArkHostCaptchaTokenReCaptcha { token, .. } => token,
             AuthResult::ArkHostCaptchaTokenGeeTest { token, .. } => token,
@@ -556,136 +524,32 @@ impl Controller {
         .map(|_| ())
     }
 
-    fn reset_game_request_state(app_weak: Weak<AppWindow>, id: String) {
-        slint::invoke_from_event_loop(move || {
-            let app = app_weak.clone().unwrap();
-            let game_info_list = app.get_game_info_list();
-            match Controller::find_game_by_id(&game_info_list, &id) {
-                Some((i, mut game_info)) => {
-                    game_info.request_state = GameOperationRequestState::Idle;
-                    game_info_list.set_row_data(i, game_info);
-                }
-                None => eprintln!("Game with id {id} not found in game info list"),
-            }
-        })
-        .unwrap();
-    }
-
-    fn reset_game_save_state(app_weak: Weak<AppWindow>, id: String) {
-        slint::invoke_from_event_loop(move || {
-            let app = app_weak.clone().unwrap();
-            let game_info_list = app.get_game_info_list();
-            match Controller::find_game_by_id(&game_info_list, &id) {
-                Some((i, mut game_info)) => {
-                    game_info.save_state = GameOptionSaveState::Idle;
-                    game_info_list.set_row_data(i, game_info);
-                }
-                None => eprintln!("Game with id {id} not found in game info list"),
-            }
-        })
-        .unwrap();
-    }
-
-    fn refresh_logs_if_needed(
-        app_weak: Weak<AppWindow>,
+    async fn refresh_logs_if_needed(
+        self: Arc<Self>,
         id: String,
         cond: RefreshLogsCondition,
         tx: mpsc::Sender<ApiCommand>,
     ) {
-        slint::invoke_from_event_loop(move || {
-            let app = app_weak.clone().unwrap();
-            let game_info_list = app.get_game_info_list();
-            match Controller::find_game_by_id(&game_info_list, &id) {
-                Some((i, mut game_info)) => {
-                    let should_refresh = match cond {
-                        RefreshLogsCondition::Always => true,
-                        RefreshLogsCondition::OnLogsViewOpened => {
-                            game_info.log_loaded == GameLogLoadState::Loaded
-                                && game_info.active_view == GameInfoViewType::Logs
-                        }
-                        RefreshLogsCondition::Never => false,
-                    };
-                    if should_refresh && game_info.log_loaded != GameLogLoadState::Loading {
-                        game_info.log_loaded = GameLogLoadState::Loading;
-                        game_info_list.set_row_data(i, game_info);
-                        let load_spec = GameLogLoadRequestType::Later;
-                        tokio::task::spawn(Controller::retrieve_logs(
-                            app_weak.clone(),
-                            id.into(),
-                            load_spec,
-                            tx,
-                        ));
+        let this = self.clone();
+        self.app_state.lock().unwrap().get_game_by_id(
+            id.clone(),
+            move |game_info_list, i, mut game_info| {
+                let should_refresh = match cond {
+                    RefreshLogsCondition::Always => true,
+                    RefreshLogsCondition::OnLogsViewOpened => {
+                        game_info.log_loaded == GameLogLoadState::Loaded
+                            && game_info.active_view == GameInfoViewType::Logs
                     }
-                }
-                None => eprintln!("Game with id {id} not found in game info list"),
-            }
-        })
-        .unwrap();
-    }
-
-    fn refresh_game_view(
-        app_weak: Weak<AppWindow>,
-        id: String,
-        game_represent: Option<GameInfoRepresent>,
-        refresh_logs: bool,
-    ) {
-        slint::invoke_from_event_loop(move || {
-            let app = app_weak.unwrap();
-            let game_info_list = app.get_game_info_list();
-            match Controller::find_game_by_id(&game_info_list, &id) {
-                Some((i, mut game_info)) => {
-                    if refresh_logs {
-                        game_info.log_loaded = GameLogLoadState::Loaded;
-                    }
-                    if let Some(game_represent) = game_represent {
-                        game_represent.mutate(&mut game_info, refresh_logs);
-                    }
+                    RefreshLogsCondition::Never => false,
+                };
+                if should_refresh && game_info.log_loaded != GameLogLoadState::Loading {
+                    game_info.log_loaded = GameLogLoadState::Loading;
                     game_info_list.set_row_data(i, game_info);
+                    let load_spec = GameLogLoadRequestType::Later;
+                    tokio::task::spawn(this.to_owned().retrieve_logs(id.into(), load_spec, tx));
                 }
-                None => eprintln!("Game with id {id} not found in game info list"),
-            }
-        })
-        .unwrap();
-    }
-
-    fn refresh_game_views(
-        app: AppWindow,
-        game_list: &Vec<(i32, String, GameInfoRepresent)>,
-        refresh_logs: bool,
-    ) {
-        let current_game_info_list = app.get_game_info_list();
-        if game_list.len() == current_game_info_list.row_count()
-            && current_game_info_list
-                .iter()
-                .enumerate()
-                .all(|(i, x)| x.id == &game_list[i].1)
-        {
-            current_game_info_list
-                .iter()
-                .enumerate()
-                .for_each(|(i, mut x)| {
-                    let (_, _, game_info_represent) = &game_list[i];
-                    game_info_represent.mutate(&mut x, refresh_logs);
-                    current_game_info_list.set_row_data(i, x);
-                });
-            return;
-        }
-
-        let game_info_list: Vec<GameInfo> = game_list
-            .iter()
-            .map(|(_, _, rep)| rep.create_game_info())
-            .collect();
-        let model = Rc::new(VecModel::from(game_info_list));
-        app.set_game_info_list(ModelRc::from(model));
-        println!("[Controller] Recreated rows on game list changed");
-    }
-
-    fn find_game_by_id(game_info_list: &ModelRc<GameInfo>, id: &str) -> Option<(usize, GameInfo)> {
-        game_info_list
-            .iter()
-            .enumerate()
-            .find(|(_i, x)| x.id.as_str() == id)
-            .take()
+            },
+        )
     }
 
     async fn send_command(command: ApiCommand, tx: mpsc::Sender<ApiCommand>) -> ApiResult<()> {
