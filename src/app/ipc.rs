@@ -1,7 +1,7 @@
 use super::webview::auth;
 use futures_util::StreamExt;
 use ipc_channel::asynch::IpcStream;
-use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
+use ipc_channel::ipc::{self, IpcOneShotServer, IpcReceiver, IpcSender};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -28,8 +28,8 @@ pub enum AuthenticatorMessage {
 
 pub struct AuthenticatorConnection {
     /// 发送消息给当前客户端的Sender, 目前只实现单客户端
-    pub tx_client: IpcSender<AuthenticatorMessage>,
-    pub rx_client: IpcStream<AuthenticatorMessage>,
+    pub tx_client_sender: IpcSender<AuthenticatorMessage>,
+    pub rx_client_receiver: IpcStream<AuthenticatorMessage>,
 }
 
 impl AuthenticatorConnection {
@@ -41,21 +41,27 @@ impl AuthenticatorConnection {
     /// let conn = AuthenticatorConnection::accept(tx_server, rx_server);
     /// ```
     pub fn accept(
-        tx_server: IpcOneShotServer<IpcSender<AuthenticatorMessage>>,
-        rx_server: IpcOneShotServer<AuthenticatorMessage>,
+        ipc_server: IpcOneShotServer<(
+            IpcSender<AuthenticatorMessage>,
+            IpcSender<IpcSender<AuthenticatorMessage>>,
+        )>,
     ) -> anyhow::Result<AuthenticatorConnection> {
-        let (_, tx_client) = tx_server.accept()?;
-        let (rx_client, _init_msg) = rx_server.accept()?;
+        let (_, (tx_client_sender, rx_client_sender_sender)) = ipc_server.accept()?;
+        let (rx_client_sender, rx_client_receiver): (
+            IpcSender<AuthenticatorMessage>,
+            IpcReceiver<AuthenticatorMessage>,
+        ) = ipc::channel()?;
+        rx_client_sender_sender.send(rx_client_sender)?;
         println!("[AuthenticatorConnection] Accepted Authenticator connection");
         Ok(Self {
-            tx_client,
-            rx_client: rx_client.to_stream(),
+            tx_client_sender,
+            rx_client_receiver: rx_client_receiver.to_stream(),
         })
     }
 
     pub async fn send_command(&mut self, command: AuthenticatorMessage) -> anyhow::Result<()> {
-        self.tx_client.send(command)?;
-        let event = self.rx_client.next().await;
+        self.tx_client_sender.send(command)?;
+        let event = self.rx_client_receiver.next().await;
         match event {
             Some(Err(e)) => Err(AuthenticatorConnectionError::RecvError(e.into()).into()),
             Some(Ok(AuthenticatorMessage::Acknowledged)) => Ok(()),
@@ -73,7 +79,7 @@ impl AuthenticatorConnection {
     ) -> anyhow::Result<auth::AuthResult> {
         self.send_command(action).await?;
 
-        let event = self.rx_client.next().await;
+        let event = self.rx_client_receiver.next().await;
         match event {
             Some(Err(e)) => Err(AuthenticatorConnectionError::RecvError(e.into()).into()),
             Some(Ok(AuthenticatorMessage::Result { result })) => Ok(result),
@@ -89,6 +95,6 @@ impl AuthenticatorConnection {
     }
 
     pub fn close(&self) {
-        _ = self.tx_client.send(AuthenticatorMessage::CloseRequested);
+        _ = self.tx_client_sender.send(AuthenticatorMessage::CloseRequested);
     }
 }

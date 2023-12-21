@@ -70,13 +70,17 @@ impl IpcAuthController {
         Self { auth_process: None }
     }
 
-    pub async fn set_visible(
-        &mut self,
-        visible: bool
-    ) -> anyhow::Result<()> {
+    pub async fn set_visible(&mut self, visible: bool) -> anyhow::Result<()> {
         let auth_process = self.ensure_auth_process().await?;
         let mut auth_process = auth_process.lock().await;
-        auth_process.connection.send_command(AuthenticatorMessage::SetVisible { x: 0., y: 0., visible }).await
+        auth_process
+            .connection
+            .send_command(AuthenticatorMessage::SetVisible {
+                x: 0.,
+                y: 0.,
+                visible,
+            })
+            .await
     }
 
     pub async fn auth_arkhost(
@@ -128,23 +132,24 @@ impl IpcAuthController {
     }
 
     fn spawn_auth_process(&mut self) -> anyhow::Result<Arc<Mutex<AuthProcess>>> {
-        let (tx_server, tx_name): (IpcOneShotServer<IpcSender<AuthenticatorMessage>>, String) =
-            IpcOneShotServer::new().unwrap();
-        let (rx_server, rx_name): (IpcOneShotServer<AuthenticatorMessage>, String) =
-            IpcOneShotServer::new().unwrap();
+        let (ipc_server, ipc_server_name): (
+            IpcOneShotServer<(
+                IpcSender<AuthenticatorMessage>,
+                IpcSender<IpcSender<AuthenticatorMessage>>,
+            )>,
+            String,
+        ) = IpcOneShotServer::new().unwrap();
 
         let process = crate::app::utils::subprocess::dup_current_exe(&[
             OsStr::new(""),
             OsStr::new("--launch-webview"),
             OsStr::new("--account"),
             OsStr::new("''"),
-            OsStr::new("--host-tx"),
-            OsStr::new(&tx_name.clone()),
-            OsStr::new("--host-rx"),
-            OsStr::new(&rx_name.clone()),
+            OsStr::new("--ipc"),
+            OsStr::new(&ipc_server_name.clone()),
         ])?;
 
-        let connection = AuthenticatorConnection::accept(tx_server, rx_server)?;
+        let connection = AuthenticatorConnection::accept(ipc_server)?;
 
         Ok(Arc::new(Mutex::new(AuthProcess {
             process,

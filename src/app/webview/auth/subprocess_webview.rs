@@ -32,12 +32,8 @@ pub struct LaunchArgs {
     pub account: Option<String>,
 
     #[argh(option)]
-    /// 父进程的IPC Server（发送端）名称
-    pub host_tx: Option<String>,
-
-    #[argh(option)]
-    /// 父进程的IPC Server（接收端）名称
-    pub host_rx: Option<String>,
+    /// 父进程的IPC Server 名称
+    pub ipc: Option<String>,
 }
 
 pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
@@ -59,22 +55,21 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         }
     }
 
-    let (host_tx_inverse_sender, host_tx_receiver): (
+    let (rx_host_sender, rx_host_receiver): (
         IpcSender<AuthenticatorMessage>,
         IpcReceiver<AuthenticatorMessage>,
     ) = ipc::channel()?;
+    let (tx_host_sender_sender, tx_host_sender_receiver): (
+        IpcSender<IpcSender<AuthenticatorMessage>>,
+        IpcReceiver<IpcSender<AuthenticatorMessage>>,
+    ) = ipc::channel()?;
     println!(
-        "[WebViewSubprocess] Connecting to host TX {}",
-        args.host_tx.as_ref().unwrap()
+        "[WebViewSubprocess] Sending inverse side senders to host {}",
+        args.ipc.as_ref().unwrap()
     );
-    IpcSender::connect(args.host_tx.unwrap())?.send(host_tx_inverse_sender)?;
-    println!(
-        "[WebViewSubprocess] Connecting to host RX {}",
-        args.host_rx.as_ref().unwrap()
-    );
-    let host_rx_sender: IpcSender<AuthenticatorMessage> =
-        IpcSender::connect(args.host_rx.unwrap())?;
-    host_rx_sender.send(AuthenticatorMessage::Acknowledged)?;
+    IpcSender::connect(args.ipc.unwrap())?.send((rx_host_sender, tx_host_sender_sender))?;
+    println!("[WebViewSubprocess] Receiving host TX receiver from host");
+    let tx_host_sender: IpcSender<AuthenticatorMessage> = tx_host_sender_receiver.recv()?;
 
     let event_loop = EventLoopBuilder::<AuthenticatorMessage>::with_user_event()
         .build()
@@ -111,7 +106,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
     thread::spawn(move || {
         let mut close_requested = false;
         loop {
-            match host_tx_receiver.recv() {
+            match rx_host_receiver.recv() {
                 Ok(event) => {
                     if let AuthenticatorMessage::CloseRequested = event {
                         close_requested = true;
@@ -154,24 +149,24 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                     if visible {
                         window.set_outer_position(LogicalPosition::new(x, y));
                     }
-                    _ = host_rx_sender.send(AuthenticatorMessage::Acknowledged);
+                    _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
                 }
                 AuthenticatorMessage::PerformAction { action } => {
                     let preform_res = authenticator.auth_resolver.preform(action.clone());
                     if let Err(err) = preform_res {
                         eprintln!("[WebViewSubprocess] Error preforming auth action: '{:?}'; Err: {}", action, err);
                     }
-                    _ = host_rx_sender.send(AuthenticatorMessage::Acknowledged);
+                    _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
                 }
                 AuthenticatorMessage::Result { .. } => {
-                    let send_res = host_rx_sender.send(ev);
+                    let send_res = tx_host_sender.send(ev);
                     if let Err(e) = send_res {
                         eprintln!("[WebViewSubprocess] Unable to send auth result, Err: {}", e);
                     }
                 }
                 AuthenticatorMessage::CloseRequested => {
-                    _ = host_rx_sender.send(AuthenticatorMessage::Acknowledged);
-                    _ = host_rx_sender.send(AuthenticatorMessage::Closed);
+                    _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
+                    _ = tx_host_sender.send(AuthenticatorMessage::Closed);
                     evl.exit();
                 }
                 AuthenticatorMessage::ReloadRequested => {
@@ -179,7 +174,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                     if let Err(e) = res {
                         eprintln!("[WebViewSubprocess] Unable to reload auth page, Err: {}", e);
                     }
-                    _ = host_rx_sender.send(AuthenticatorMessage::Acknowledged);
+                    _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
                 }
                 #[allow(unreachable_patterns)]
                 _ => eprintln!(
@@ -191,7 +186,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                _ = host_rx_sender.send(AuthenticatorMessage::Closed);
+                _ = tx_host_sender.send(AuthenticatorMessage::Closed);
                 evl.exit();
             }
             _ => {}
@@ -212,8 +207,7 @@ pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
         LaunchArgs {
             launch_webview: Some(true),
             account: Some(_),
-            host_tx: Some(_),
-            host_rx: Some(_),
+            ipc: Some(_),
         } => Some(launch(launch_args)),
         _ => Some(Err(ChildProcessAuthenticatorError::InvalidLaunchArgs {
             launch_args_dbg_str: format!("{:?}", launch_args),
