@@ -35,10 +35,17 @@ pub struct AuthenticatorConnection {
 impl AuthenticatorConnection {
     /// 使用例：
     /// ```
-    /// let (tx_server, tx_name): (IpcOneShotServer<IpcSender<AuthenticatorEvent>>, String) = IpcOneShotServer::new()?;
-    /// let (rx_server, rx_name): (IpcOneShotServer<AuthenticatorEvent>, String) = IpcOneShotServer::new()?;
+    /// use ipc_channel::ipc::{self, IpcOneShotServer, IpcReceiver, IpcSender};
+    /// 
+    /// let (ipc_server, ipc_server_name): (
+    ///     IpcOneShotServer<(
+    ///         IpcSender<AuthenticatorMessage>,
+    ///         IpcSender<IpcSender<AuthenticatorMessage>>,
+    ///     )>,
+    ///     String,
+    /// ) = IpcOneShotServer::new()
     /// // ...
-    /// let conn = AuthenticatorConnection::accept(tx_server, rx_server);
+    /// let connection = AuthenticatorConnection::accept(ipc_server)?;
     /// ```
     pub fn accept(
         ipc_server: IpcOneShotServer<(
