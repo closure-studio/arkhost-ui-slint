@@ -1,4 +1,8 @@
-use crate::models::common::{ResponseData, ResponseWrapper};
+use crate::models::{
+    api_passport::UserStateData,
+    common::{ResponseData, ResponseWrapper},
+};
+use base64::Engine;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json;
@@ -7,9 +11,20 @@ use thiserror::Error;
 
 pub type ApiResult<T> = anyhow::Result<T>;
 
+#[derive(Debug)]
+pub struct ResponseErrorInfo {
+    pub status_code: u16,
+    pub internal_status_code: Option<i32>,
+    pub internal_message: Option<String>,
+}
+
+pub trait ResponseErrorInfoSource {
+    fn get_error_info(&self) -> ResponseErrorInfo;
+}
+
 #[derive(Error, Debug)]
 pub enum UnauthorizedError {
-    #[error("登陆已失效")]
+    #[error("登录已失效")]
     MissingUserCredentials,
     #[error("用户已被封禁")]
     BannedUser,
@@ -33,6 +48,19 @@ where
     pub internal_status_code: Option<i32>,
     pub internal_message: Option<String>,
     pub source_error: Option<anyhow::Error>,
+}
+
+impl<TRes> ResponseErrorInfoSource for ResponseError<TRes>
+where
+    TRes: Debug,
+{
+    fn get_error_info(&self) -> ResponseErrorInfo {
+        ResponseErrorInfo {
+            status_code: self.status_code,
+            internal_status_code: self.internal_status_code,
+            internal_message: self.internal_message.clone(),
+        }
+    }
 }
 
 pub async fn try_response_json<T>(response: reqwest::Response) -> anyhow::Result<T>
@@ -69,7 +97,7 @@ where
             data: Some(data),
             ..
         } => Ok(data),
-       _ => Err(ResponseError {
+        _ => Err(ResponseError {
             status_code: status_code.as_u16(),
             internal_status_code: data.internal_code.clone(),
             internal_message: data.internal_message.clone(),
@@ -109,4 +137,45 @@ impl UserState for UserStateMemStorage {
     fn erase_login_state(&mut self) {
         self.jwt = None;
     }
+}
+
+pub trait UserStateDataSource {
+    fn get_user_state_data(&self) -> Option<UserStateData>;
+}
+
+impl<T: UserState> UserStateDataSource for T {
+    fn get_user_state_data(&self) -> Option<UserStateData> {
+        if let Some(token) = self.get_login_state() {
+            let mut iter = token.rsplitn(3, '.').into_iter();
+            if let (Some(_), Some(payload), Some(_), None) =
+                (iter.next(), iter.next(), iter.next(), iter.next())
+            {
+                match base64::engine::general_purpose::STANDARD_NO_PAD
+                    .decode(payload)
+                    .map_err(anyhow::Error::from)
+                    .and_then(|x| {
+                        serde_json::de::from_slice::<UserStateData>(&x).map_err(anyhow::Error::from)
+                    }) {
+                    Ok(state) => return Some(state),
+                    Err(e) => eprintln!("Error deserializing JWT payload '{payload}' {e:?}"),
+                }
+            }
+        }
+
+        None
+    }
+}
+
+pub fn get_common_headers() -> reqwest::header::HeaderMap {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        "X-Platform",
+        reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_IDENTIFIER),
+    );
+    headers.insert(
+        "User-Agent",
+        reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_USER_AGENT),
+    );
+
+    headers
 }

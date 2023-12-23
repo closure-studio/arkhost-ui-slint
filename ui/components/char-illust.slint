@@ -1,0 +1,25 @@
+import { IllustInfo } from "../game-info.slint";
+import { MockData } from "../mock-data.slint";
+
+export component CharIllust inherits Rectangle {
+    in property <IllustInfo> illust-info: MockData.game-info.details.char-illust;
+    in property <length> target-width: 500px;
+
+    property <image> image: illust-info.illust-image;
+
+    property <float> image-pivot-x: image.width * (illust-info.pivot-factor-x + illust-info.offset-x * (1 / illust-info.size-x));
+    property <float> image-pivot-y: image.height * (illust-info.pivot-factor-y + illust-info.offset-y * (1 / illust-info.size-y));
+    property <float> actual-scale-ratio: target-width / 1px / image.width;
+
+    Image {
+        x: illust-info.offset-x / illust-info.size-x * target-width;
+
+        source: illust-info.illust-image;
+        width: target-width;
+
+        source-clip-y: image-pivot-y - root.height / 1px / actual-scale-ratio / 2;
+        source-clip-height: root.height / 1px / actual-scale-ratio;
+    }
+
+    width: target-width;
+}

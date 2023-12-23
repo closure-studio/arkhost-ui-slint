@@ -4,7 +4,7 @@ import { FontGlobals } from "../font-globals.slint";
 export component ClosureStudioLogoSingleRow inherits HorizontalBox {
     in property <length> single-row-size: 48px;
     in property <image> logo: @image-url("../images/closure_drone.png");
-    in property <bool> omit-text: false;
+    in property <bool> compact: false;
     alignment: space-around;
     
     VerticalLayout {
@@ -25,7 +25,7 @@ export component ClosureStudioLogoSingleRow inherits HorizontalBox {
                 }
             }
     
-            if !omit-text: Text {
+            if !compact: Text {
                 font-family: FontGlobals.closure-studio-logo;
                 font-size: single-row-size * 85%;
                 height: single-row-size;

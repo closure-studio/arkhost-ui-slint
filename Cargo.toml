@@ -30,6 +30,16 @@ thiserror = "1.0.50"
 home = "0.5.5"
 futures-util = "0.3.29"
 async-trait = "0.1.74"
+reqwest = "0.11.22"
+reqwest-middleware = "0.2.4"
+reqwest-retry = "0.3.0"
+http-cache = { version = "0.17.0", features = [
+    "manager-cacache",
+    "cacache-tokio",
+], default-features = false }
+http-cache-reqwest = "0.12.0"
+image = { version = "0.24.7", features = ["webp"], default-features = false }
+bytes = "1.5.0"
 
 [build-dependencies]
 slint-build = "1.3.2"

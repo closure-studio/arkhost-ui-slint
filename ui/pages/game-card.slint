@@ -3,8 +3,10 @@ import { GameInfo, GameState, GameInfoViewType, GameLogLoadState, GameLogLoadReq
 import { GameCardDoctorInfo } from "game-card-doctor-info.slint";
 import { GameCardOptions } from "game-card-options.slint";
 import { GameCardLog } from "game-card-log.slint";
-import { GameCardOperationShortcutPanel } from "game-card-operation-shotcut-panel.slint";
+import { GameCardOperationShortcutPanel, GameCardOperationShortcutPanelVertical } from "game-card-operation-shotcut-panel.slint";
 import { GameStatusBadge } from "game-status-badge.slint";
+import { MockData } from "../mock-data.slint";
+import { CharIllust } from "../components/char-illust.slint";
 
 component GameCardTab inherits Rectangle {
     in property <int> active-tab;
@@ -53,25 +55,72 @@ component GameCardTabSwitch inherits Rectangle {
 }
 
 export component GameCard inherits Rectangle {
-    in property <GameInfo> info;
+    in property <GameInfo> info: MockData.game-info;
     private property <int> current-active-tab: 0;
-    private property <length> current-tab-height: 200px;
+    private property <length> current-tab-height: 300px;
     
-    callback start-game <=> shortcut-panel.start-game;
-    callback stop-game <=> shortcut-panel.stop-game;
-    callback restart-game <=> shortcut-panel.restart-game;
+    callback start-game <=> doc-info.start-game;
+    callback stop-game <=> doc-info.stop-game;
+    callback restart-game <=> doc-info.restart-game;
     callback save-options <=> options.save-options;
     callback load-logs <=> logs.load-logs;
     callback view-changed(string, GameInfoViewType);
     
     border-radius: 10px;
-    border-width: 2px;
-
+    border-width: 1px;
     background: StyleMetrics.window-background;
-
-    drop-shadow-blur: 5px;
-    drop-shadow-color: dimgray;
+    drop-shadow-blur: 3px;
+    drop-shadow-color: darkgray;
+    clip: true;
     
+    CharIllust {
+        illust-info: info.details.char-illust;
+        target-width: min(800px, parent.width * 0.6);
+        property <length> pos-x: max(250px, parent.width * 0.35);
+
+        states [
+            show when info.details.char-illust.loaded 
+                && current-active-tab == 0 
+                && parent.width >= 600px: {
+                x: pos-x;
+                y: 0;
+                opacity: 1;
+                in {
+                    animate opacity {
+                        delay: 0.15s;
+                        duration: 0.2s;
+                    }
+            
+                    animate x {
+                        delay: 0.15s;
+                        duration: 0.2s;
+                        easing: ease;
+                    }
+                }
+            }
+            hide when !info.details.char-illust.loaded 
+                || current-active-tab != 0 
+                || parent.width < 600px: {
+                x: pos-x + 40px;
+                y: doctor-tab.y;
+                opacity: 0;
+                in {
+                    animate opacity {
+                        duration: 0.1s;
+                    }
+
+                    animate y {
+                        duration: 0.1s;
+                    }
+
+                    animate x {
+                        delay: 0.1s;
+                    }
+                }
+            }
+        ]
+    }
+
     HorizontalBox {
         spacing: 5px;
 
@@ -85,7 +134,7 @@ export component GameCard inherits Rectangle {
                     doc-info := GameCardDoctorInfo { 
                         info: info; 
                     }
-                    height: 200px;
+                    height: 300px;
                 }
                 
                 settings-tab := GameCardTab {
@@ -108,16 +157,8 @@ export component GameCard inherits Rectangle {
 
                 height: current-tab-height;
                 animate height {
-                     duration: 0.25s;
-                     easing: ease;
-                }
-            }
-
-            VerticalLayout {
-                alignment: end;
-                shortcut-panel := GameCardOperationShortcutPanel { 
-                    info: info; 
-                    min-width: 400px;
+                    duration: 0.25s;
+                    easing: ease;
                 }
             }
         }
@@ -163,11 +204,26 @@ export component GameCard inherits Rectangle {
             }
 
             VerticalLayout {
+                spacing: 10px;
                 alignment: end;
+
+                GameCardOperationShortcutPanelVertical {
+                    info: info;
+                    compact: true;
+
+                    opacity: current-active-tab != 0
+                        ? 100%
+                        : 0%;
+                
+                    animate opacity {
+                        easing: ease;
+                        duration: 0.125s;
+                    }
+                }
 
                 GameStatusBadge {
                     info: info;
-                    omit-text: true;
+                    compact: true;
                     opacity: current-active-tab != 0
                         ? 100%
                         : 0%;

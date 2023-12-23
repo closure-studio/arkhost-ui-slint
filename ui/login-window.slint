@@ -16,8 +16,22 @@ export component LoginWindow {
     in-out property <string> login-status-text: "";
 
     private property <bool> logging;
+    private property <bool> use-auth;
+
     callback login-requested(string, string);
+    callback auth-requested();
     callback register-requested <=> register.clicked;
+    public function set-use-auth(
+        account: string, 
+        use-auth-val: bool
+    ) {
+        use-auth = use-auth-val;
+        if (use-auth-val) {
+            account-input.text = account;
+        } else {
+            password-input.text = "";
+        }
+    }
 
     vbox := VerticalBox {
         alignment: start;
@@ -52,8 +66,8 @@ export component LoginWindow {
         HorizontalBox {
             alignment: center;
 
-            account := LineEdit {
-                enabled: !logging;
+            account-input := LineEdit {
+                enabled: !use-auth && !logging;
                 width: parent.width - 40px;
                 height: 42px;
                 horizontal-alignment: left;
@@ -65,14 +79,14 @@ export component LoginWindow {
         HorizontalBox {
             alignment: center;
 
-            password := LineEdit {
-                enabled: !logging;
+            password-input := LineEdit {
+                enabled: !use-auth && !logging;
                 width: parent.width - 40px;
                 height: 42px;
                 horizontal-alignment: left;
                 input-type: InputType.password;
 
-                placeholder-text: @tr("密码");
+                placeholder-text: use-auth ? @tr("已记住登录状态") : @tr("密码");
             }
         }
 
@@ -84,7 +98,27 @@ export component LoginWindow {
                 text: @tr("登录");
                 width: parent.width - 40px;
                 clicked => {
-                    login-requested(account.text, password.text)
+                    if (use-auth) {
+                        auth-requested();
+                    } else {
+                        login-requested(account-input.text, password-input.text);
+                    }
+                }
+            }
+        }
+
+        if use-auth && !logging : HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                Text {
+                    text: @tr("[退出当前登录]");
+                }
+
+                TouchArea {
+                    clicked => {
+                        set-use-auth("", false);
+                    }
                 }
             }
         }

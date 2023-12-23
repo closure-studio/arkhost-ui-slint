@@ -1,5 +1,4 @@
 use serde::Deserialize;
-
 #[derive(Default, Clone, Debug)]
 pub struct ResponseData<T>
 where
@@ -108,3 +107,4 @@ where
         }
     }
 }
+

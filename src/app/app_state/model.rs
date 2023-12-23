@@ -1,9 +1,11 @@
 use std::rc::Rc;
 
-use crate::app::api_controller::GameInfo as ApiGameInfo;
 use crate::app::ui::*;
+use crate::app::{api_controller::GameInfo as ApiGameInfo, game_data};
 use arkhost_api::models::api_arkhost::{self, GameConfigFields};
 use slint::{ModelRc, SharedString, VecModel};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub struct GameInfoModel {
     pub game_info: ApiGameInfo,
@@ -84,6 +86,34 @@ impl GameInfoModel {
         }
         let options_model = GameOptionsModel::from(&self.game_info.info.game_config);
         options_model.mutate(&mut game_info.options);
+        if self.game_info.info.status.code == api_arkhost::GameStatus::Running {
+            if let Some(ref game_details) = self.game_info.details {
+                let details_model = GameDetailsModel::from(game_details.status.clone());
+                details_model.mutate(&mut game_info.details);
+            }
+        }
+    }
+}
+
+pub struct GameDetailsModel {
+    details: api_arkhost::StatusDetails,
+}
+
+impl GameDetailsModel {
+    pub fn from(details: api_arkhost::StatusDetails) -> Self {
+        Self { details }
+    }
+
+    pub fn mutate(&self, game_details: &mut GameDetails) {
+        game_details.loaded = true;
+        game_details.diamond = self.details.android_diamond.to_string().into();
+        game_details.diamond_shard = self.details.diamond_shard.to_string().into();
+        game_details.gacha_ticket = self.details.gacha_ticket.to_string().into();
+        game_details.tenfold_gacha_ticket = self.details.ten_gacha_ticket.to_string().into();
+        game_details.gold = self.details.gold.to_string().into();
+        game_details.max_ap = self.details.max_ap.to_string().into();
+        game_details.recruit_license = self.details.recruit_license.to_string().into();
+        game_details.social_point = self.details.social_point.to_string().into();
     }
 }
 
@@ -210,3 +240,42 @@ mod utils {
         return result;
     }
 }
+
+#[derive(Default, Debug, Clone)]
+pub struct CharIllust {
+    pub image: ImageData,
+    pub positions: game_data::CharPack,
+}
+
+#[derive(Default, Debug, Clone)]
+pub enum ImageDataRaw {
+    #[default]
+    Empty,
+    Pending,
+    Rgba8 {
+        raw: bytes::Bytes,
+        width: u32,
+        height: u32,
+    },
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ImageData {
+    pub asset_path: String,
+    pub cache_key: Option<String>,
+    pub format: Option<image::ImageFormat>,
+    pub loaded_image: ImageDataRaw,
+}
+
+impl ImageData {
+    pub fn to_slint_image(&self) -> Option<slint::Image> {
+        match &self.loaded_image {
+            ImageDataRaw::Rgba8 { raw, width, height } => Some(slint::Image::from_rgba8(
+                slint::SharedPixelBuffer::clone_from_slice(raw, *width, *height),
+            )),
+            _ => None,
+        }
+    }
+}
+
+pub type ImageDataRef = Arc<RwLock<ImageData>>;

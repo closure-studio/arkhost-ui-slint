@@ -1,10 +1,10 @@
 use bitflags::bitflags;
-use chrono::{DateTime, Utc, Local};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, TimestampSeconds};
 use serde_repr::Deserialize_repr;
+use serde_with::{serde_as, TimestampSeconds};
 
-#[derive(Default, Deserialize_repr, Clone, Debug)]
+#[derive(Default, PartialEq, Deserialize_repr, Clone, Debug)]
 #[repr(i32)]
 pub enum GameStatus {
     LoginFailed = -1,
@@ -12,7 +12,7 @@ pub enum GameStatus {
     Pending = 0,
     Logging = 1,
     Running = 2,
-    Error = 3
+    Error = 3,
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -61,7 +61,7 @@ pub struct Status {
 pub struct GameDetails {
     pub status: StatusDetails,
     pub config: GameConfigFields,
-    pub screenshot: Screenshots,
+    pub screenshot: Option<Vec<Screenshots>>,
 }
 
 #[serde_as]
@@ -71,7 +71,7 @@ pub struct StatusDetails {
     pub android_diamond: u32,
     pub ap: u32,
     pub avatar: Avatar,
-    pub avatar_id: u32,
+    pub avatar_id: String,
     pub diamond_shard: u32,
     pub gacha_ticket: u32,
     pub ten_gacha_ticket: u32,
@@ -85,6 +85,12 @@ pub struct StatusDetails {
     pub secretary: String,
     pub secretary_skin_id: String,
     pub social_point: u32,
+}
+
+impl StatusDetails {
+    pub fn get_secretary_skin_id_escaped(&self) -> String {
+        self.secretary_skin_id.replace("@", "_").replace("#", "_")
+    }
 }
 
 #[serde_as]

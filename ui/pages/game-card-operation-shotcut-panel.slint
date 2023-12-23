@@ -1,77 +1,154 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , Spinner} from "std-widgets.slint";
 import { GameInfo, GameState, GameOperationRequestState } from "../game-info.slint";
 
-component GameOperationShortcutButton inherits Button {
-
+enum ButtonType {
+    StartGame,
+    StopGame,
+    RestartGame
 }
 
-export component GameCardOperationShortcutPanel inherits HorizontalLayout {
+component GameOperationShortcutButton inherits Button {
+    in property <ButtonType> type;
     in property <GameInfo> info;
-    callback start-game(string /* GameInfo ID */ );
-    callback stop-game(string /* GameInfo ID */ );
-    callback restart-game(string /* GameInfo ID */ );
 
-    private property <bool> can-login;
+    private property <bool> can-start;
     private property <bool> can-stop;
     private property <bool> can-restart;
-    
-    spacing: 10px;
-    alignment: start;
 
-    login := GameOperationShortcutButton {
-        enabled: can-login;
-        icon: StyleMetrics.dark-color-scheme 
-            ? @image-url("../images/game_card_shortcut_start.svg")
-            : @image-url("../images/game_card_shortcut_start_light.svg");
-        text: @tr("启动");
-        clicked => { start-game(info.id); }
-    }
+    enabled: 
+        (type == ButtonType.StartGame && can-start)
+        || (type == ButtonType.StopGame && can-stop)
+        || (type == ButtonType.RestartGame && can-restart);
 
-    stop := GameOperationShortcutButton {
-        enabled: can-stop;
-        icon: StyleMetrics.dark-color-scheme 
-            ? @image-url("../images/game_card_shortcut_stop.svg")
-            : @image-url("../images/game_card_shortcut_stop_light.svg");
-        text: @tr("停止");
-        clicked => { stop-game(info.id); }
-    }
-
-    // restart := GameOperationShortcutButton {
-    //     enabled: can-restart;
-    //     icon: StyleMetrics.dark-color-scheme 
-    //         ? @image-url("../images/game_card_shortcut_restart.svg")
-    //         : @image-url("../images/game_card_shortcut_restart_light.svg");
-    //     text: @tr("重启");
-    //     clicked => { restart-game(info.id); }
-    // }
-
-    request-spinner := Spinner {
-        width: self.visible ? root.height : 0px;
-        indeterminate: true;
-        visible: info.request-state == GameOperationRequestState.Requesting;
-    }
-    
     states [
         busy when 
             info.request-state == GameOperationRequestState.Requesting
             || info.game-state == GameState.Logging
             || info.game-state == GameState.Captcha: {
-            can-login: false;
+            can-start: false;
             can-stop: false;
             can-restart: false;
         }
         can-login when 
             info.game-state == GameState.Faulted
             || info.game-state == GameState.Stopped: {
-            can-login: true;
+            can-start: true;
             can-stop: false;
             can-restart: false;
         }
         can-interrupt when 
             info.game-state == GameState.Running: {
-            can-login: false;
+            can-start: false;
             can-stop: true;
             can-restart: true;
         }
     ]
+}
+
+component StartGameButton inherits GameOperationShortcutButton {
+    in property <bool> compact: false;
+
+    type: ButtonType.StartGame;
+    icon: StyleMetrics.dark-color-scheme 
+        ? @image-url("../images/game_card_shortcut_start.svg")
+        : @image-url("../images/game_card_shortcut_start_light.svg");
+    text: !compact 
+        ? @tr("启动") 
+        : "";
+}
+
+component StopGameButton inherits GameOperationShortcutButton {
+    in property <bool> compact: false;
+
+    type: ButtonType.StopGame;
+    icon: StyleMetrics.dark-color-scheme 
+        ? @image-url("../images/game_card_shortcut_stop.svg")
+        : @image-url("../images/game_card_shortcut_stop_light.svg");
+    text: !compact 
+        ? @tr("停止") 
+        : "";
+}
+
+// component RestartGameButton inherits GameOperationShortcutButton {
+//     in property <bool> compact: false;
+    
+//     type: ButtonType.RestartGame;
+//     icon: StyleMetrics.dark-color-scheme 
+//         ? @image-url("../images/game_card_shortcut_restart.svg")
+//         : @image-url("../images/game_card_shortcut_restart_light.svg");
+//     text: !compact 
+//         ? @tr("重启") 
+//         : "";
+// }
+
+export component GameCardOperationShortcutPanel inherits HorizontalLayout {
+    in property <GameInfo> info;
+
+    in property <bool> compact: false;
+
+    callback start-game(string /* GameInfo ID */ );
+    callback stop-game(string /* GameInfo ID */ );
+    callback restart-game(string /* GameInfo ID */ );
+    
+    spacing: 10px;
+
+    StartGameButton {
+        info: info;
+        compact: compact;
+        clicked => { start-game(info.id); }
+    }
+
+    StopGameButton {
+        info: info;
+        compact: compact;
+        clicked => { stop-game(info.id); }
+    }
+
+    // RestartGameButton {
+    //     info: info;
+    //     compact: compact;
+    //     clicked => { restart-game(info.id); }
+    // }
+
+    // request-spinner := Spinner {
+    //     width: self.visible ? root.height : 0px;
+    //     indeterminate: true;
+    //     visible: info.request-state == GameOperationRequestState.Requesting;
+    // }
+}
+
+export component GameCardOperationShortcutPanelVertical inherits VerticalLayout {
+    in property <GameInfo> info;
+
+    in property <bool> compact: false;
+
+    callback start-game(string /* GameInfo ID */ );
+    callback stop-game(string /* GameInfo ID */ );
+    callback restart-game(string /* GameInfo ID */ );
+    
+    spacing: 10px;
+    alignment: start;
+
+    request-spinner := Spinner {
+        indeterminate: true;
+        visible: info.request-state == GameOperationRequestState.Requesting;
+    }
+
+    StartGameButton {
+        info: info;
+        compact: compact;
+        clicked => { start-game(info.id); }
+    }
+
+    StopGameButton {
+        info: info;
+        compact: compact;
+        clicked => { stop-game(info.id); }
+    }
+
+    // RestartGameButton {
+    //     info: info;
+    //     compact: compact;
+    //     clicked => { restart-game(info.id); }
+    // }
 }

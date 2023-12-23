@@ -1,53 +1,209 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
-import { GameStatusBadge } from "game-status-badge.slint";
+import { GameStatusBadgeWide } from "game-status-badge.slint";
+import { GameCardOperationShortcutPanel } from "game-card-operation-shotcut-panel.slint";
+
+component ItemDisplay {
+    in property <image> icon;
+    in property <float> icon-max-width: 0;
+    in property <float> icon-max-height: 0;
+    in property <string> text;
+    in property <length> font-size: 18px;
+    in property <length> text-start: 25px;
+    in property <length> text-min-width: 120px;
+    in property <TextHorizontalAlignment> horzontal-alignment: left;
+    property <float> icon-scale: min(icon-max-width / icon.height, icon-max-height / icon.width);
+    
+    HorizontalLayout {
+        padding-left: 5px;
+        padding-right: 5px;
+        spacing: 5px;
+
+        Rectangle {
+            width: text-start;
+
+            Image {
+                source: icon;
+                width: icon.width * icon-scale * 1px;
+                height: icon.height * icon-scale * 1px;
+                colorize: StyleMetrics.default-text-color;
+    
+                horizontal-stretch: 0;
+            }
+        }
+
+        Text {
+            font-size: font-size;
+            font-family: FontGlobals.alphanumeric-text-sans;
+            text: text;
+            vertical-alignment: center;
+            horizontal-alignment: horzontal-alignment;
+
+            min-width: text-min-width;
+        }
+    }
+}
 
 export component GameCardDoctorInfo inherits Rectangle {
     in property <GameInfo> info;
 
-    VerticalLayout {
+    callback start-game <=> shortcut-panel.start-game;
+    callback stop-game <=> shortcut-panel.stop-game;
+    callback restart-game <=> shortcut-panel.restart-game;
+
+    HorizontalLayout {
         alignment: start;
+        spacing: 10px;
 
-        HorizontalBox {
-            alignment: space-between;
+        // Doc Info 
+        GridLayout {
+            spacing: 10px;
+            min-width: 320px;
 
-            VerticalLayout {
-                alignment: start;
+            GridLayout {
+                spacing-horizontal: 10px;
 
                 Rectangle {
-                    doctor-name := Text {
-                        text: info.doctor-name;
-                        font-family: FontGlobals.alphanumeric-text-sans;
-                        font-size: 36px;
+                    width: 64px;
+                    height: 64px;
+        
+                    border-radius: 24px;
+                    clip: true;
+        
+                    Image {
+                        source: info.details.avatar.loaded
+                            ? info.details.avatar.avatar-image
+                            : @image-url("../images/avatar_default.jpg");
+                        width: 64px;
+                        height: 64px;
                     }
-                    border-radius: self.width * 0.05;
     
-                    max-width: 120px;
-                    max-height: 40px;
+                    rowspan: 3;
+                    colspan: 1;
+                }
+    
+                doctor-name := Text {
+                    text: info.doctor-name;
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 32px;
+    
+                    vertical-alignment: top;
+                    row: 0;
+                    col: 1;
+                    rowspan: 2;
                 }
     
                 doctor-serial := Text {
                     text: info.doctor-serial;
                     font-family: FontGlobals.alphanumeric-text-sans;
-                    font-size: 18px;
-                    font-italic: true;
+                    font-size: 16px;
                     color: StyleMetrics.default-text-color.transparentize(60%);
     
-                    vertical-alignment: bottom;
+                    vertical-alignment: top;
+                    row: 2;
+                    col: 1;
                 }
+
+                row: 0;
             }
 
-            GameStatusBadge {
+            GameStatusBadgeWide {
                 info: info;
+
+                row: 1;
+            }
+
+            GridBox {
+                spacing-vertical: 10px;
+
+                ItemDisplay {
+                    icon: @image-url("../images/icon_ap.png");
+                    icon-max-width: 22;
+                    icon-max-height: 22;
+
+                    text: info.details.loaded 
+                        ? info.ap + " / " + info.details.max-ap
+                        : info.ap;
+                    row: 0;
+                    col: 0;
+                }
+
+                ItemDisplay {
+                    icon: @image-url("../images/icon_gold.png");
+                    icon-max-width: 24;
+                    icon-max-height: 24;
+
+                    text: info.details.loaded 
+                        ? info.details.gold
+                        : "-";
+                    row: 0;
+                    col: 1;
+                }
+
+                ItemDisplay {
+                    icon: @image-url("../images/icon_diamond.png");
+                    icon-max-width: 22;
+                    icon-max-height: 22;
+
+                    text: info.details.loaded 
+                        ? info.details.diamond
+                        : "-";
+                    row: 1;
+                    col: 0;
+                }
+
+                ItemDisplay {
+                    icon: @image-url("../images/icon_diamond_shard.png");
+                    icon-max-width: 24;
+                    icon-max-height: 24;
+                    
+                    text: info.details.loaded 
+                        ? info.details.diamond-shard
+                        : "-";
+                    row: 1;
+                    col: 1;
+                }
+
+                ItemDisplay {
+                    icon: @image-url("../images/icon_battle.png");
+                    icon-max-width: 22;
+                    icon-max-height: 22;
+                    
+                    text: info.battle-map;
+
+                    row: 2;
+                    col: 0;
+                    colspan: 2;
+                }
+
+                Rectangle {
+                    row: 3;
+                }
+
+                row: 2;
+            }
+
+            shortcut-panel := GameCardOperationShortcutPanel {
+                info: info;
+
+                vertical-stretch: 0;
+                horizontal-stretch: 1;
+
+                row: 3;
             }
         }
 
-        GridBox {
-            Text { text: @tr("理智：") + info.ap; font-size: 14px; row: 0; col: 0; }
-            Text { text: @tr("作战关卡：") + info.battle-map; font-size: 14px; row: 1; col: 0; }
+        Rectangle {
+            width: 1px;
+            // background: StyleMetrics.default-text-color.transparentize(50%);
         }
-        
-        min-width: 150px;
+
+        Rectangle {
+            clip: true;
+
+            // border-color: StyleMetrics.default-text-color.transparentize(80%);
+            // border-width: 1px;
+        }
     }
 }

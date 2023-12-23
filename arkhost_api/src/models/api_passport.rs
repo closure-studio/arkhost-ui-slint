@@ -1,6 +1,8 @@
 use bitflags::bitflags;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
+use serde_with::{serde_as, TimestampSeconds};
 use std::fmt::Debug;
 
 #[derive(Default, Deserialize_repr, Clone, Debug, PartialEq)]
@@ -12,7 +14,7 @@ pub enum UserStatus {
     Normal = 1,
     ManuallyVerified = 2,
     #[serde(other)]
-    UnsupportedStatus = i32::MIN
+    UnsupportedStatus = i32::MIN,
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -65,4 +67,23 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     #[serde(rename = "token")]
     pub token: String,
+}
+
+#[serde_as]
+#[derive(Default, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStateData {
+    #[serde(rename = "email")]
+    pub account: String,
+    #[serde_as(as = "TimestampSeconds<i64>")]
+    pub exp: DateTime<Utc>,
+    pub permission: UserPermissions,
+    pub status: UserStatus,
+    pub uuid: String,
+}
+
+impl UserStateData {
+    pub fn is_expired(&self) -> bool {
+        return Utc::now() >= self.exp;
+    }
 }

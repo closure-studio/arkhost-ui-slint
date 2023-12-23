@@ -1,10 +1,58 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
 import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
-import { ScrollView , VerticalBox} from "std-widgets.slint";
+import { ScrollView , VerticalBox, Spinner} from "std-widgets.slint";
+
+export enum FetchGamesState {
+    NotFetched,
+    Fetching,
+    Fetched,
+    Retrying
+}
+
+component FetchGamesIndicator inherits VerticalBox {
+    alignment: start;
+    in property <[GameInfo]> game-info-list;
+    in property <FetchGamesState> fetch-games-state;
+    private property <string> fetch-games-status-text;
+
+    if fetch-games-state != FetchGamesState.NotFetched 
+    && game-info-list.length == 0: VerticalLayout {
+    alignment: start;
+    HorizontalLayout {
+            alignment: center;
+            spacing: 10px;
+
+            Text {
+                text: fetch-games-status-text;
+                vertical-alignment: center;
+            }
+
+            if fetch-games-state != FetchGamesState.Fetched : Spinner {
+                indeterminate: true;
+            }
+
+            height: 50px;
+        }
+    } 
+
+    states [
+        fetching when fetch-games-state == FetchGamesState.Fetching: {
+            fetch-games-status-text: @tr("正在加载账号列表…… ");
+        }
+        empty when fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: {
+            fetch-games-status-text: @tr("这里似乎没有游戏账号 ");
+        }
+        retrying when fetch-games-state == FetchGamesState.Retrying: {
+            fetch-games-status-text: @tr("加载账号列表似乎不太顺利…… ");
+        }
+    ]
+}
 
 export component GameInfoPage {
     in property <[GameInfo]> game-info-list;
+    in property <FetchGamesState> fetch-games-state;
+    private property <string> fetch-games-status-text;
 
     ScrollView {
         VerticalBox {
@@ -19,6 +67,11 @@ export component GameInfoPage {
                 save-options(id, options) => { Callbacks.save-options(id, options); }
                 load-logs(id, type) => { Callbacks.load-logs(id, type); }
                 view-changed(id, type) => { Callbacks.view-changed(id, type); }
+            }
+
+            FetchGamesIndicator {
+                game-info-list: game-info-list;
+                fetch-games-state: fetch-games-state;
             }
         }
     }

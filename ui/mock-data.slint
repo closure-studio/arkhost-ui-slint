@@ -1,0 +1,40 @@
+import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
+
+export global MockData {
+    out property <GameInfo> game-info: {
+        id: "test",
+        doctor-name: "Dr. Nonary",
+        doctor-level: "120",
+        doctor-serial: "G199------88",
+        status-text: "",
+        ap: "135",
+        battle-map: "1-7",
+        game-state: GameState.Running,
+        options: {
+
+        },
+        log-loaded: GameLogLoadState.Loaded,
+        logs: [
+            { timestamp: "12-20.18:52:59", content: "作战成功 " },
+            { timestamp: "12-20.18:52:58", content: "正在进攻1-7 " },
+            { timestamp: "12-20.18:52:57", content: "很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长 " },
+            { timestamp: "12-20.18:52:57", content: "very very very very very very very very very very very very very very very very very long " },
+            { timestamp: "12-20.18:52:56", content: "一二三四五六七八九十\n换行\n1234567890Alphanumeric\nEmoji：“🤔” " },
+            { timestamp: "12-20.18:52:55", content: "下面是空字符串 " },
+            { timestamp: "12-20.18:52:54", content: "" },
+            { timestamp: "12-20.18:52:53", content: "上面是空字符串 " },
+        ],
+        details: {
+            loaded: true,
+            diamond: "233",
+            diamond-shard: "180000",
+            gacha-ticket: "300",
+            tenfold-gacha-ticket: "30",
+            gold: "368880000",
+            max-ap: "135",
+            recruit-license: "1000",
+            secretary: "澄闪",
+            social-point: "300"
+        }
+    };
+}

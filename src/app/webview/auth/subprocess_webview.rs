@@ -1,5 +1,7 @@
 use super::super::auth;
 use crate::app::ipc::AuthenticatorMessage;
+use crate::app::utils::data_dir;
+use crate::app::webview::auth::consts;
 use argh::FromArgs;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
@@ -12,7 +14,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
     window::WindowButtons,
 };
-use wry::WebViewBuilder;
+use wry::{WebContext, WebViewBuilder};
 
 #[derive(Error, Debug)]
 pub enum ChildProcessAuthenticatorError {
@@ -92,8 +94,15 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         })),
     );
 
+    let user_data_dir = data_dir::get_data_dir().join(consts::WEBVIEW_USER_DATA_DIR);
+    println!(
+        "[WebViewSubprocess] User data directory: {}",
+        user_data_dir.display()
+    );
+    let mut web_context = WebContext::new(Some(user_data_dir));
+
     let webview = authenticator
-        .build_webview(WebViewBuilder::new(&window))?
+        .build_webview(WebViewBuilder::new(&window).with_web_context(&mut web_context))?
         .build()?;
     authenticator
         .webview

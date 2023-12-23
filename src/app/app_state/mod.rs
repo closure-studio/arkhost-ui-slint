@@ -1,6 +1,6 @@
 pub mod model;
 
-use self::model::GameInfoModel;
+use self::model::{CharIllust, GameInfoModel, ImageData};
 use super::ui::*;
 use slint::{Model, ModelRc, Timer, VecModel, Weak};
 use std::rc::Rc;
@@ -18,11 +18,28 @@ impl AppState {
         }
     }
 
-    pub fn set_login_state(&self, state: LoginState, status_text: String) {
+    pub fn set_login_state(&self, state: LoginState, mut status_text: String) {
         self.ui
             .upgrade_in_event_loop(move |ui| {
+                status_text.push(' '); // slint word wrap bug
                 ui.set_login_state(state);
                 ui.set_login_status_text(status_text.into());
+            })
+            .unwrap();
+    }
+
+    pub fn set_fetch_games_state(&self, state: FetchGamesState) {
+        self.ui
+            .upgrade_in_event_loop(move |ui| {
+                ui.set_fetch_games_state(state);
+            })
+            .unwrap();
+    }
+
+    pub fn set_use_auth(&self, account: String, use_auth: bool) {
+        self.ui
+            .upgrade_in_event_loop(move |ui| {
+                ui.invoke_set_use_auth(account.into(), use_auth);
             })
             .unwrap();
     }
@@ -46,6 +63,37 @@ impl AppState {
             game_info.log_loaded = state;
             game_info_list.set_row_data(i, game_info);
         });
+    }
+
+    pub fn set_game_images(
+        &self,
+        id: String,
+        avatar: Option<ImageData>,
+        char_illust: Option<CharIllust>,
+    ) {
+        self.get_game_by_id(id, move |game_info_list, i, mut game_info| {
+            if let Some(avatar) = avatar {
+                if let Some(image) = avatar.to_slint_image() {
+                    game_info.details.avatar.loaded = true;
+                    game_info.details.avatar.avatar_image = image;
+                }
+            }
+
+            if let Some(illust_data) = char_illust {
+                if let Some(image) = illust_data.image.to_slint_image() {
+                    let illust = &mut game_info.details.char_illust;
+                    let positions = &illust_data.positions;
+                    illust.loaded = true;
+                    illust.illust_image = image;
+                    [illust.pivot_factor_x, illust.pivot_factor_y] = positions.pivot_factor;
+                    [illust.offset_x, illust.offset_y] = positions.pivot_offset;
+                    [illust.scale_x, illust.scale_y] = positions.scale;
+                    [illust.size_x, illust.size_y] = positions.size;
+                }
+            }
+
+            game_info_list.set_row_data(i, game_info);
+        })
     }
 
     pub fn update_game_views(

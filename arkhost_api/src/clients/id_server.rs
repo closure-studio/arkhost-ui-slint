@@ -8,36 +8,33 @@ use std::{
 };
 
 use super::common::{
-    try_response_data, try_response_json, ApiResult, UnauthorizedError, UserState,
+    try_response_data, try_response_json, ApiResult, UnauthorizedError, UserState, self,
 };
 
 #[derive(Debug, Clone)]
 pub struct AuthClient {
     base_url: reqwest::Url,
     user_state: Arc<RwLock<dyn UserState>>,
-    pub client: reqwest::Client,
+    pub client: reqwest_middleware::ClientWithMiddleware,
 }
 
 impl AuthClient {
-    pub fn new(base_url: &str, user_state: Arc<RwLock<dyn UserState>>) -> Self {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            "X-Platform",
-            reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_IDENTIFIER),
-        );
-        headers.insert(
-            "User-Agent",
-            reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_USER_AGENT),
-        );
-
+    pub fn new(
+        base_url: &str,
+        client: reqwest_middleware::ClientWithMiddleware,
+        user_state: Arc<RwLock<dyn UserState>>,
+    ) -> Self {
         Self {
             base_url: Url::parse(base_url).unwrap(),
             user_state: user_state.clone(),
-            client: reqwest::ClientBuilder::new()
-                .default_headers(headers)
-                .build()
-                .unwrap(),
+            client,
         }
+    }
+
+    pub fn get_client_builder_with_default_settings() -> reqwest::ClientBuilder {
+        let client_builder = reqwest::ClientBuilder::new();
+        let headers = common::get_common_headers();
+        client_builder.default_headers(headers).gzip(true).brotli(true)
     }
 
     pub async fn login(&self, email: String, password: String) -> ApiResult<User> {
@@ -89,9 +86,5 @@ impl AuthClient {
             Some(jwt) => Ok(jwt),
             None => Err(UnauthorizedError::MissingUserCredentials),
         }
-    }
-
-    pub async fn validate_and_update_user_state(&self) -> ApiResult<String> {
-        todo!()
     }
 }

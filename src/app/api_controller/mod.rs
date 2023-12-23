@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use arkhost_api::clients::{
     self,
-    common::{ApiResult, UserState},
+    common::ApiResult
 };
 use arkhost_api::consts;
 use arkhost_api::models::{api_arkhost, api_passport};
@@ -113,10 +113,7 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(user_state: Arc<std::sync::RwLock<dyn UserState>>) -> Self {
-        let auth_client =
-            clients::id_server::AuthClient::new(consts::passport::API_BASE_URL, user_state);
-
+    pub fn new(auth_client: clients::id_server::AuthClient) -> Self {
         Self {
             games: Arc::new(RwLock::new(HashMap::new())),
             auth_client: Arc::new(auth_client.clone()),

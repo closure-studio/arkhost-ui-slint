@@ -48,6 +48,39 @@ export enum GameInfoViewType {
     Logs,
 }
 
+export struct AvatarInfo {
+    loaded: bool,
+    avatar-image: image
+}
+
+export struct IllustInfo {
+    loaded: bool,
+    illust-image: image,
+    pivot-factor-x: float,
+    pivot-factor-y: float,
+    offset-x: float,
+    offset-y: float,
+    scale-x: float,
+    scale-y: float,
+    size-x: float,
+    size-y: float
+}
+
+export struct GameDetails {  
+    loaded: bool,
+    avatar: AvatarInfo,
+    char-illust: IllustInfo,
+    diamond: string,
+    diamond-shard: string,
+    gacha-ticket: string,
+    tenfold-gacha-ticket: string,
+    gold: string,
+    max-ap: string,
+    recruit-license: string,
+    secretary: string,
+    social-point: string
+}
+
 export struct GameInfo {
     id: string,
     doctor-name: string,
@@ -62,5 +95,6 @@ export struct GameInfo {
     logs: [GameLogEntry],
     request-state: GameOperationRequestState,
     save-state: GameOptionSaveState,
-    active-view: GameInfoViewType
+    active-view: GameInfoViewType,
+    details: GameDetails
 }

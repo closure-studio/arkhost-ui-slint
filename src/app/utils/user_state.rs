@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::{self, File},
     io::{Read, Write},
     path::PathBuf,
@@ -7,12 +6,11 @@ use std::{
 
 use arkhost_api::clients::common::UserState;
 
-static DATA_DIR: &str = ".arkhost-ui-slint";
 static FILE_NAME: &str = "user-state.token";
 
 #[derive(Debug)]
 pub enum UserStateFileStoreSetting {
-    HomeDirWithCurrentDirFallback,
+    DataDirWithCurrentDirFallback,
     #[allow(unused)]
     Path(String),
 }
@@ -39,7 +37,10 @@ impl UserStateFileStorage {
                 let mut jwt = String::new();
                 if let Ok(_) = f.read_to_string(&mut jwt) {
                     self.jwt = Some(jwt);
-                    println!("[UserStateFileStorage] loaded user state file from {:?}", path);
+                    println!(
+                        "[UserStateFileStorage] loaded user state file from {}",
+                        path.display()
+                    );
                 };
             }
             Err(_) => {}
@@ -56,21 +57,29 @@ impl UserStateFileStorage {
         let path = dir_path.join(FILE_NAME);
         match File::create(&path) {
             Ok(mut file) => match file.write_all(self.jwt.clone().unwrap().as_bytes()) {
-                Ok(_) => println!("[UserStateFileStorage] user state file have been written to {:?}", path),
-                Err(e) => eprintln!("[UserStateFileStorage] unable to write user state file at {:?}; Err: {e}", path),
+                Ok(_) => println!(
+                    "[UserStateFileStorage] user state file have been written to {:?}",
+                    path
+                ),
+                Err(e) => eprintln!(
+                    "[UserStateFileStorage] unable to write user state file at {:?}; Err: {e}",
+                    path
+                ),
             },
-            Err(e) => eprintln!("[UserStateFileStorage] unable to create user state file at {:?}; Err: {e}", path),
+            Err(e) => eprintln!(
+                "[UserStateFileStorage] unable to create user state file at {:?}; Err: {e}",
+                path
+            ),
         };
     }
 
     pub fn get_store_path(&self) -> PathBuf {
         match &self.store_setting {
-            UserStateFileStoreSetting::HomeDirWithCurrentDirFallback => home::home_dir()
-                .or(env::current_dir().ok())
-                .unwrap_or(PathBuf::from(".")),
+            UserStateFileStoreSetting::DataDirWithCurrentDirFallback => {
+                super::data_dir::get_data_dir()
+            }
             UserStateFileStoreSetting::Path(path) => PathBuf::from(path),
         }
-        .join(DATA_DIR)
     }
 }
 
