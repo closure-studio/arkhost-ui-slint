@@ -52,7 +52,16 @@ fn create_asset_client() -> AssetClient {
             manager: CACacheManager {
                 path: get_data_dir().join("cache/assets/"),
             },
-            options: HttpCacheOptions::default(),
+            options: HttpCacheOptions {
+                cache_mode_fn: Some(Arc::new(|req| {
+                    if req.uri.path().ends_with(".json") {
+                        CacheMode::NoStore
+                    } else {
+                        CacheMode::Default
+                    }
+                })),
+                ..Default::default()
+            },
         }))
         .build();
 
