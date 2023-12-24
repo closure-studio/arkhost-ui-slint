@@ -5,6 +5,8 @@ use serde_repr::Deserialize_repr;
 use serde_with::{serde_as, TimestampSeconds};
 use std::fmt::Debug;
 
+use super::common::NullableData;
+
 #[derive(Default, Deserialize_repr, Clone, Debug, PartialEq)]
 #[repr(i32)]
 pub enum UserStatus {
@@ -64,10 +66,12 @@ pub struct LoginRequest {
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
-pub struct LoginResponse {
+pub struct LoginResponseValue {
     #[serde(rename = "token")]
     pub token: String,
 }
+
+pub type LoginResponse = NullableData<LoginResponseValue>;
 
 #[serde_as]
 #[derive(Default, Deserialize, Clone, Debug)]

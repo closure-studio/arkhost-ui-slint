@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 use serde_with::{serde_as, TimestampSeconds};
 
+use super::common::NullableData;
+
 #[derive(Default, PartialEq, Deserialize_repr, Clone, Debug)]
 #[repr(i32)]
 pub enum GameStatus {
@@ -39,6 +41,8 @@ pub struct GameInfo {
     pub captcha_info: CaptchaInfo,
     pub game_config: GameConfigFields,
 }
+
+pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
 
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]

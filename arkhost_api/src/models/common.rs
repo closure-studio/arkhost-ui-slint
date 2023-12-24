@@ -31,7 +31,7 @@ where
     T: Clone,
 {
     pub code: Option<i32>,
-    pub data: NullableData<T>,
+    pub data: T,
     pub message: Option<String>,
 }
 
@@ -52,23 +52,11 @@ where
     T: Clone,
 {
     fn to_response_data(self) -> ResponseData<T> {
-        match self {
-            ResponseWrapperNested {
-                data: NullableData::Data(data),
-                code,
-                message,
-            } => ResponseData {
-                success: code == Some(1),
-                data: Some(data),
-                internal_code: code,
-                internal_message: message,
-            },
-            ResponseWrapperNested { code, message, .. } => ResponseData {
-                success: false,
-                data: None,
-                internal_code: code,
-                internal_message: message,
-            },
+        ResponseData {
+            success: self.code == Some(1),
+            data: Some(self.data),
+            internal_code: self.code,
+            internal_message: self.message,
         }
     }
 }

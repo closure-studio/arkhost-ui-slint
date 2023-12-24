@@ -1,9 +1,9 @@
 use super::{
-    common::{try_response_data, try_response_json, ApiResult},
+    common::{map_try_response_data, try_response_data, try_response_json, ApiResult},
     id_server::AuthClient,
 };
-use crate::consts::arkhost::api;
 use crate::models::{api_arkhost::*, common::ResponseWrapperNested};
+use crate::{consts::arkhost::api, models::common::NullableData};
 
 use reqwest::Url;
 pub struct Client {
@@ -29,9 +29,12 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<Vec<GameInfo>>>(resp).await?;
+        let json = try_response_json::<ResponseWrapperNested<FetchGamesResult>>(resp).await?;
 
-        Ok(try_response_data(status_code, json)?)
+        Ok(map_try_response_data(status_code, json, |x| match x {
+            NullableData::Data(games) => Ok(games),
+            _ => Ok(vec![]),
+        })?)
     }
 
     pub async fn get_game(&self, account: &str) -> ApiResult<GameDetails> {

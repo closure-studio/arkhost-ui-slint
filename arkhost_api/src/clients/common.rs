@@ -86,25 +86,59 @@ where
 pub fn try_response_data<T>(
     status_code: StatusCode,
     resp: impl ResponseWrapper<T>,
-) -> Result<T, ResponseError<ResponseData<T>>>
+) -> Result<T, ResponseError<T>>
 where
     T: Clone + Debug,
 {
+    map_try_response_data(status_code, resp, |x| Ok(x))
+}
+
+pub fn map_try_response_data<T, R>(
+    status_code: StatusCode,
+    resp: impl ResponseWrapper<T>,
+    op: impl FnOnce(T) -> Result<R, T>,
+) -> Result<R, ResponseError<T>>
+where
+    T: Clone + Debug,
+{
+    fn make_err<T: Clone + Debug>(
+        status_code: StatusCode,
+        data: Option<T>,
+        internal_code: Option<i32>,
+        internal_message: Option<String>,
+    ) -> ResponseError<T> {
+        ResponseError {
+            status_code: status_code.as_u16(),
+            internal_status_code: internal_code,
+            internal_message,
+            raw_response: data,
+            raw_data: None,
+            source_error: None,
+        }
+    }
+
     let data = resp.to_response_data();
     match data {
         ResponseData {
             success: true,
             data: Some(data),
+            internal_code,
+            internal_message,
+        } => match op(data) {
+            Ok(r) => Ok(r),
+            Err(data) => Err(make_err(
+                status_code,
+                Some(data),
+                internal_code,
+                internal_message,
+            )),
+        },
+        ResponseData {
+            data,
+            internal_code,
+            internal_message,
             ..
-        } => Ok(data),
-        _ => Err(ResponseError {
-            status_code: status_code.as_u16(),
-            internal_status_code: data.internal_code.clone(),
-            internal_message: data.internal_message.clone(),
-            raw_response: Some(data),
-            raw_data: None,
-            source_error: None,
-        }),
+        } => Err(make_err(status_code, data, internal_code, internal_message)),
     }
 }
 

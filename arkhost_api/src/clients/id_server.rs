@@ -1,6 +1,6 @@
 use crate::consts::passport::api;
 use crate::models::api_passport::{LoginRequest, LoginResponse, User, UserStatus};
-use crate::models::common::ResponseWrapperNested;
+use crate::models::common::{NullableData, ResponseWrapperNested};
 use reqwest::Url;
 use std::{
     fmt::Debug,
@@ -8,7 +8,8 @@ use std::{
 };
 
 use super::common::{
-    try_response_data, try_response_json, ApiResult, UnauthorizedError, UserState, self,
+    self, map_try_response_data, try_response_data, try_response_json, ApiResult,
+    UnauthorizedError, UserState,
 };
 
 #[derive(Debug, Clone)]
@@ -34,7 +35,10 @@ impl AuthClient {
     pub fn get_client_builder_with_default_settings() -> reqwest::ClientBuilder {
         let client_builder = reqwest::ClientBuilder::new();
         let headers = common::get_common_headers();
-        client_builder.default_headers(headers).gzip(true).brotli(true)
+        client_builder
+            .default_headers(headers)
+            .gzip(true)
+            .brotli(true)
     }
 
     pub async fn login(&self, email: String, password: String) -> ApiResult<User> {
@@ -50,7 +54,10 @@ impl AuthClient {
         let status_code = resp.status();
         let json = try_response_json::<ResponseWrapperNested<LoginResponse>>(resp).await?;
 
-        let login_result = try_response_data(status_code, json)?;
+        let login_result = map_try_response_data(status_code, json, |data| match data {
+            NullableData::Data(login_result) => Ok(login_result),
+            _ => Err(data),
+        })?;
         self.user_state
             .write()
             .unwrap()
