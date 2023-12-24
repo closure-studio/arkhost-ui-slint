@@ -9,20 +9,27 @@ import { MockData } from "../mock-data.slint";
 import { CharIllust } from "../components/char-illust.slint";
 
 component GameCardTab inherits Rectangle {
+    in property <length> design-height;
+    in property <length> adaptive-height;
     in property <int> active-tab;
     in property <int> current-active-tab;
-
     y: current-active-tab == active-tab
         ? 0
         : current-active-tab > active-tab
-            ? - self.height - 1px
-            : root.height + 1px;
+            ? - self.height - 5px
+            : root.height + 5px;
 
-    animate y {
-        duration: 0.25s;
-        easing: ease;
-    }
-
+    height: adaptive-height;
+    states [
+        active when current-active-tab == active-tab: {
+            opacity: 1;
+        }
+        inactive when current-active-tab == active-tab: {
+            opacity: 0;
+            in { animate opacity { delay: 0.25s; } }
+        }
+    ]
+    animate y { duration: 0.25s; easing: ease; }
     @children
 }
 
@@ -57,7 +64,6 @@ component GameCardTabSwitch inherits Rectangle {
 export component GameCard inherits Rectangle {
     in property <GameInfo> info: MockData.game-info;
     private property <int> current-active-tab: 0;
-    private property <length> current-tab-height: 300px;
     
     callback start-game <=> doc-info.start-game;
     callback stop-game <=> doc-info.stop-game;
@@ -69,14 +75,14 @@ export component GameCard inherits Rectangle {
     border-radius: 10px;
     border-width: 1px;
     background: StyleMetrics.window-background;
-    drop-shadow-blur: 3px;
+    drop-shadow-blur: 5px;
     drop-shadow-color: darkgray;
     clip: true;
     
     CharIllust {
         illust-info: info.details.char-illust;
-        target-width: min(800px, parent.width * 0.6);
-        property <length> pos-x: max(250px, parent.width * 0.35);
+        target-width: min(1000px, parent.width * 0.6);
+        property <length> pos-x: max(270px, parent.width * 0.35);
 
         states [
             show when info.details.char-illust.loaded 
@@ -105,13 +111,8 @@ export component GameCard inherits Rectangle {
                 y: doctor-tab.y;
                 opacity: 0;
                 in {
-                    animate opacity {
-                        duration: 0.1s;
-                    }
-
-                    animate y {
-                        duration: 0.1s;
-                    }
+                    animate opacity { duration: 0.1s; }
+                    animate y { duration: 0.1s; }
 
                     animate x {
                         delay: 0.1s;
@@ -126,6 +127,10 @@ export component GameCard inherits Rectangle {
 
         VerticalLayout {
             Rectangle {
+                private property <length> current-tab-design-height: doctor-tab.design-height;
+                pure function get-adaptive-height(orig-width: length) -> length {
+                    return orig-width * clamp(1 + (root.width - 1200px) / 800px, 1, 4.8 / 3);
+                }
                 clip: true;
 
                 doctor-tab := GameCardTab {
@@ -134,7 +139,8 @@ export component GameCard inherits Rectangle {
                     doc-info := GameCardDoctorInfo { 
                         info: info; 
                     }
-                    height: 300px;
+                    design-height: 320px;
+                    adaptive-height: get-adaptive-height(self.design-height);
                 }
                 
                 settings-tab := GameCardTab {
@@ -143,7 +149,8 @@ export component GameCard inherits Rectangle {
                     options := GameCardOptions {
                         info: info;
                     }
-                    height: 500px;
+                    design-height: 500px;
+                    adaptive-height: get-adaptive-height(self.design-height);
                 }
 
                 log-tab := GameCardTab {
@@ -152,14 +159,29 @@ export component GameCard inherits Rectangle {
                     logs := GameCardLog {
                         info: info;
                     }
-                    height: 500px;
+                    design-height: 500px;
+                    adaptive-height: get-adaptive-height(self.design-height);
                 }
 
-                height: current-tab-height;
-                animate height {
-                    duration: 0.25s;
-                    easing: ease;
-                }
+                height: get-adaptive-height(current-tab-design-height);
+                
+                states [
+                    doc-info when current-active-tab == 0: {
+                        current-tab-design-height: doctor-tab.design-height;
+                        height: get-adaptive-height(current-tab-design-height);
+                        in { animate height { duration: 0.25s; easing: ease; } }
+                    }
+                    settings when current-active-tab == 1: {
+                        current-tab-design-height: settings-tab.design-height;
+                        height: get-adaptive-height(current-tab-design-height);
+                        in { animate height { duration: 0.25s; easing: ease; } }
+                    }
+                    log when current-active-tab == 2: {
+                        current-tab-design-height: log-tab.design-height;
+                        height: get-adaptive-height(current-tab-design-height);
+                        in { animate height { duration: 0.25s; easing: ease; } }
+                    }
+                ]
             }
         }
 
@@ -175,7 +197,6 @@ export component GameCard inherits Rectangle {
                     icon: @image-url("../images/game_card_tab_user.svg");
                     clicked => { 
                         current-active-tab = 0; 
-                        current-tab-height = doctor-tab.height;
                         view-changed(info.id, GameInfoViewType.DoctorInfo);
                     }
                 }
@@ -186,7 +207,6 @@ export component GameCard inherits Rectangle {
                     icon: @image-url("../images/game_card_tab_options.svg");
                     clicked => { 
                         current-active-tab = 1; 
-                        current-tab-height = settings-tab.height;
                         view-changed(info.id, GameInfoViewType.Settings);
                     }
                 }
@@ -196,8 +216,7 @@ export component GameCard inherits Rectangle {
                     current-active-tab: current-active-tab;
                     icon: @image-url("../images/game_card_tab_log.svg");
                     clicked => { 
-                        current-active-tab = 2; 
-                        current-tab-height = log-tab.height;                    
+                        current-active-tab = 2;                 
                         view-changed(info.id, GameInfoViewType.Logs);
                     }
                 }

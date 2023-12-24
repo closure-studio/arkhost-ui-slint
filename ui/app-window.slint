@@ -32,7 +32,7 @@ export component AppWindow inherits Window {
     callback view-changed <=> Callbacks.view-changed;
 
     preferred-width: 1280px;
-    preferred-height: 720px;
+    preferred-height: 800px;
 
     VerticalLayout {
         visible: login-state == LoginState.Logged;
@@ -45,6 +45,28 @@ export component AppWindow inherits Window {
                     game-info-page := GameInfoPage {
                         game-info-list: game-info-list;
                         fetch-games-state: fetch-games-state;
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("设置");
+    
+                HorizontalLayout {
+                    alignment: space-around;
+
+                    VerticalBox {
+                        max-width: 300px;
+                        alignment: start;
+
+                        Button {
+                            text: @tr("退出登录");
+
+                            clicked => {
+                                login-state = LoginState.Unlogged;
+                                login-status-text = "";
+                            }
+                        }
                     }
                 }
             }
