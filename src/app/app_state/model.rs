@@ -65,9 +65,7 @@ impl GameInfoModel {
         // 邮箱能码但是不完全能码
         game_info.doctor_serial = utils::redact_account(&self.game_info.info.status.account).into();
         game_info.game_state = match self.game_info.info.status.code {
-            api_arkhost::GameStatus::Logging if self.game_info.info.captcha_info.created != 0 => {
-                GameState::Captcha
-            }
+            api_arkhost::GameStatus::Captcha => GameState::Captcha,
             api_arkhost::GameStatus::LoginFailed => GameState::Faulted,
             api_arkhost::GameStatus::Pending => GameState::Stopped,
             api_arkhost::GameStatus::Logging => GameState::Logging,

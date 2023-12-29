@@ -15,6 +15,7 @@ pub enum GameStatus {
     Logging = 1,
     Running = 2,
     Error = 3,
+    Captcha = 999
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -124,7 +125,7 @@ pub struct Avatar {
 pub struct CaptchaInfo {
     pub captcha_type: String,
     pub challenge: String,
-    pub created: i32,
+    pub created: u64,
     pub gt: String,
 }
 
