@@ -10,10 +10,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 use thiserror::Error;
-use wry::{
-    http::HeaderMap,
-    PageLoadEvent, WebView, WebViewBuilder,
-};
+use wry::{http::HeaderMap, PageLoadEvent, WebView, WebViewBuilder};
 
 #[derive(Error, Debug)]
 pub enum AuthenticatorError {
@@ -34,9 +31,19 @@ pub enum AuthParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AuthAction {
-    ArkHostRestrictedActionBackground { id: String, action: String },
-    ArkHostRestrictedActionCaptcha { id: String, action: String },
-    GeeTestAuth {},
+    ArkHostRestrictedActionBackground {
+        id: String,
+        action: String,
+    },
+    ArkHostRestrictedActionCaptcha {
+        id: String,
+        action: String,
+    },
+    GeeTestAuth {
+        id: String,
+        gt: String,
+        challenge: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +52,7 @@ pub enum AuthResult {
     Failed { id: String, err: String },
     ArkHostCaptchaTokenReCaptcha { id: String, token: String },
     ArkHostCaptchaTokenGeeTest { id: String, token: String },
+    GeeTestAuth { id: String, token: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,7 +88,8 @@ impl AuthResolver {
         let webview = self.webview.read().unwrap().get_webview()?;
         match action {
             AuthAction::ArkHostRestrictedActionBackground { ref id, .. }
-            | AuthAction::ArkHostRestrictedActionCaptcha { ref id, .. } => {
+            | AuthAction::ArkHostRestrictedActionCaptcha { ref id, .. }
+            | AuthAction::GeeTestAuth { ref id, .. } => {
                 self.pending_auth
                     .write()
                     .unwrap()
@@ -92,7 +101,6 @@ impl AuthResolver {
                     Ok(())
                 }
             }
-            AuthAction::GeeTestAuth {} => todo!(),
         }
     }
 
@@ -112,7 +120,8 @@ impl AuthResolver {
     fn preform_now(&self, webview: &WebView, action: &AuthAction) -> anyhow::Result<()> {
         match action {
             AuthAction::ArkHostRestrictedActionBackground { .. }
-            | AuthAction::ArkHostRestrictedActionCaptcha { .. } => {
+            | AuthAction::ArkHostRestrictedActionCaptcha { .. }
+            | AuthAction::GeeTestAuth { .. } => {
                 let params = AuthPagePrams {
                     params: &self.auth_params,
                     action: &action,
@@ -130,7 +139,6 @@ impl AuthResolver {
                     "}"].concat())?;
                 Ok(())
             }
-            AuthAction::GeeTestAuth {} => todo!(),
         }
     }
 
@@ -177,13 +185,12 @@ impl Authenticator {
         let mut builder = builder;
 
         match self.auth_params {
-            AuthParams::ArkHostAuth { .. } => {
+            AuthParams::GeeTestAuth {} | AuthParams::ArkHostAuth { .. } => {
                 builder = builder.with_url_and_headers(
                     consts::ARKHOST_VERIFY_URL,
                     Authenticator::get_request_headers(),
                 )?;
             }
-            AuthParams::GeeTestAuth {} => todo!(),
         }
         {
             let auth_listener_ref = self.auth_listener.clone();

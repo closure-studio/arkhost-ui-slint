@@ -39,7 +39,7 @@ bitflags! {
 #[serde(rename_all = "snake_case")]
 pub struct GameInfo {
     pub status: Status,
-    pub captcha_info: CaptchaInfo,
+    pub captcha_info: CaptchaChallengeInfo,
     pub game_config: GameConfigFields,
 }
 
@@ -93,6 +93,7 @@ pub struct StatusDetails {
 }
 
 impl StatusDetails {
+    /// 获取secretary_skin_id在asset server中的文件名
     pub fn get_secretary_skin_id_escaped(&self) -> String {
         self.secretary_skin_id.replace("@", "_").replace("#", "_")
     }
@@ -120,13 +121,28 @@ pub struct Avatar {
     pub id: String,
 }
 
+impl Avatar {
+    pub fn get_id_escaped(&self) -> String {
+        self.id.replace("@", "_").replace("#", "_")
+    }
+}
+
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
-pub struct CaptchaInfo {
+pub struct CaptchaChallengeInfo {
     pub captcha_type: String,
     pub challenge: String,
     pub created: u64,
     pub gt: String,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct CaptchaResultInfo {
+    pub challenge: String,
+    pub geetest_challenge: String,
+    pub geetest_validate: String,
+    pub geetest_seccode: String
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -160,7 +176,8 @@ impl GameConfigFields {
 #[derive(Default, Serialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct UpdateGameRequest {
-    pub config: GameConfigFields,
+    pub config: Option<GameConfigFields>,
+    pub captcha_info: Option<CaptchaResultInfo>
 }
 
 #[serde_as]

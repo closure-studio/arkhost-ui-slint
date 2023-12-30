@@ -88,13 +88,32 @@ impl Client {
         account: &str,
         config: GameConfigFields,
     ) -> ApiResult<()> {
-        let update_config_request = UpdateGameRequest { config };
+        let request = UpdateGameRequest {
+            config: Some(config),
+            captcha_info: None,
+        };
+        self.update_game(account, request).await
+    }
+
+    pub async fn update_captcha_info(
+        &self,
+        account: &str,
+        captcha_info: CaptchaResultInfo,
+    ) -> ApiResult<()> {
+        let request = UpdateGameRequest {
+            config: None,
+            captcha_info: Some(captcha_info),
+        };
+        self.update_game(account, request).await
+    }
+
+    pub async fn update_game(&self, account: &str, request: UpdateGameRequest) -> ApiResult<()> {
         let resp = self
             .auth_client
             .client
             .post(self.base_url.join(&api::game_config(account))?)
             .bearer_auth(self.auth_client.get_jwt()?)
-            .json(&update_config_request)
+            .json(&request)
             .send()
             .await?;
 

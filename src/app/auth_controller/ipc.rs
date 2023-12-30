@@ -28,7 +28,7 @@ impl AuthController for IpcAuthController {
             match cmd {
                 Command::AuthArkHostBackground { resp, action } => {
                     _ = resp.send(
-                        self.auth_arkhost(
+                        self.auth(
                             AuthAction::ArkHostRestrictedActionBackground {
                                 id: "UNUSED".into(),
                                 action,
@@ -40,7 +40,7 @@ impl AuthController for IpcAuthController {
                 }
                 Command::AuthArkHostCaptcha { resp, action } => {
                     _ = resp.send(
-                        self.auth_arkhost(
+                        self.auth(
                             AuthAction::ArkHostRestrictedActionCaptcha {
                                 id: "UNUSED".into(),
                                 action,
@@ -48,6 +48,11 @@ impl AuthController for IpcAuthController {
                             false,
                         )
                         .await,
+                    )
+                },
+                Command::AuthGeeTest { resp, gt, challenge } => {
+                    _ = resp.send(
+                        self.auth(AuthAction::GeeTestAuth { id: gt.clone(), gt, challenge }, false).await
                     )
                 }
                 Command::HideWindow {} => {
@@ -83,7 +88,7 @@ impl IpcAuthController {
             .await
     }
 
-    pub async fn auth_arkhost(
+    pub async fn auth(
         &mut self,
         action: AuthAction,
         background: bool,

@@ -1,5 +1,6 @@
 use crate::app::ui::*;
 use crate::app::webview::auth::AuthResult;
+use arkhost_api::models::api_arkhost;
 use tokio::sync::oneshot;
 
 use anyhow::anyhow;
@@ -89,6 +90,63 @@ impl GameOperationController {
         parent
             .get_app_state()
             .set_game_request_state(account.clone(), GameOperationRequestState::Idle);
+    }
+
+    pub async fn preform_game_captcha(
+        &self,
+        parent: Arc<super::ControllerHub>,
+        account: String,
+        gt: String,
+        challenge: String,
+    ) -> anyhow::Result<()> {
+        let (resp, mut rx) = oneshot::channel();
+        let auth_result = parent
+            .send_auth_request(
+                AuthCommand::AuthGeeTest {
+                    resp,
+                    gt,
+                    challenge,
+                },
+                &mut rx,
+            )
+            .await;
+        _ = parent
+            .tx_auth_controller
+            .send(AuthCommand::HideWindow {})
+            .await;
+        let captcha_info = match auth_result.and_then(|result| match result {
+            AuthResult::GeeTestAuth { token, .. } => {
+                serde_json::de::from_str::<api_arkhost::CaptchaResultInfo>(&token)
+                    .map_err(anyhow::Error::from)
+            }
+            _ => anyhow::Result::Err(anyhow!("unexpected auth result: {result:?}")),
+        }) {
+            Ok(captcha_info) => captcha_info,
+            Err(e) => {
+                eprintln!(
+                    "[Controller] Error performing game captcha (invoking authenticator) {e}"
+                );
+                return Err(e);
+            }
+        };
+
+        let (resp, mut rx) = oneshot::channel();
+        if let Err(e) = parent
+            .send_api_request(
+                ApiCommand::PreformCaptcha {
+                    account,
+                    captcha_info,
+                    resp,
+                },
+                &mut rx,
+            )
+            .await
+        {
+            eprintln!("[Controller] Error performing game captcha (updating game config) {e}");
+            return Err(e);
+        }
+
+        Ok(())
     }
 
     async fn try_start_game(

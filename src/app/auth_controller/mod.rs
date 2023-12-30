@@ -10,6 +10,7 @@ use super::webview::auth::AuthResult;
 pub enum Command {
     AuthArkHostBackground { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
     AuthArkHostCaptcha { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
+    AuthGeeTest { resp: oneshot::Sender<anyhow::Result<AuthResult>>, gt: String, challenge: String },
     HideWindow { },
     Stop { },
 }

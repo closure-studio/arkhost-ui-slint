@@ -8,6 +8,7 @@ use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
+use winit::window::WindowLevel;
 use winit::{
     dpi::LogicalPosition,
     event::{Event, WindowEvent},
@@ -81,6 +82,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         .with_visible(false)
         .with_title("Closure Studio - 用户验证")
         .with_enabled_buttons(WindowButtons::MINIMIZE | WindowButtons::CLOSE)
+        .with_window_level(WindowLevel::AlwaysOnTop)
         .build(&event_loop)
         .unwrap();
 

@@ -33,7 +33,7 @@ impl ImageController {
         if !info.info.status.avatar.id.is_empty() {
             let mut path = arkhost_api::consts::asset::api::avatar(
                 &info.info.status.avatar.type_val,
-                &info.info.status.avatar.id,
+                &info.info.status.avatar.get_id_escaped(),
             );
             path.push_str(".webp");
             {

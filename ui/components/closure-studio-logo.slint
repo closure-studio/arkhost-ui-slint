@@ -75,5 +75,25 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
                 }
             }
         }
+
+        HorizontalLayout {
+            padding: 5px;
+            alignment: space-around;
+
+            Rectangle {
+                height: 30px;
+                width: 60px;
+                border-radius: 8px;
+
+                Text {
+                    font-size: 18px;
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    color: whitesmoke;
+                    text: "BETA";
+                }
+
+                background: gray;
+            }
+        }
     }
 }

@@ -6,14 +6,20 @@ use crate::app::{
     ui::*,
 };
 use anyhow::anyhow;
-use arkhost_api::models::api_arkhost::{self, GameConfigFields};
+use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameStatus};
 use serde::Deserialize;
 use slint::Model;
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 
 use std::{collections::HashMap, sync::Arc};
 
 use super::{ApiCommand, AssetCommand};
+
+enum CaptchaState {
+    Running,
+    Succeeded,
+    Failed
+}
 
 #[derive(Default, Debug)]
 struct GameResourceEntry {
@@ -27,6 +33,7 @@ pub struct GameController {
     #[allow(unused)] // TODO: 关卡相关
     stage_data: RwLock<Option<StageTable>>,
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
+    captcha_states: Mutex<HashMap<String, CaptchaState>>,
 }
 
 impl GameController {
@@ -35,6 +42,7 @@ impl GameController {
             game_resource_map: RwLock::new(HashMap::new()),
             stage_data: RwLock::new(None),
             char_pack_summaries: RwLock::new(None),
+            captcha_states: Mutex::new(HashMap::new()),
         }
     }
 
@@ -82,6 +90,42 @@ impl GameController {
                 let mut game_list: Vec<(i32, String, GameInfoModel)> = Vec::new();
                 for game_ref in games.read().await.values() {
                     let game_info = game_ref.info.read().await;
+                    if game_info.info.status.code == GameStatus::Captcha {
+                        let mut captcha_states = self.captcha_states.lock().await;
+                        match captcha_states.get(&game_info.info.status.account) {
+                            None => {
+                                let parent = parent.clone();
+                                let account = game_info.info.status.account.clone();
+                                let gt = game_info.info.captcha_info.gt.clone();
+                                let challenge = game_info.info.captcha_info.challenge.clone();
+                                tokio::task::spawn(async move {
+                                    let result = parent
+                                        .game_operation_controller
+                                        .preform_game_captcha(
+                                            parent.clone(),
+                                            account.clone(),
+                                            gt,
+                                            challenge,
+                                        )
+                                        .await;
+                                    parent.game_controller.captcha_states.lock().await.insert(
+                                        account,
+                                        if result.is_ok() {
+                                            CaptchaState::Succeeded
+                                        } else {
+                                            CaptchaState::Failed
+                                        },
+                                    );
+                                });
+                                captcha_states.insert(
+                                    game_info.info.status.account.clone(),
+                                    CaptchaState::Running,
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+
                     self.load_game_images_if_empty(
                         parent.clone(),
                         &game_info,

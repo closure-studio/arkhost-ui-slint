@@ -38,7 +38,7 @@ pub mod quota {
 
 pub mod asset {
     pub static API_BASE_URL: &str = "https://assets.closure.setonink.com/dst/";
-    pub static REFERER_URL: &str = "https://closure-studio.vercel.app";
+    pub static REFERER_URL: &str = "https://arknights.host";
 
     pub mod api {
         pub fn avatar(avatar_type: &str, id: &str) -> String {

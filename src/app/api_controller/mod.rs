@@ -1,8 +1,5 @@
 use anyhow::anyhow;
-use arkhost_api::clients::{
-    self,
-    common::ApiResult
-};
+use arkhost_api::clients::{self, common::ApiResult};
 use arkhost_api::consts;
 use arkhost_api::models::{api_arkhost, api_passport};
 use std::{collections::HashMap, mem, sync::Arc};
@@ -73,6 +70,11 @@ pub enum Command {
     UpdateGameSettings {
         account: String,
         config: api_arkhost::GameConfigFields,
+        resp: Responder<()>,
+    },
+    PreformCaptcha {
+        account: String,
+        captcha_info: api_arkhost::CaptchaResultInfo,
         resp: Responder<()>,
     },
     Stop {},
@@ -162,6 +164,11 @@ impl Controller {
                     config,
                     resp,
                 } => _ = resp.send(self.update_game_settings(account, config).await),
+                Command::PreformCaptcha {
+                    account,
+                    captcha_info,
+                    resp,
+                } => _ = resp.send(self.update_captcha_info(account, captcha_info).await),
                 Command::Stop {} => {
                     break;
                 }
@@ -325,6 +332,16 @@ impl Controller {
     ) -> CommandResult<()> {
         self.arkhost_client
             .update_game_config(&account.clone(), config)
+            .await
+    }
+
+    pub async fn update_captcha_info(
+        &self,
+        account: String,
+        captcha_info: api_arkhost::CaptchaResultInfo,
+    ) -> CommandResult<()> {
+        self.arkhost_client
+            .update_captcha_info(&account, captcha_info)
             .await
     }
 
