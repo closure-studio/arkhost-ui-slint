@@ -54,7 +54,8 @@ fn create_asset_client() -> AssetClient {
             },
             options: HttpCacheOptions {
                 cache_mode_fn: Some(Arc::new(|req| {
-                    if req.uri.path().ends_with(".json") {
+                    // TODO: temporary fix
+                    if req.uri.path().ends_with(".json") || req.uri.path().contains("/avatar/") {
                         CacheMode::NoStore
                     } else {
                         CacheMode::Default
