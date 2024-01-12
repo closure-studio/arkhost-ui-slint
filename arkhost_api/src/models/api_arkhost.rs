@@ -94,7 +94,7 @@ pub struct StatusDetails {
 
 impl StatusDetails {
     /// 获取secretary_skin_id在asset server中的文件名
-    pub fn get_secretary_skin_id_escaped(&self) -> String {
+    pub fn sanitize_secretary_skin_id_for_url(&self) -> String {
         self.secretary_skin_id.replace("@", "_").replace("#", "_")
     }
 }
@@ -122,7 +122,7 @@ pub struct Avatar {
 }
 
 impl Avatar {
-    pub fn get_id_escaped(&self) -> String {
+    pub fn sanitize_id_for_url(&self) -> String {
         self.id.replace("@", "_").replace("#", "_")
     }
 }

@@ -236,7 +236,7 @@ impl GameController {
                     .char_illust_filename
                     .write()
                     .await
-                    .insert(details.status.get_secretary_skin_id_escaped());
+                    .insert(details.status.sanitize_secretary_skin_id_for_url());
             }
         }
     }

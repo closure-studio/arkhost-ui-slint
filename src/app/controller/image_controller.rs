@@ -30,7 +30,7 @@ impl ImageController {
         if !info.info.status.avatar.id.is_empty() {
             let mut path = arkhost_api::consts::asset::api::avatar(
                 &info.info.status.avatar.type_val,
-                &info.info.status.avatar.get_id_escaped(),
+                &info.info.status.avatar.sanitize_id_for_url(),
             );
             path.push_str(".webp");
             {
@@ -55,7 +55,7 @@ impl ImageController {
 
         if let Some(details) = &info.details {
             if !details.status.secretary_skin_id.is_empty() {
-                let mut skin_id = details.status.get_secretary_skin_id_escaped();
+                let mut skin_id = details.status.sanitize_secretary_skin_id_for_url();
                 skin_id.push_str(".webp");
                 let path = arkhost_api::consts::asset::api::charpack(&skin_id);
                 {
