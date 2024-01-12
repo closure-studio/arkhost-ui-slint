@@ -2,14 +2,23 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-pub type StageTable = HashMap<String, Stage>;
+#[derive(Default, Deserialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
+pub struct StageTable {
+    pub stages: HashMap<String, Stage>
+}
 
 #[derive(Default, Deserialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
 pub struct Stage {
-    pub name: String,
+    pub name: Option<String>,
     pub code: String,
-    pub ap: u16,
-    pub items: Vec<String>
+    pub ap_cost: i32,
+    pub is_predefined: bool,
+    pub is_hard_predefined: bool,
+    pub is_skill_selectable_predefined: bool,
+    pub is_story_only: bool,
+    pub can_battle_replay: bool
 }
 
 pub type CharPackSummaryTable = HashMap<String, CharPack>;

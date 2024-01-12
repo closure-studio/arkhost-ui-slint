@@ -289,17 +289,18 @@ impl GameController {
     }
 
     pub async fn load_resources(&self) {
-        // let has_stage_data = self.stage_data.read().await.is_some();
+        let has_stage_data = self.stage_data.read().await.is_some();
         let has_char_pack_summary = self.char_pack_summaries.read().await.is_some();
 
-        // if !has_stage_data {
-        //     if let Some(stage_data) = self
-        //         .load_json_table::<StageTable>(parent, "stages.json".into(), Some("stages.json".into()))
-        //         .await
-        //     {
-        //         _ = self.stage_data.write().await.insert(stage_data);
-        //     }
-        // }
+        if !has_stage_data {
+            let path = arkhost_api::consts::asset::api::gamedata("excel/stage_table.json");
+            if let Some(stage_data) = self
+                .load_json_table::<StageTable>(path.clone(), Some(path))
+                .await
+            {
+                _ = self.stage_data.write().await.insert(stage_data);
+            }
+        }
 
         if !has_char_pack_summary {
             let path = arkhost_api::consts::asset::api::charpack("summary.json");
