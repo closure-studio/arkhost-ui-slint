@@ -3,23 +3,22 @@ use tokio::sync::oneshot;
 
 use std::sync::Arc;
 
-use super::ApiCommand;
+use super::{
+    app_state_controller::AppStateController, game_controller::GameController,
+    request_controller::RequestController, ApiCommand,
+};
 
-pub struct AccountController {}
+pub struct AccountController {
+    pub request_controller: Arc<RequestController>,
+    pub app_state_controller: Arc<AppStateController>,
+    pub game_controller: Arc<GameController>,
+}
 
 impl AccountController {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub async fn login(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        account: String,
-        password: String,
-    ) {
+    pub async fn login(&self, account: String, password: String) {
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_api_request(
                 ApiCommand::Login {
                     email: account.into(),
@@ -32,29 +31,25 @@ impl AccountController {
         {
             Ok(user) => {
                 println!("[Controller] Logged in: {} {}", user.user_email, user.uuid);
-                parent
-                    .get_app_state()
-                    .set_login_state(LoginState::Logged, "登录成功".into());
-
-                parent
-                    .game_controller
-                    .refresh_games(parent.clone(), super::RefreshLogsCondition::Never)
+                self.app_state_controller
+                    .exec(|x| x.set_login_state(LoginState::Logged, "登录成功".into()));
+                self.game_controller
+                    .refresh_games(super::RefreshLogsCondition::Never)
                     .await;
             }
             Err(e) => {
-                parent
-                    .get_app_state()
-                    .set_login_state(LoginState::Errored, format!("{:?}", e).into());
+                self.app_state_controller
+                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{:?}", e).into()));
             }
         }
     }
 
-    pub async fn auth(&self, parent: Arc<super::ControllerHub>) {
-        parent
-            .get_app_state()
-            .set_login_state(LoginState::LoggingIn, "自动登录中……".into());
+    pub async fn auth(&self) {
+        self.app_state_controller
+            .exec(|x| x.set_login_state(LoginState::LoggingIn, "自动登录中……".into()));
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_api_request(ApiCommand::Auth { resp }, &mut rx)
             .await
         {
@@ -63,23 +58,20 @@ impl AccountController {
                     "[Controller] Auth success: {} {}",
                     user.user_email, user.uuid
                 );
-                parent
-                    .get_app_state()
-                    .set_login_state(LoginState::Logged, "登录成功".into());
+                self.app_state_controller
+                    .exec(|x| x.set_login_state(LoginState::Logged, "登录成功".into()));
 
-                parent
-                    .game_controller
-                    .refresh_games(
-                        parent.clone(),
-                        super::RefreshLogsCondition::OnLogsViewOpened,
-                    )
+                self.game_controller
+                    .refresh_games(super::RefreshLogsCondition::OnLogsViewOpened)
                     .await;
             }
             Err(e) => {
-                parent.get_app_state().set_login_state(
-                    LoginState::Errored,
-                    format!("自动登录失败，请重试或检查网络环境\n{:?}", e).into(),
-                );
+                self.app_state_controller.exec(|x| {
+                    x.set_login_state(
+                        LoginState::Errored,
+                        format!("自动登录失败，请重试或检查网络环境\n{:?}", e).into(),
+                    )
+                });
             }
         }
     }

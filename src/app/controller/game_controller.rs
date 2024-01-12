@@ -9,17 +9,21 @@ use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameStatus};
 use serde::Deserialize;
 use slint::Model;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{oneshot, RwLock};
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
-use super::{ApiCommand, AssetCommand};
-
-enum CaptchaState {
-    Running,
-    Succeeded,
-    Failed
-}
+use super::{
+    app_state_controller::AppStateController, game_operation_controller::GameOperationController,
+    image_controller::ImageController, request_controller::RequestController, ApiCommand,
+    AssetCommand,
+};
 
 #[derive(Default, Debug)]
 struct GameResourceEntry {
@@ -33,30 +37,48 @@ pub struct GameController {
     #[allow(unused)] // TODO: 关卡相关
     stage_data: RwLock<Option<StageTable>>,
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
-    captcha_states: Mutex<HashMap<String, CaptchaState>>,
+    refreshing: AtomicBool,
+
+    app_state_controller: Arc<AppStateController>,
+    request_controller: Arc<RequestController>,
+    image_controller: Arc<ImageController>,
+    game_operation_controller: Arc<GameOperationController>,
 }
 
 impl GameController {
-    pub fn new() -> Self {
+    pub fn new(
+        app_state_controller: Arc<AppStateController>,
+        request_controller: Arc<RequestController>,
+        image_controller: Arc<ImageController>,
+        game_operation_controller: Arc<GameOperationController>,
+    ) -> Self {
         Self {
             game_resource_map: RwLock::new(HashMap::new()),
             stage_data: RwLock::new(None),
             char_pack_summaries: RwLock::new(None),
-            captcha_states: Mutex::new(HashMap::new()),
+            refreshing: AtomicBool::new(false),
+            app_state_controller,
+            request_controller,
+            image_controller,
+            game_operation_controller,
         }
     }
 
-    pub async fn refresh_games(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        refresh_log_cond: super::RefreshLogsCondition,
-    ) {
-        self.load_resources(parent.clone()).await;
+    pub async fn refresh_games(&self, refresh_log_cond: super::RefreshLogsCondition) {
+        if self
+            .refreshing
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            return;
+        }
+
+        self.load_resources().await;
         let (resp, mut rx) = oneshot::channel();
-        parent
-            .get_app_state()
-            .set_fetch_games_state(FetchGamesState::Fetching);
-        match parent
+        self.app_state_controller
+            .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetching));
+        match self
+            .request_controller
             .send_api_request(ApiCommand::RetrieveGames { resp }, &mut rx)
             .await
         {
@@ -70,7 +92,8 @@ impl GameController {
                 }
                 for account in games_to_fetch_details {
                     let (resp, mut rx) = oneshot::channel();
-                    let result = parent
+                    let result = self
+                        .request_controller
                         .send_api_request(
                             ApiCommand::RetrieveGameDetails {
                                 account: account.clone(),
@@ -91,43 +114,15 @@ impl GameController {
                 for game_ref in games.read().await.values() {
                     let game_info = game_ref.info.read().await;
                     if game_info.info.status.code == GameStatus::Captcha {
-                        let mut captcha_states = self.captcha_states.lock().await;
-                        match captcha_states.get(&game_info.info.status.account) {
-                            None => {
-                                let parent = parent.clone();
-                                let account = game_info.info.status.account.clone();
-                                let gt = game_info.info.captcha_info.gt.clone();
-                                let challenge = game_info.info.captcha_info.challenge.clone();
-                                tokio::task::spawn(async move {
-                                    let result = parent
-                                        .game_operation_controller
-                                        .preform_game_captcha(
-                                            parent.clone(),
-                                            account.clone(),
-                                            gt,
-                                            challenge,
-                                        )
-                                        .await;
-                                    parent.game_controller.captcha_states.lock().await.insert(
-                                        account,
-                                        if result.is_ok() {
-                                            CaptchaState::Succeeded
-                                        } else {
-                                            CaptchaState::Failed
-                                        },
-                                    );
-                                });
-                                captcha_states.insert(
-                                    game_info.info.status.account.clone(),
-                                    CaptchaState::Running,
-                                );
-                            }
-                            _ => {}
-                        }
+                        let account = game_info.info.status.account.clone();
+                        let gt = game_info.info.captcha_info.gt.clone();
+                        let challenge = game_info.info.captcha_info.challenge.clone();
+                        self.game_operation_controller
+                            .preform_game_captcha(account.clone(), gt, challenge)
+                            .await;
                     }
 
                     self.load_game_images_if_empty(
-                        parent.clone(),
                         &game_info,
                         game_info.info.status.account.clone(),
                     )
@@ -141,50 +136,31 @@ impl GameController {
                 game_list.sort_by_key(|(order, _, _)| *order);
 
                 let game_ids: Vec<String> = game_list.iter().map(|(_, id, _)| id.clone()).collect();
-                let app_state = parent.get_app_state();
-                app_state.update_game_views(game_list, false);
-                app_state.set_fetch_games_state(FetchGamesState::Fetched);
+                self.app_state_controller
+                    .exec(|x| x.update_game_views(game_list, false));
+                self.app_state_controller
+                    .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
 
                 for id in game_ids {
-                    {
-                        let parent = parent.clone();
-                        let id = id.clone();
-                        let refresh_log_cond = refresh_log_cond.clone();
-                        tokio::task::spawn(async move {
-                            parent
-                                .game_controller
-                                .refresh_logs_if_needed(parent.clone(), id.into(), refresh_log_cond)
-                                .await
-                        });
-                    }
-                    {
-                        let parent = parent.clone();
-                        tokio::task::spawn(async move {
-                            parent
-                                .game_controller
-                                .apply_game_images_if_exist(parent.clone(), id.clone())
-                                .await;
-                        });
-                    }
+                    self.refresh_logs_if_needed(id.clone(), refresh_log_cond.clone())
+                        .await;
+                    self.apply_game_images_if_exist(id.clone()).await;
                 }
             }
             Err(e) => {
                 println!("[Controller] Error retrieving games {}", e);
-                parent
-                    .get_app_state()
-                    .set_fetch_games_state(FetchGamesState::Retrying);
+                self.app_state_controller
+                    .exec(|x| x.set_fetch_games_state(FetchGamesState::Retrying));
             }
         };
+
+        self.refreshing.store(false, Ordering::Release);
     }
 
-    pub async fn update_game_settings(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        account: String,
-        config_fields: GameConfigFields,
-    ) {
+    pub async fn update_game_settings(&self, account: String, config_fields: GameConfigFields) {
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_api_request(
                 ApiCommand::UpdateGameSettings {
                     account: account.clone(),
@@ -195,30 +171,22 @@ impl GameController {
             )
             .await
         {
-            Ok(_) => {
-                self.refresh_games(parent.clone(), super::RefreshLogsCondition::Never)
-                    .await
-            }
+            Ok(_) => self.refresh_games(super::RefreshLogsCondition::Never).await,
             Err(e) => eprintln!("[Controller] Error stopping game {e}"),
         }
 
-        parent
-            .get_app_state()
-            .set_game_save_state(account.clone(), GameOptionSaveState::Idle);
+        self.app_state_controller
+            .exec(|x| x.set_game_save_state(account.clone(), GameOptionSaveState::Idle));
     }
 
-    pub async fn retrieve_logs(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        id: String,
-        load_spec: GameLogLoadRequestType,
-    ) {
+    pub async fn retrieve_logs(&self, id: String, load_spec: GameLogLoadRequestType) {
         let spec = match load_spec {
             GameLogLoadRequestType::Later => RetrieveLogSpec::Latest {},
             GameLogLoadRequestType::Former => RetrieveLogSpec::Former {},
         };
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_api_request(
                 ApiCommand::RetrieveLog {
                     account: id.clone(),
@@ -232,23 +200,18 @@ impl GameController {
             Ok(game_ref) => {
                 let game = &game_ref.info.read().await;
                 let model = GameInfoModel::from(game);
-                parent
-                    .get_app_state()
-                    .update_game_view(id, Some(model), true);
+                self.app_state_controller
+                    .exec(|x| x.update_game_view(id, Some(model), true));
             }
             Err(e) => {
                 eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
-                parent.get_app_state().update_game_view(id, None, true);
+                self.app_state_controller
+                    .exec(|x| x.update_game_view(id, None, true));
             }
         }
     }
 
-    pub async fn load_game_images_if_empty(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        info: &api_controller::GameInfo,
-        id: String,
-    ) {
+    pub async fn load_game_images_if_empty(&self, info: &api_controller::GameInfo, id: String) {
         let game_resource_entry;
         {
             let mut game_resource_map = self.game_resource_map.write().await;
@@ -259,16 +222,12 @@ impl GameController {
                 _ = game_resource_map.insert(id, game_resource_entry.clone());
             }
         }
-        let image_controller = &parent.image_controller;
+        let image_controller = &self.image_controller;
         image_controller
-            .load_game_avatar_if_empty(parent.clone(), info, game_resource_entry.avatar.clone())
+            .load_game_avatar_if_empty(info, game_resource_entry.avatar.clone())
             .await;
         image_controller
-            .load_game_char_illust_if_empty(
-                parent.clone(),
-                info,
-                game_resource_entry.char_illust.clone(),
-            )
+            .load_game_char_illust_if_empty(info, game_resource_entry.char_illust.clone())
             .await;
 
         if let Some(details) = &info.details {
@@ -282,7 +241,7 @@ impl GameController {
         }
     }
 
-    pub async fn apply_game_images_if_exist(&self, parent: Arc<super::ControllerHub>, id: String) {
+    pub async fn apply_game_images_if_exist(&self, id: String) {
         if let Some(resource_entry) = self.game_resource_map.read().await.get(&id) {
             let mut avatar_image_data = None;
             let mut char_illust_data = None;
@@ -323,14 +282,13 @@ impl GameController {
             }
 
             if avatar_image_data.is_some() || char_illust_data.is_some() {
-                parent
-                    .get_app_state()
-                    .set_game_images(id, avatar_image_data, char_illust_data);
+                self.app_state_controller
+                    .exec(|x| x.set_game_images(id, avatar_image_data, char_illust_data));
             }
         }
     }
 
-    pub async fn load_resources(&self, parent: Arc<super::ControllerHub>) {
+    pub async fn load_resources(&self) {
         // let has_stage_data = self.stage_data.read().await.is_some();
         let has_char_pack_summary = self.char_pack_summaries.read().await.is_some();
 
@@ -346,7 +304,7 @@ impl GameController {
         if !has_char_pack_summary {
             let path = arkhost_api::consts::asset::api::charpack("summary.json");
             if let Some(char_pack_summary) = self
-                .load_json_table::<CharPackSummaryTable>(parent, path.clone(), Some(path))
+                .load_json_table::<CharPackSummaryTable>(path.clone(), Some(path))
                 .await
             {
                 _ = self
@@ -358,17 +316,13 @@ impl GameController {
         }
     }
 
-    async fn load_json_table<T>(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        path: String,
-        cache_key: Option<String>,
-    ) -> Option<T>
+    async fn load_json_table<T>(&self, path: String, cache_key: Option<String>) -> Option<T>
     where
         T: 'static + Send + Sync + for<'de> Deserialize<'de>,
     {
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_asset_request(
                 AssetCommand::LoadAsset {
                     cache_key,
@@ -392,36 +346,35 @@ impl GameController {
         }
     }
 
-    async fn refresh_logs_if_needed(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        id: String,
-        cond: super::RefreshLogsCondition,
-    ) {
-        parent.clone().get_app_state().get_game_by_id(
-            id.clone(),
-            move |game_info_list, i, mut game_info| {
-                let should_refresh = match cond {
-                    super::RefreshLogsCondition::Always => true,
-                    super::RefreshLogsCondition::OnLogsViewOpened => {
-                        game_info.log_loaded == GameLogLoadState::Loaded
-                            && game_info.active_view == GameInfoViewType::Logs
-                    }
-                    super::RefreshLogsCondition::Never => false,
-                };
-                if should_refresh && game_info.log_loaded != GameLogLoadState::Loading {
-                    game_info.log_loaded = GameLogLoadState::Loading;
-                    game_info_list.set_row_data(i, game_info);
-                    let load_spec = GameLogLoadRequestType::Later;
-                    let parent = parent.clone();
-                    tokio::spawn(async move {
-                        parent
-                            .game_controller
-                            .retrieve_logs(parent.clone(), id.into(), load_spec)
-                            .await
-                    });
-                }
-            },
-        )
+    async fn refresh_logs_if_needed(&self, id: String, cond: super::RefreshLogsCondition) {
+        let should_refresh_val = Arc::new(AtomicBool::new(false));
+
+        {
+            let should_refresh_val = should_refresh_val.clone();
+            self.app_state_controller
+                .exec_wait(|x| {
+                    x.exec_with_game_by_id(id.clone(), move |game_info_list, i, mut game_info| {
+                        let should_refresh = match cond {
+                            super::RefreshLogsCondition::Always => true,
+                            super::RefreshLogsCondition::OnLogsViewOpened => {
+                                game_info.log_loaded == GameLogLoadState::Loaded
+                                    && game_info.active_view == GameInfoViewType::Logs
+                            }
+                            super::RefreshLogsCondition::Never => false,
+                        };
+                        if should_refresh && game_info.log_loaded != GameLogLoadState::Loading {
+                            game_info.log_loaded = GameLogLoadState::Loading;
+                            game_info_list.set_row_data(i, game_info);
+                            should_refresh_val.store(true, Ordering::Relaxed);
+                        }
+                    })
+                })
+                .await;
+        }
+
+        if should_refresh_val.load(Ordering::Relaxed) {
+            self.retrieve_logs(id.into(), GameLogLoadRequestType::Later)
+                .await;
+        }
     }
 }

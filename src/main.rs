@@ -119,7 +119,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             app_state.set_use_auth(state.account, true);
             let controller = hub.clone();
             tokio::task::spawn(async move {
-                controller.account_controller.auth(controller.clone()).await
+                controller.account_controller.auth().await
             });
         }
     }

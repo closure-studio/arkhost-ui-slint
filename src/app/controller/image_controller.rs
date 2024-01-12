@@ -9,19 +9,16 @@ use tokio::sync::oneshot;
 
 use std::sync::Arc;
 
-use super::AssetCommand;
+use super::{AssetCommand, request_controller::RequestController};
 use anyhow::anyhow;
 
-pub struct ImageController {}
+pub struct ImageController {
+    pub request_controller: Arc<RequestController>
+}
 
 impl ImageController {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub async fn load_game_avatar_if_empty(
         &self,
-        parent: Arc<super::ControllerHub>,
         info: &api_controller::GameInfo,
         image_ref: ImageDataRef,
     ) {
@@ -42,13 +39,12 @@ impl ImageController {
                 image_ref.cache_key = Some(path);
                 image_ref.format = Some(ImageFormat::WebP);
             }
-            self.load_image(parent.clone(), image_ref).await;
+            self.load_image(image_ref).await;
         }
     }
 
     pub async fn load_game_char_illust_if_empty(
         &self,
-        parent: Arc<super::ControllerHub>,
         info: &api_controller::GameInfo,
         image_ref: ImageDataRef,
     ) {
@@ -68,13 +64,12 @@ impl ImageController {
                     image_ref.cache_key = Some(path);
                     image_ref.format = Some(ImageFormat::WebP);
                 }
-                let parent = parent.clone();
-                self.load_image(parent.clone(), image_ref).await;
+                self.load_image(image_ref).await;
             }
         }
     }
 
-    pub async fn load_image(&self, parent: Arc<super::ControllerHub>, image_ref: ImageDataRef) {
+    pub async fn load_image(&self, image_ref: ImageDataRef) {
         let (path, cache_key, src_format) = {
             let mut image_ref = image_ref.write().await;
             image_ref.loaded_image = ImageDataRaw::Pending;
@@ -85,7 +80,7 @@ impl ImageController {
             )
         };
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self.request_controller
             .send_asset_request(
                 AssetCommand::LoadImageRgba8 {
                     path,

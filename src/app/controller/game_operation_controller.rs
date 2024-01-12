@@ -2,21 +2,42 @@ use crate::app::ui::*;
 use crate::app::webview::auth::AuthResult;
 use arkhost_api::models::api_arkhost;
 use tokio::sync::oneshot;
+use tokio::sync::Mutex;
 
 use anyhow::anyhow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::app_state_controller::AppStateController;
+use super::request_controller::RequestController;
 use super::ApiCommand;
 use super::AuthCommand;
 
-pub struct GameOperationController {}
+enum CaptchaState {
+    Running,
+    Succeeded,
+    Failed,
+}
+
+pub struct GameOperationController {
+    app_state_controller: Arc<AppStateController>,
+    request_controller: Arc<RequestController>,
+    captcha_states: Mutex<HashMap<String, (String, CaptchaState)>>,
+}
 
 impl GameOperationController {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(
+        app_state_controller: Arc<AppStateController>,
+        request_controller: Arc<RequestController>,
+    ) -> Self {
+        Self {
+            request_controller,
+            app_state_controller,
+            captcha_states: Mutex::new(HashMap::new()),
+        }
     }
 
-    pub async fn start_game(&self, parent: Arc<super::ControllerHub>, account: String) {
+    pub async fn start_game(&self, account: String) {
         let mut success = false;
         let (resp1, rx1) = oneshot::channel();
         let (resp2, rx2) = oneshot::channel();
@@ -39,7 +60,7 @@ impl GameOperationController {
 
         for (auth_command, mut rx) in auth_methods {
             match self
-                .try_start_game(parent.clone(), account.clone(), auth_command, &mut rx)
+                .try_start_game(account.clone(), auth_command, &mut rx)
                 .await
             {
                 Ok(_) => {
@@ -49,7 +70,8 @@ impl GameOperationController {
                 Err(e) => println!("[Controller] failed attempting to start game {account}: {e}"),
             }
         }
-        _ = parent
+        _ = self
+            .request_controller
             .tx_auth_controller
             .send(AuthCommand::HideWindow {})
             .await;
@@ -57,18 +79,14 @@ impl GameOperationController {
         if !success {
             eprintln!("[Controller] all attempts to start game {account} failed");
         }
-        parent
-            .get_app_state()
-            .set_game_request_state(account.clone(), GameOperationRequestState::Idle);
-        parent
-            .game_controller
-            .refresh_games(parent.clone(), super::RefreshLogsCondition::Never)
-            .await;
+        self.app_state_controller
+            .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
     }
 
-    pub async fn stop_game(&self, parent: Arc<super::ControllerHub>, account: String) {
+    pub async fn stop_game(&self, account: String) {
         let (resp, mut rx) = oneshot::channel();
-        match parent
+        match self
+            .request_controller
             .send_api_request(
                 ApiCommand::StopGame {
                     account: account.clone(),
@@ -78,39 +96,41 @@ impl GameOperationController {
             )
             .await
         {
-            Ok(_) => {
-                parent
-                    .game_controller
-                    .refresh_games(parent.clone(), super::RefreshLogsCondition::Never)
-                    .await
-            }
+            Ok(_) => {}
             Err(e) => eprintln!("[Controller] Error stopping game {e}"),
         }
 
-        parent
-            .get_app_state()
-            .set_game_request_state(account.clone(), GameOperationRequestState::Idle);
+        self.app_state_controller
+            .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
     }
 
-    pub async fn preform_game_captcha(
-        &self,
-        parent: Arc<super::ControllerHub>,
-        account: String,
-        gt: String,
-        challenge: String,
-    ) -> anyhow::Result<()> {
+    pub async fn preform_game_captcha(&self, account: String, gt: String, challenge: String) {
+        match self.captcha_states.lock().await.get(&account) {
+            Some((ref existing_gt, _)) if existing_gt == &gt => {
+                return;
+            }
+            _ => {}
+        }
+
+        self.captcha_states
+            .lock()
+            .await
+            .insert(account.clone(), (gt.clone(), CaptchaState::Running));
+
         let (resp, mut rx) = oneshot::channel();
-        let auth_result = parent
+        let auth_result = self
+            .request_controller
             .send_auth_request(
                 AuthCommand::AuthGeeTest {
                     resp,
-                    gt,
+                    gt: gt.clone(),
                     challenge,
                 },
                 &mut rx,
             )
             .await;
-        _ = parent
+        _ = self
+            .request_controller
             .tx_auth_controller
             .send(AuthCommand::HideWindow {})
             .await;
@@ -126,15 +146,20 @@ impl GameOperationController {
                 eprintln!(
                     "[Controller] Error performing game captcha (invoking authenticator) {e}"
                 );
-                return Err(e);
+                self.captcha_states
+                    .lock()
+                    .await
+                    .insert(account.clone(), (gt.clone(), CaptchaState::Failed));
+                return;
             }
         };
 
         let (resp, mut rx) = oneshot::channel();
-        if let Err(e) = parent
+        if let Err(e) = self
+            .request_controller
             .send_api_request(
                 ApiCommand::PreformCaptcha {
-                    account,
+                    account: account.clone(),
                     captcha_info,
                     resp,
                 },
@@ -143,20 +168,27 @@ impl GameOperationController {
             .await
         {
             eprintln!("[Controller] Error performing game captcha (updating game config) {e}");
-            return Err(e);
+            self.captcha_states
+                .lock()
+                .await
+                .insert(account.clone(), (gt.clone(), CaptchaState::Failed));
+            return;
         }
 
-        Ok(())
+        self.captcha_states
+            .lock()
+            .await
+            .insert(account.clone(), (gt.clone(), CaptchaState::Succeeded));
     }
 
     async fn try_start_game(
         &self,
-        parent: Arc<super::ControllerHub>,
         account: String,
         auth_command: AuthCommand,
         rx_auth_controller: &mut oneshot::Receiver<anyhow::Result<AuthResult>>,
     ) -> anyhow::Result<()> {
-        let auth_result = parent
+        let auth_result = self
+            .request_controller
             .send_auth_request(auth_command, rx_auth_controller)
             .await?;
         let captcha_token = match auth_result {
@@ -168,7 +200,7 @@ impl GameOperationController {
         };
 
         let (resp, mut rx) = oneshot::channel();
-        parent
+        self.request_controller
             .send_api_request(
                 ApiCommand::StartGame {
                     account,
