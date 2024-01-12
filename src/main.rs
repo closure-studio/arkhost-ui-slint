@@ -113,10 +113,10 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     if let Some(state) = user_state_data_or_null {
         let app_state = hub.app_state.lock().unwrap();
         if state.is_expired() {
-            app_state.set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into());
-            app_state.set_use_auth(String::new(), false);
+            app_state.set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into()).exec();
+            app_state.set_use_auth(String::new(), false).exec();
         } else {
-            app_state.set_use_auth(state.account, true);
+            app_state.set_use_auth(state.account, true).exec();
             let controller = hub.clone();
             tokio::task::spawn(async move {
                 controller.account_controller.auth().await

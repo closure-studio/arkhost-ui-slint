@@ -44,10 +44,9 @@ impl GameInfoModel {
 
     pub fn mutate(&self, game_info: &mut GameInfo, refresh_logs: bool) {
         game_info.ap = self.game_info.info.status.ap.to_string().into();
-        // TODO：从静态数据里面拿关卡名
         game_info.battle_map = match self.game_info.info.game_config.map_id {
             Some(ref map) if map != "" => map,
-            _ => "【作战未开始】",
+            _ => "[作战未开始]",
         }
         .into();
         game_info.doctor_level = match self.game_info.info.status.level {
