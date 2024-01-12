@@ -13,16 +13,10 @@ use super::request_controller::RequestController;
 use super::ApiCommand;
 use super::AuthCommand;
 
-enum CaptchaState {
-    Running,
-    Succeeded,
-    Failed,
-}
-
 pub struct GameOperationController {
     app_state_controller: Arc<AppStateController>,
     request_controller: Arc<RequestController>,
-    captcha_states: Mutex<HashMap<String, (String, CaptchaState)>>,
+    captcha_states: Mutex<HashMap<String, (ChallengeInfo, CaptchaState)>>,
 }
 
 impl GameOperationController {
@@ -106,16 +100,26 @@ impl GameOperationController {
 
     pub async fn preform_game_captcha(&self, account: String, gt: String, challenge: String) {
         match self.captcha_states.lock().await.get(&account) {
-            Some((ref existing_gt, _)) if existing_gt == &gt => {
+            Some((
+                ChallengeInfo {
+                    gt: existing_gt,
+                    challenge: existing_challenge,
+                },
+                _,
+            )) if existing_gt == &gt && existing_challenge == &challenge => {
                 return;
             }
             _ => {}
         }
+        let challenge_info = ChallengeInfo {
+            gt: gt.clone(),
+            challenge: challenge.clone(),
+        };
 
-        self.captcha_states
-            .lock()
-            .await
-            .insert(account.clone(), (gt.clone(), CaptchaState::Running));
+        self.captcha_states.lock().await.insert(
+            account.clone(),
+            (challenge_info.clone(), CaptchaState::Running),
+        );
 
         let (resp, mut rx) = oneshot::channel();
         let auth_result = self
@@ -149,7 +153,7 @@ impl GameOperationController {
                 self.captcha_states
                     .lock()
                     .await
-                    .insert(account.clone(), (gt.clone(), CaptchaState::Failed));
+                    .insert(account.clone(), (challenge_info, CaptchaState::Failed));
                 return;
             }
         };
@@ -171,14 +175,14 @@ impl GameOperationController {
             self.captcha_states
                 .lock()
                 .await
-                .insert(account.clone(), (gt.clone(), CaptchaState::Failed));
+                .insert(account.clone(), (challenge_info, CaptchaState::Failed));
             return;
         }
 
         self.captcha_states
             .lock()
             .await
-            .insert(account.clone(), (gt.clone(), CaptchaState::Succeeded));
+            .insert(account.clone(), (challenge_info, CaptchaState::Succeeded));
     }
 
     async fn try_start_game(
@@ -212,4 +216,16 @@ impl GameOperationController {
             .await
             .map(|_| ())
     }
+}
+
+enum CaptchaState {
+    Running,
+    Succeeded,
+    Failed,
+}
+
+#[derive(Clone)]
+struct ChallengeInfo {
+    gt: String,
+    challenge: String,
 }
