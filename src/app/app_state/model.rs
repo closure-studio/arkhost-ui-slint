@@ -69,7 +69,10 @@ impl GameInfoModel {
             api_arkhost::GameStatus::Pending => GameState::Stopped,
             api_arkhost::GameStatus::Logging => GameState::Logging,
             api_arkhost::GameStatus::Running => GameState::Running,
-            api_arkhost::GameStatus::Error => GameState::Faulted,
+            api_arkhost::GameStatus::Error
+            | api_arkhost::GameStatus::ErrorLoggedOut
+            | api_arkhost::GameStatus::ErrorBattleFailed
+            | api_arkhost::GameStatus::ErrorCaptchaTimedOut => GameState::Faulted,
         };
         if game_info.game_state == GameState::Faulted {
             game_info.status_text = self.game_info.info.status.text.clone().into();

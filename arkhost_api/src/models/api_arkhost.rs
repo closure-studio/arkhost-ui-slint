@@ -15,6 +15,9 @@ pub enum GameStatus {
     Logging = 1,
     Running = 2,
     Error = 3,
+    ErrorLoggedOut = 4,
+    ErrorBattleFailed = 5,
+    ErrorCaptchaTimedOut = 6,
     Captcha = 999
 }
 
