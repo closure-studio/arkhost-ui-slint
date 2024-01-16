@@ -132,7 +132,7 @@ impl ControllerHub {
                 app.set_login_state(LoginState::LoggingIn);
 
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.account_controller
                         .login(account.into(), password.into())
                         .await;
@@ -145,7 +145,7 @@ impl ControllerHub {
 
             app.on_auth_requested(move || {
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.account_controller.auth().await;
                 });
             });
@@ -159,7 +159,7 @@ impl ControllerHub {
                     .exec(|x| x.set_log_load_state(id.clone().into(), GameLogLoadState::Loading));
 
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.game_controller
                         .retrieve_logs(id.into(), load_spec)
                         .await;
@@ -179,7 +179,7 @@ impl ControllerHub {
                 });
 
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.game_operation_controller.start_game(id.into()).await;
                 });
             });
@@ -197,7 +197,7 @@ impl ControllerHub {
                 });
 
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.game_operation_controller.stop_game(id.into()).await;
                 });
             });
@@ -214,7 +214,7 @@ impl ControllerHub {
                 let config_fields = GameOptionsModel::from_ui(&options).to_game_options();
 
                 let this = this.clone();
-                tokio::task::spawn(async move {
+                tokio::spawn(async move {
                     this.game_controller
                         .update_game_settings(id.into(), config_fields)
                         .await;
@@ -240,7 +240,7 @@ impl ControllerHub {
                                     if game_info.log_loaded != GameLogLoadState::Loading {
                                         game_info.log_loaded = GameLogLoadState::Loading;
                                         let this = this.clone();
-                                        tokio::task::spawn(async move {
+                                        tokio::spawn(async move {
                                             this.game_controller
                                                 .retrieve_logs(
                                                     id.into(),
@@ -276,7 +276,7 @@ impl ControllerHub {
                         }
 
                         let this = this.clone();
-                        tokio::task::spawn(async move {
+                        tokio::spawn(async move {
                             this.game_controller
                                 .refresh_games(RefreshLogsCondition::OnLogsViewOpened)
                                 .await;

@@ -84,21 +84,21 @@ async fn run_app() -> Result<(), slint::PlatformError> {
 
     let mut api_controller = ApiController::new(auth_client);
     let (tx_api_command, rx_api_command) = mpsc::channel(32);
-    tokio::task::spawn(async move {
+    tokio::spawn(async move {
         api_controller.run(rx_api_command).await;
     });
 
     #[cfg(feature = "desktop-app")]
     let mut auth_controller = IpcAuthController::new();
     let (tx_auth_command, rx_auth_command) = mpsc::channel(16);
-    tokio::task::spawn(async move {
+    tokio::spawn(async move {
         auth_controller.run(rx_auth_command).await;
     });
 
     let asset_client = create_asset_client();
     let mut asset_controller = AssetController::new(asset_client);
     let (tx_asset_command, rx_asset_command) = mpsc::channel(32);
-    tokio::task::spawn(async move {
+    tokio::spawn(async move {
         asset_controller.run(rx_asset_command).await;
     });
 
@@ -117,22 +117,22 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             app_state.set_use_auth(String::new(), false).exec();
         } else {
             app_state.set_use_auth(state.account, true).exec();
-            let controller = hub.clone();
-            tokio::task::spawn(async move {
-                controller.account_controller.auth().await
+            let hub = hub.clone();
+            tokio::spawn(async move {
+                hub.account_controller.auth().await
             });
         }
     }
 
     let result = ui.run();
 
-    let _ = tx_api_command
+    _ = tx_api_command
         .send(app::api_controller::Command::Stop {})
         .await;
-    let _ = tx_auth_command
+    _ = tx_auth_command
         .send(app::auth_controller::Command::Stop {})
         .await;
-    let _ = tx_asset_command
+    _ = tx_asset_command
         .send(app::asset_controller::Command::Stop {})
         .await;
 
