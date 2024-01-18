@@ -2,7 +2,7 @@ use crate::app::ui::*;
 use tokio::sync::oneshot;
 use tokio_util::sync::{CancellationToken, DropGuard};
 
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex}, time::Duration};
 
 use super::{
     app_state_controller::AppStateController, game_controller::GameController,
@@ -103,11 +103,20 @@ impl AccountController {
         self.game_controller.try_ensure_resources().await;
         let game_controller = self.game_controller.clone();
         tokio::spawn(async move {
-            if let Err(e) = game_controller
-                .connect_games_sse(stop_connection_token)
-                .await
-            {
-                eprintln!("[Controller] Games SSE connection terminated with error: {e:?}");
+            loop {
+                if let Err(e) = game_controller
+                    .connect_games_sse(stop_connection_token.clone())
+                    .await
+                {
+                    eprintln!("[Controller] Games SSE connection terminated with error: {e:?}");
+                }
+
+                if !stop_connection_token.is_cancelled() {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    println!("[Controller] Reconnecting games SSE connection");
+                    continue;
+                }
+                break;
             }
         });
     }
