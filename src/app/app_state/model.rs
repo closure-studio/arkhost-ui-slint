@@ -1,14 +1,14 @@
 use std::rc::Rc;
 
 use crate::app::ui::*;
-use crate::app::{api_controller::GameInfo as ApiGameInfo, game_data};
+use crate::app::{api_model::GameEntry, game_data};
 use arkhost_api::models::api_arkhost::{self, GameConfigFields};
 use slint::{ModelRc, SharedString, VecModel};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub struct GameInfoModel {
-    pub game_info: ApiGameInfo,
+    pub game: GameEntry,
 }
 
 /**
@@ -28,10 +28,8 @@ GameInfo {
 }
 */
 impl GameInfoModel {
-    pub fn from(game_info: &ApiGameInfo) -> Self {
-        Self {
-            game_info: game_info.clone(),
-        }
+    pub fn from(game: &GameEntry) -> Self {
+        Self { game: game.clone() }
     }
 
     pub fn create_game_info(&self) -> GameInfo {
@@ -43,18 +41,18 @@ impl GameInfoModel {
     }
 
     pub fn mutate(&self, game_info: &mut GameInfo, refresh_logs: bool) {
-        game_info.ap = self.game_info.info.status.ap.to_string().into();
-        game_info.battle_map = match self.game_info.info.game_config.map_id {
+        game_info.ap = self.game.info.status.ap.to_string().into();
+        game_info.battle_map = match self.game.info.game_config.map_id {
             Some(ref map) if map != "" => map,
             _ => "[作战未开始]",
         }
         .into();
-        game_info.doctor_level = match self.game_info.info.status.level {
+        game_info.doctor_level = match self.game.info.status.level {
             0 => "-".to_string(),
             val => val.to_string(),
         }
         .into();
-        game_info.doctor_name = match self.game_info.info.status.nick_name.as_str() {
+        game_info.doctor_name = match self.game.info.status.nick_name.as_str() {
             "" => "未登录".to_string(),
             nickname => format!("Dr. {}", nickname),
         }
@@ -62,8 +60,8 @@ impl GameInfoModel {
         // 未实现玩家编号#1234，使用账号代替
         // 需要码掉手机号“G199------88”，mask为"-"
         // 邮箱能码但是不完全能码
-        game_info.doctor_serial = utils::redact_account(&self.game_info.info.status.account).into();
-        game_info.game_state = match self.game_info.info.status.code {
+        game_info.doctor_serial = utils::redact_account(&self.game.info.status.account).into();
+        game_info.game_state = match self.game.info.status.code {
             api_arkhost::GameStatus::Captcha => GameState::Captcha,
             api_arkhost::GameStatus::LoginFailed => GameState::Faulted,
             api_arkhost::GameStatus::Pending => GameState::Stopped,
@@ -75,19 +73,18 @@ impl GameInfoModel {
             | api_arkhost::GameStatus::ErrorCaptchaTimedOut => GameState::Faulted,
         };
         if game_info.game_state == GameState::Faulted {
-            game_info.status_text = self.game_info.info.status.text.clone().into();
+            game_info.status_text = self.game.info.status.text.clone().into();
         }
 
-        game_info.id = self.game_info.info.status.account.clone().into();
+        game_info.id = self.game.info.status.account.clone().into();
         if refresh_logs {
-            let log_model =
-                GameLogModel::from(&self.game_info.logs, self.game_info.log_cursor_back);
+            let log_model = GameLogModel::from(&self.game.logs, self.game.log_cursor_back);
             log_model.mutate(game_info);
         }
-        let options_model = GameOptionsModel::from(&self.game_info.info.game_config);
+        let options_model = GameOptionsModel::from(&self.game.info.game_config);
         options_model.mutate(&mut game_info.options);
-        if self.game_info.info.status.code == api_arkhost::GameStatus::Running {
-            if let Some(ref game_details) = self.game_info.details {
+        if self.game.info.status.code == api_arkhost::GameStatus::Running {
+            if let Some(ref game_details) = self.game.details {
                 let details_model = GameDetailsModel::from(game_details.status.clone());
                 details_model.mutate(&mut game_info.details);
             }

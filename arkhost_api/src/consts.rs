@@ -1,20 +1,21 @@
-pub static CLIENT_IDENTIFIER: &str = "arkhost-ui-slint";
-pub static CLIENT_USER_AGENT: &str = "ArkHostApp/1.0";
+pub const CLIENT_IDENTIFIER: &str = "arkhost-ui-slint";
+pub const CLIENT_USER_AGENT: &str = "ArkHostApp/1.0";
 
 pub mod passport {
-    pub static API_BASE_URL: &str = "https://passport.closure.setonink.com/";
+    pub const API_BASE_URL: &str = "https://passport.closure.setonink.com/";
     pub mod api {
         pub mod v1 {
-            pub static LOGIN: &str = "api/v1/login";
-            pub static INFO: &str = "api/v1/info";
+            pub const LOGIN: &str = "api/v1/login";
+            pub const INFO: &str = "api/v1/info";
         }
     }
 }
 
 pub mod arkhost {
-    pub static API_BASE_URL: &str = "https://api.arknights.host/";
+    pub const API_BASE_URL: &str = "https://api.arknights.host/";
     pub mod api {
-        pub static GAMES: &str = "game";
+        pub const GAMES: &str = "game";
+        pub const GAMES_SSE: &str = "sse/games";
 
         pub fn game(account: &str) -> String {
             format!("game/{account}")
@@ -28,17 +29,21 @@ pub mod arkhost {
         pub fn game_config(account: &str) -> String {
             format!("game/config/{account}")
         }
+
+        pub mod sse {
+            pub const SSE_EVENT_TYPE_GAME: &str = "game";
+        }
     }
 }
 
 pub mod quota {
-    pub static API_BASE_URL: &str = "https://registry.closure.setonink.com";
+    pub const API_BASE_URL: &str = "https://registry.closure.setonink.com";
     pub mod api {}
 }
 
 pub mod asset {
-    pub static API_BASE_URL: &str = "https://assets.closure.setonink.com/";
-    pub static REFERER_URL: &str = "https://arknights.host";
+    pub const API_BASE_URL: &str = "https://assets.closure.setonink.com/";
+    pub const REFERER_URL: &str = "https://arknights.host";
 
     pub mod api {
         pub fn avatar(avatar_type: &str, id: &str) -> String {

@@ -18,7 +18,7 @@ pub enum GameStatus {
     ErrorLoggedOut = 4,
     ErrorBattleFailed = 5,
     ErrorCaptchaTimedOut = 6,
-    Captcha = 999
+    Captcha = 999,
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -47,6 +47,9 @@ pub struct GameInfo {
 }
 
 pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
+pub enum GameSseEvent {
+    Game(Vec<GameInfo>),
+}
 
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -145,7 +148,7 @@ pub struct CaptchaResultInfo {
     pub challenge: String,
     pub geetest_challenge: String,
     pub geetest_validate: String,
-    pub geetest_seccode: String
+    pub geetest_seccode: String,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -180,7 +183,7 @@ impl GameConfigFields {
 #[serde(rename_all = "snake_case")]
 pub struct UpdateGameRequest {
     pub config: Option<GameConfigFields>,
-    pub captcha_info: Option<CaptchaResultInfo>
+    pub captcha_info: Option<CaptchaResultInfo>,
 }
 
 #[serde_as]

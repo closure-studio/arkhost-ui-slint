@@ -11,6 +11,7 @@ use ipc_channel::ipc::IpcOneShotServer;
 use ipc_channel::ipc::IpcSender;
 use subprocess::Popen;
 use tokio::sync::{mpsc, Mutex};
+use tokio_util::sync::CancellationToken;
 
 struct AuthProcess {
     process: Popen,
@@ -23,45 +24,47 @@ pub struct IpcAuthController {
 
 #[async_trait]
 impl AuthController for IpcAuthController {
-    async fn run(&mut self, mut tx: mpsc::Receiver<super::Command>) {
-        while let Some(cmd) = tx.recv().await {
-            match cmd {
-                Command::AuthArkHostBackground { resp, action } => {
-                    _ = resp.send(
-                        self.auth(
-                            AuthAction::ArkHostRestrictedActionBackground {
-                                id: "UNUSED".into(),
-                                action,
-                            },
-                            false,
-                        )
-                        .await,
-                    )
+    async fn run(&mut self, mut tx: mpsc::Receiver<super::Command>, stop: CancellationToken) {
+        tokio::select! {
+            _ = async {
+                while let Some(cmd) = tx.recv().await {
+                    match cmd {
+                        Command::AuthArkHostBackground { resp, action } => {
+                            _ = resp.send(
+                                self.auth(
+                                    AuthAction::ArkHostRestrictedActionBackground {
+                                        id: "UNUSED".into(),
+                                        action,
+                                    },
+                                    false,
+                                )
+                                .await,
+                            )
+                        }
+                        Command::AuthArkHostCaptcha { resp, action } => {
+                            _ = resp.send(
+                                self.auth(
+                                    AuthAction::ArkHostRestrictedActionCaptcha {
+                                        id: "UNUSED".into(),
+                                        action,
+                                    },
+                                    false,
+                                )
+                                .await,
+                            )
+                        },
+                        Command::AuthGeeTest { resp, gt, challenge } => {
+                            _ = resp.send(
+                                self.auth(AuthAction::GeeTestAuth { id: gt.clone(), gt, challenge }, false).await
+                            )
+                        }
+                        Command::HideWindow {} => {
+                            _ = self.set_visible(false).await;
+                        }
+                    }
                 }
-                Command::AuthArkHostCaptcha { resp, action } => {
-                    _ = resp.send(
-                        self.auth(
-                            AuthAction::ArkHostRestrictedActionCaptcha {
-                                id: "UNUSED".into(),
-                                action,
-                            },
-                            false,
-                        )
-                        .await,
-                    )
-                },
-                Command::AuthGeeTest { resp, gt, challenge } => {
-                    _ = resp.send(
-                        self.auth(AuthAction::GeeTestAuth { id: gt.clone(), gt, challenge }, false).await
-                    )
-                }
-                Command::HideWindow {} => {
-                    _ = self.set_visible(false).await;
-                }
-                Command::Stop {} => {
-                    break;
-                }
-            }
+            } => {},
+            _ = stop.cancelled() => {}
         }
 
         if let Some(auth_process) = &self.auth_process {
@@ -149,7 +152,7 @@ impl IpcAuthController {
             OsStr::new(""),
             OsStr::new("--launch-webview"),
             OsStr::new("--account"),
-            OsStr::new("''"),
+            OsStr::new("UNUSED"),
             OsStr::new("--ipc"),
             OsStr::new(&ipc_server_name.clone()),
         ])?;

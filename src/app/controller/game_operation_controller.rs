@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use super::app_state_controller::AppStateController;
 use super::request_controller::RequestController;
-use super::ApiCommand;
+use super::ApiOperation;
 use super::AuthCommand;
 
 pub struct GameOperationController {
@@ -82,7 +82,7 @@ impl GameOperationController {
         match self
             .request_controller
             .send_api_request(
-                ApiCommand::StopGame {
+                ApiOperation::StopGame {
                     account: account.clone(),
                     resp,
                 },
@@ -98,7 +98,12 @@ impl GameOperationController {
             .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
     }
 
-    pub async fn preform_game_captcha(&self, account: String, gt: String, challenge: String) {
+    pub async fn try_preform_game_captcha(
+        &self,
+        account: String,
+        gt: String,
+        challenge: String,
+    ) -> anyhow::Result<()> {
         match self.captcha_states.lock().await.get(&account) {
             Some((
                 ChallengeInfo {
@@ -107,7 +112,7 @@ impl GameOperationController {
                 },
                 _,
             )) if existing_gt == &gt && existing_challenge == &challenge => {
-                return;
+                return Err(anyhow!("challenge is still running or used"));
             }
             _ => {}
         }
@@ -154,7 +159,7 @@ impl GameOperationController {
                     .lock()
                     .await
                     .insert(account.clone(), (challenge_info, CaptchaState::Failed));
-                return;
+                return Err(e);
             }
         };
 
@@ -162,7 +167,7 @@ impl GameOperationController {
         if let Err(e) = self
             .request_controller
             .send_api_request(
-                ApiCommand::PreformCaptcha {
+                ApiOperation::PreformCaptcha {
                     account: account.clone(),
                     captcha_info,
                     resp,
@@ -176,13 +181,14 @@ impl GameOperationController {
                 .lock()
                 .await
                 .insert(account.clone(), (challenge_info, CaptchaState::Failed));
-            return;
+            return Err(e);
         }
 
         self.captcha_states
             .lock()
             .await
             .insert(account.clone(), (challenge_info, CaptchaState::Succeeded));
+        Ok(())
     }
 
     async fn try_start_game(
@@ -206,7 +212,7 @@ impl GameOperationController {
         let (resp, mut rx) = oneshot::channel();
         self.request_controller
             .send_api_request(
-                ApiCommand::StartGame {
+                ApiOperation::StartGame {
                     account,
                     captcha_token,
                     resp,

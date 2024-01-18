@@ -9,6 +9,7 @@ use app::asset_controller::AssetController;
 use app::auth_controller::ipc::IpcAuthController;
 
 use app::auth_controller::AuthController;
+use app::controller::api_model::ApiModel;
 use app::ui::*;
 use app::utils::data_dir::get_data_dir;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
@@ -19,6 +20,7 @@ use arkhost_api::clients::{common::UserStateDataSource, id_server::AuthClient};
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
+use tokio_util::sync::CancellationToken;
 use std::sync::{Arc, RwLock};
 use tokio::{self, sync::mpsc};
 
@@ -82,29 +84,41 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     let user_state_data_or_null = user_state.get_user_state_data();
     let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
 
+    let stop = CancellationToken::new();
+
     let mut api_controller = ApiController::new(auth_client);
     let (tx_api_command, rx_api_command) = mpsc::channel(32);
-    tokio::spawn(async move {
-        api_controller.run(rx_api_command).await;
-    });
+    {
+        let stop = stop.clone();
+        tokio::spawn(async move {
+            api_controller.run(rx_api_command, stop).await;
+        });
+    }
 
     #[cfg(feature = "desktop-app")]
     let mut auth_controller = IpcAuthController::new();
     let (tx_auth_command, rx_auth_command) = mpsc::channel(16);
-    tokio::spawn(async move {
-        auth_controller.run(rx_auth_command).await;
-    });
+    {
+        let stop = stop.clone();
+        tokio::spawn(async move {
+            auth_controller.run(rx_auth_command, stop).await;
+        });
+    }
 
     let asset_client = create_asset_client();
     let mut asset_controller = AssetController::new(asset_client);
     let (tx_asset_command, rx_asset_command) = mpsc::channel(32);
-    tokio::spawn(async move {
-        asset_controller.run(rx_asset_command).await;
-    });
+    {
+        let stop = stop.clone();
+        tokio::spawn(async move {
+            asset_controller.run(rx_asset_command, stop).await;
+        });
+    }
 
     let ui = AppWindow::new()?;
     let hub = Arc::new(ControllerHub::new(
         AppState::new(ui.as_weak()),
+        Arc::new(ApiModel::new()),
         tx_api_command.clone(),
         tx_auth_command.clone(),
         tx_asset_command.clone(),
@@ -126,15 +140,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
 
     let result = ui.run();
 
-    _ = tx_api_command
-        .send(app::api_controller::Command::Stop {})
-        .await;
-    _ = tx_auth_command
-        .send(app::auth_controller::Command::Stop {})
-        .await;
-    _ = tx_asset_command
-        .send(app::asset_controller::Command::Stop {})
-        .await;
+    stop.cancel();
 
     result
 }

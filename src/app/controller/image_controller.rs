@@ -1,25 +1,33 @@
 use crate::app::{
-    api_controller,
+    api_model,
     app_state::model::{ImageDataRaw, ImageDataRef},
     asset_controller::AssetRef,
 };
 
 use image::ImageFormat;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, RwLock};
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
-use super::{AssetCommand, request_controller::RequestController};
+use super::{request_controller::RequestController, AssetCommand};
 use anyhow::anyhow;
 
 pub struct ImageController {
-    pub request_controller: Arc<RequestController>
+    request_controller: Arc<RequestController>,
+    errored_resource_urls: RwLock<HashSet<String>>,
 }
 
 impl ImageController {
+    pub fn new(request_controller: Arc<RequestController>) -> Self {
+        Self {
+            request_controller,
+            errored_resource_urls: RwLock::new(HashSet::new()),
+        }
+    }
+
     pub async fn load_game_avatar_if_empty(
         &self,
-        info: &api_controller::GameInfo,
+        game: &api_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {
@@ -27,10 +35,10 @@ impl ImageController {
             _ => return,
         };
 
-        if !info.info.status.avatar.id.is_empty() {
+        if !game.info.status.avatar.id.is_empty() {
             let mut path = arkhost_api::consts::asset::api::avatar(
-                &info.info.status.avatar.type_val,
-                &info.info.status.avatar.sanitize_id_for_url(),
+                &game.info.status.avatar.type_val,
+                &game.info.status.avatar.sanitize_id_for_url(),
             );
             path.push_str(".webp");
             {
@@ -45,7 +53,7 @@ impl ImageController {
 
     pub async fn load_game_char_illust_if_empty(
         &self,
-        info: &api_controller::GameInfo,
+        game: &api_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {
@@ -53,11 +61,11 @@ impl ImageController {
             _ => return,
         };
 
-        if let Some(details) = &info.details {
+        if let Some(details) = &game.details {
             if !details.status.secretary_skin_id.is_empty() {
                 let mut skin_id = details.status.sanitize_secretary_skin_id_for_url();
                 skin_id.push_str(".webp");
-                let path = arkhost_api::consts::asset::api::charpack(&skin_id);
+                let path: String = arkhost_api::consts::asset::api::charpack(&skin_id);
                 {
                     let mut image_ref = image_ref.write().await;
                     image_ref.asset_path = path.clone();
@@ -80,7 +88,8 @@ impl ImageController {
             )
         };
         let (resp, mut rx) = oneshot::channel();
-        match self.request_controller
+        match self
+            .request_controller
             .send_asset_request(
                 AssetCommand::LoadImageRgba8 {
                     path,
@@ -102,7 +111,18 @@ impl ImageController {
             }
             Err(e) => {
                 image_ref.write().await.loaded_image = ImageDataRaw::Empty;
-                eprintln!("Error loading image: {:?} {:?}", image_ref.read().await, e);
+                if !self
+                    .errored_resource_urls
+                    .read()
+                    .await
+                    .contains(&image_ref.read().await.asset_path)
+                {
+                    self.errored_resource_urls
+                        .write()
+                        .await
+                        .insert(image_ref.read().await.asset_path.clone());
+                    eprintln!("Error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_ref.read().await, e);
+                }
             }
         }
     }

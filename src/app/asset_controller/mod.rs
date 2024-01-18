@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Ok;
 use arkhost_api::clients::asset::AssetClient;
 use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio_util::sync::CancellationToken;
 
 pub type CommandResult<T> = anyhow::Result<T>;
 pub type Responder<T> = oneshot::Sender<CommandResult<T>>;
@@ -20,7 +21,6 @@ pub enum AssetRef {
 #[derive(Debug)]
 #[allow(unused)]
 pub enum Command {
-    Stop {},
     LoadAsset {
         cache_key: Option<String>,
         path: String,
@@ -54,28 +54,32 @@ impl AssetController {
         }
     }
 
-    pub async fn run(&mut self, mut recv: mpsc::Receiver<Command>) {
-        while let Some(cmd) = recv.recv().await {
-            match cmd {
-                Command::Stop {} => break,
-                Command::LoadAsset {
-                    cache_key,
-                    path,
-                    resp,
-                } => _ = resp.send(self.load_asset(cache_key, path).await),
-                Command::LoadImageRgba8 {
-                    cache_key,
-                    path,
-                    src_format,
-                    resp,
-                } => _ = resp.send(self.load_image_rgba8(cache_key, path, src_format).await),
-                Command::RetrieveCache { cache_key, resp } => {
-                    _ = resp.send(self.read_cache_by_key(&Some(cache_key)).await)
+    pub async fn run(&mut self, mut recv: mpsc::Receiver<Command>, stop: CancellationToken) {
+        tokio::select! {
+            _ = async {
+                while let Some(cmd) = recv.recv().await {
+                    match cmd {
+                        Command::LoadAsset {
+                            cache_key,
+                            path,
+                            resp,
+                        } => _ = resp.send(self.load_asset(cache_key, path).await),
+                        Command::LoadImageRgba8 {
+                            cache_key,
+                            path,
+                            src_format,
+                            resp,
+                        } => _ = resp.send(self.load_image_rgba8(cache_key, path, src_format).await),
+                        Command::RetrieveCache { cache_key, resp } => {
+                            _ = resp.send(self.read_cache_by_key(&Some(cache_key)).await)
+                        }
+                        Command::DeleteCache { cache_key } => {
+                            self.delete_cache_by_key(&Some(cache_key)).await
+                        }
+                    }
                 }
-                Command::DeleteCache { cache_key } => {
-                    self.delete_cache_by_key(&Some(cache_key)).await
-                }
-            }
+            } => {},
+            _ = stop.cancelled() => {}
         }
     }
 

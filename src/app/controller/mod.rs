@@ -1,4 +1,5 @@
 pub mod account_controller;
+pub mod api_model;
 pub mod app_state_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
@@ -6,6 +7,7 @@ pub mod image_controller;
 pub mod request_controller;
 extern crate alloc;
 
+use self::api_model::ApiModel;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
@@ -21,6 +23,7 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
+type ApiOperation = super::api_controller::Operation;
 type ApiCommand = super::api_controller::Command;
 type AuthCommand = super::auth_controller::Command;
 type AssetCommand = super::asset_controller::Command;
@@ -60,6 +63,7 @@ pub struct ControllerHub {
 impl ControllerHub {
     pub fn new(
         app_state: AppState,
+        api_model: Arc<ApiModel>,
         tx_api_controller: mpsc::Sender<ApiCommand>,
         tx_auth_controller: mpsc::Sender<AuthCommand>,
         tx_asset_controller: mpsc::Sender<AssetCommand>,
@@ -69,29 +73,28 @@ impl ControllerHub {
             app_state: app_state.clone(),
         });
         let request_controller = Arc::new(RequestController {
+            api_model: api_model.clone(),
             tx_api_controller,
             tx_auth_controller,
             tx_asset_controller,
         });
-        let image_controller = Arc::new(ImageController {
-            request_controller: request_controller.clone(),
-        });
+        let image_controller = Arc::new(ImageController::new(request_controller.clone()));
         let game_operation_controller = Arc::new(GameOperationController::new(
             app_state_controller.clone(),
             request_controller.clone(),
         ));
         let game_controller = Arc::new(GameController::new(
+            api_model,
             app_state_controller.clone(),
             request_controller.clone(),
             image_controller.clone(),
             game_operation_controller.clone(),
         ));
-        let account_controller = Arc::new(AccountController {
-            app_state_controller: app_state_controller.clone(),
-            request_controller: request_controller.clone(),
-            game_controller: game_controller.clone(),
-        });
-
+        let account_controller = Arc::new(AccountController::new(
+            app_state_controller.clone(),
+            request_controller.clone(),
+            game_controller.clone(),
+        ));
         Self {
             app_state: app_state.clone(),
             app_state_controller,
@@ -265,7 +268,7 @@ impl ControllerHub {
             let timer = slint::Timer::default();
             timer.start(
                 slint::TimerMode::Repeated,
-                std::time::Duration::from_secs(10),
+                std::time::Duration::from_secs(30),
                 move || {
                     let app_weak = app_weak.clone();
                     let this = this.clone();

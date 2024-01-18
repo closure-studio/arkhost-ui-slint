@@ -1,18 +1,21 @@
-use super::{ApiCommand, AuthCommand, AssetCommand, ApiResult, AuthResult, AssetResult, ApiError};
+use super::api_model::ApiModel;
+use super::{ApiOperation, ApiCommand, AuthCommand, AssetCommand, ApiResult, AuthResult, AssetResult, ApiError};
 use tokio::sync::oneshot;
 use tokio::sync::mpsc;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 pub struct RequestController {
+    pub api_model: Arc<ApiModel>,
     pub tx_api_controller: mpsc::Sender<ApiCommand>,
     pub tx_auth_controller: mpsc::Sender<AuthCommand>,
     pub tx_asset_controller: mpsc::Sender<AssetCommand>,
 }
 
 impl RequestController {
-    pub async fn send_api_command(&self, command: ApiCommand) -> ApiResult<()> {
+    pub async fn send_api_command(&self, op: ApiOperation) -> ApiResult<()> {
         self.tx_api_controller
-            .send(command)
+            .send(ApiCommand { user: self.api_model.user.clone(), op })
             .await
             .map_err(ApiError::CommandSendError::<ApiCommand>)?;
 
@@ -21,13 +24,13 @@ impl RequestController {
 
     pub async fn send_api_request<T>(
         &self,
-        command: ApiCommand,
+        op: ApiOperation,
         rx: &mut oneshot::Receiver<ApiResult<T>>,
     ) -> ApiResult<T>
     where
         T: 'static + Send + Sync + Debug,
     {
-        self.send_api_command(command).await?;
+        self.send_api_command(op).await?;
         let recv = rx.await.map_err(ApiError::<T>::RespRecvError)?;
         recv
     }
