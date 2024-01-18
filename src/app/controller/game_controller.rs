@@ -121,22 +121,28 @@ impl GameController {
         tokio::select! {
             _ = async {
                 let mut is_initial = true;
-                while let Ok(Some(ev)) = stream.try_next().await {
-                    match ev {
-                        GameSseEvent::Game(games) => {
-                            println!("[Controller] Games SSE connection received {} games", games.len());
+                loop {
+                    match stream.try_next().await {
+                        Ok(Some(ev)) => match ev {
+                            GameSseEvent::Game(games) => {
+                                println!("[Controller] Games SSE connection received {} games", games.len());
 
-                            self.api_model.user.handle_retrieve_games_result(games).await;
-                            self.try_fetch_all_game_details().await;
-                            self.process_game_list_changes(RefreshLogsCondition::Never).await;
+                                self.api_model.user.handle_retrieve_games_result(games).await;
+                                self.try_fetch_all_game_details().await;
+                                self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
-
-                            if is_initial {
-                                is_initial = false;
-                                self.app_state_controller
-                                    .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
+                                if is_initial {
+                                    is_initial = false;
+                                    self.app_state_controller
+                                        .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
+                                }
                             }
                         },
+                        Ok(_) => {},
+                        Err(e) => {
+                            eprintln!("[Controller] Error in game SSE connection: {e:?}");
+                            break;
+                        }
                     }
                 }
             } => {},

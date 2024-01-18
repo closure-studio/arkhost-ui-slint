@@ -1,6 +1,6 @@
 use crate::app::ui::*;
 use tokio::sync::oneshot;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +13,7 @@ pub struct AccountController {
     pub app_state_controller: Arc<AppStateController>,
     pub request_controller: Arc<RequestController>,
     pub game_controller: Arc<GameController>,
-    pub stop_connections: Mutex<Option<CancellationToken>>,
+    pub stop_connections: Mutex<Option<DropGuard>>,
 }
 
 impl AccountController {
@@ -91,14 +91,13 @@ impl AccountController {
 
     async fn on_login(&self) {
         let stop_connection_token = CancellationToken::new();
-        if let Some(existing_token) = self
+        if let Some(_) = self
             .stop_connections
             .lock()
             .unwrap()
-            .replace(stop_connection_token.clone())
+            .replace(stop_connection_token.clone().drop_guard())
         {
             println!("[Controller] Terminated connections in previous session");
-            existing_token.cancel();
         }
 
         self.game_controller.try_ensure_resources().await;
