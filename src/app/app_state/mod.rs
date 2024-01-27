@@ -14,7 +14,7 @@ pub struct AppState {
 pub struct AppStateAsyncOp {
     pub ui: Weak<AppWindow>,
     pub notify: Arc<Notify>,
-    pub task: Box<dyn FnOnce(AppWindow) + Send + 'static>
+    pub task: Box<dyn FnOnce(AppWindow) + Send + 'static>,
 }
 
 impl AppStateAsyncOp {
@@ -23,29 +23,32 @@ impl AppStateAsyncOp {
         func: impl FnOnce(AppWindow) + Send + 'static,
     ) -> AppStateAsyncOp {
         let notify = Arc::new(Notify::new());
-        let result = AppStateAsyncOp {
+
+        AppStateAsyncOp {
             ui: ui.clone(),
             notify,
-            task: Box::new(func)
-        };
-
-        result
+            task: Box::new(func),
+        }
     }
 
     pub fn exec(self) {
         let task = self.task;
-        self.ui.upgrade_in_event_loop(move |ui| {
-            task(ui);
-        }).unwrap();
+        self.ui
+            .upgrade_in_event_loop(move |ui| {
+                task(ui);
+            })
+            .unwrap();
     }
 
     pub async fn exec_wait(self) {
         let task = self.task;
         let notify = self.notify.clone();
-        self.ui.upgrade_in_event_loop(move |ui| {
-            task(ui);
-            notify.notify_one();
-        }).unwrap();
+        self.ui
+            .upgrade_in_event_loop(move |ui| {
+                task(ui);
+                notify.notify_one();
+            })
+            .unwrap();
         self.notify.notified().await;
     }
 }
@@ -152,7 +155,7 @@ impl AppState {
                 && current_game_info_list
                     .iter()
                     .enumerate()
-                    .all(|(i, x)| x.id == &game_list[i].1)
+                    .all(|(i, x)| x.id == game_list[i].1)
             {
                 current_game_info_list
                     .iter()

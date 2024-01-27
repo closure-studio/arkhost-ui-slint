@@ -6,7 +6,6 @@ use super::{
 };
 use crate::models::{api_arkhost::*, common::ResponseWrapperNested};
 use crate::{consts::arkhost::api, models::common::NullableData};
-use anyhow::anyhow;
 use es::Client as EsClient;
 use eventsource_client as es;
 
@@ -146,10 +145,7 @@ impl EventSourceClient {
         }
     }
 
-    pub fn connect_games_sse(
-        &self,
-    ) -> anyhow::Result<SseStream<anyhow::Result<GameSseEvent>>>
-    {
+    pub fn connect_games_sse(&self) -> anyhow::Result<SseStream<anyhow::Result<GameSseEvent>>> {
         let mut url = self.base_url.join(api::GAMES_SSE)?;
         url.query_pairs_mut()
             .append_pair("token", &self.auth_client.get_jwt()?);
@@ -165,12 +161,8 @@ impl EventSourceClient {
                             let games = serde_json::de::from_str::<Vec<GameInfo>>(&ev.data)?;
                             Ok(Some(GameSseEvent::Game(games)))
                         }
-                        api::sse::EVENT_TYPE_CLOSE => {
-                            Ok(Some(GameSseEvent::Close))
-                        }
-                        other => {
-                            Ok(Some(GameSseEvent::Unrecognized(other.into())))
-                        },
+                        api::sse::EVENT_TYPE_CLOSE => Ok(Some(GameSseEvent::Close)),
+                        other => Ok(Some(GameSseEvent::Unrecognized(other.into()))),
                     },
                     es::SSE::Comment(_) => Ok(None), // Error on unexpected comment?
                 }

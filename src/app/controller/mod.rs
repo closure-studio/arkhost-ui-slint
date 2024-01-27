@@ -119,13 +119,13 @@ impl ControllerHub {
             app.on_login_requested(move |account, password| {
                 let app = app_weak.clone().unwrap();
 
-                if account.len() == 0 {
+                if account.is_empty() {
                     app.set_login_status_text("账号不能为空 ".into());
                     app.set_login_state(LoginState::Errored);
                     return;
                 }
 
-                if password.len() == 0 {
+                if password.is_empty() {
                     app.set_login_status_text("密码不能为空 ".into());
                     app.set_login_state(LoginState::Errored);
                     return;

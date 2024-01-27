@@ -43,7 +43,7 @@ impl GameInfoModel {
     pub fn mutate(&self, game_info: &mut GameInfo, refresh_logs: bool) {
         game_info.ap = self.game.info.status.ap.to_string().into();
         game_info.battle_map = match self.game.info.game_config.map_id {
-            Some(ref map) if map != "" => map,
+            Some(ref map) if !map.is_empty() => map,
             _ => "[作战未开始]",
         }
         .into();
@@ -120,9 +120,9 @@ pub struct GameLogModel {
 }
 
 impl GameLogModel {
-    pub fn from(logs: &Vec<api_arkhost::LogEntry>, log_cursor: u64) -> Self {
+    pub fn from(logs: &[api_arkhost::LogEntry], log_cursor: u64) -> Self {
         Self {
-            logs: logs.clone(),
+            logs: logs.to_owned(),
             log_cursor,
         }
     }
@@ -188,7 +188,7 @@ impl GameOptionsModel {
     }
 
     pub fn to_game_options(&self) -> GameConfigFields {
-        return self.options.clone();
+        self.options.clone()
     }
 
     pub fn mutate(&self, game_options: &mut GameOptions) {
@@ -234,7 +234,7 @@ mod utils {
                 result.push(ch);
             }
         }
-        return result;
+        result
     }
 }
 

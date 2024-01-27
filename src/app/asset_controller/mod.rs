@@ -126,7 +126,7 @@ impl AssetController {
 
     pub async fn read_cache_by_key(&self, cache_key: &Option<String>) -> Option<AssetRef> {
         if let Some(key) = cache_key {
-            return self.cache.read().await.get(key).map(|x| x.clone());
+            return self.cache.read().await.get(key).cloned();
         }
         None
     }

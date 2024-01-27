@@ -32,23 +32,20 @@ impl UserStateFileStorage {
     pub fn load_from_file(&mut self) {
         let path = self.get_store_path().join(FILE_NAME);
         let open_res = File::open(&path);
-        match open_res {
-            Ok(mut f) => {
-                let mut jwt = String::new();
-                if let Ok(_) = f.read_to_string(&mut jwt) {
-                    self.jwt = Some(jwt);
-                    println!(
-                        "[UserStateFileStorage] loaded user state file from {}",
-                        path.display()
-                    );
-                };
-            }
-            Err(_) => {}
+        if let Ok(mut f) = open_res {
+            let mut jwt = String::new();
+            if f.read_to_string(&mut jwt).is_ok() {
+                self.jwt = Some(jwt);
+                println!(
+                    "[UserStateFileStorage] loaded user state file from {}",
+                    path.display()
+                );
+            };
         }
     }
 
     pub fn save_to_file(&self) {
-        if let None = self.jwt {
+        if self.jwt.is_none() {
             return;
         }
 

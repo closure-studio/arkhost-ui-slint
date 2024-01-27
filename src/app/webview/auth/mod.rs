@@ -5,10 +5,7 @@ pub mod subprocess_webview;
 
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, rc::Rc, sync::RwLock};
 use thiserror::Error;
 use wry::{http::HeaderMap, PageLoadEvent, WebView, WebViewBuilder};
 
@@ -71,16 +68,16 @@ struct AuthPagePrams<'a> {
 
 pub struct AuthResolver {
     auth_params: AuthParams,
-    pending_auth: Arc<RwLock<HashMap<String, AuthAction>>>,
-    webview: Arc<RwLock<WebViewStore>>,
+    pending_auth: Rc<RwLock<HashMap<String, AuthAction>>>,
+    webview: Rc<RwLock<WebViewStore>>,
 }
 
 impl AuthResolver {
-    pub fn new(auth_params: AuthParams, webview_store: Arc<RwLock<WebViewStore>>) -> Self {
+    pub fn new(auth_params: AuthParams, webview_store: Rc<RwLock<WebViewStore>>) -> Self {
         Self {
             auth_params,
             webview: webview_store,
-            pending_auth: Arc::new(RwLock::new(HashMap::new())),
+            pending_auth: Rc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -124,7 +121,7 @@ impl AuthResolver {
             | AuthAction::GeeTestAuth { .. } => {
                 let params = AuthPagePrams {
                     params: &self.auth_params,
-                    action: &action,
+                    action,
                 };
                 let params_json = serde_json::ser::to_string(&params)?;
                 println!("[AuthWebView] Sent message to auth page: {}", &params_json);
@@ -161,18 +158,18 @@ impl AuthResolver {
 
 pub struct Authenticator {
     auth_params: AuthParams,
-    auth_listener: Arc<Box<dyn AuthListener>>,
-    pub auth_resolver: Arc<AuthResolver>,
-    pub webview: Arc<RwLock<WebViewStore>>,
+    auth_listener: Rc<Box<dyn AuthListener>>,
+    pub auth_resolver: Rc<AuthResolver>,
+    pub webview: Rc<RwLock<WebViewStore>>,
 }
 
 impl Authenticator {
-    pub fn new(auth_params: AuthParams, auth_listener: Arc<Box<dyn AuthListener>>) -> Self {
-        let webview_store = Arc::new(RwLock::new(WebViewStore::new()));
+    pub fn new(auth_params: AuthParams, auth_listener: Rc<Box<dyn AuthListener>>) -> Self {
+        let webview_store = Rc::new(RwLock::new(WebViewStore::new()));
 
         Self {
             auth_params: auth_params.clone(),
-            auth_resolver: Arc::new(AuthResolver::new(auth_params, webview_store.clone())),
+            auth_resolver: Rc::new(AuthResolver::new(auth_params, webview_store.clone())),
             auth_listener,
             webview: webview_store,
         }
@@ -249,13 +246,12 @@ impl Authenticator {
     }
 
     fn get_request_headers() -> HeaderMap {
-        let headers = HeaderMap::new();
-        headers
+        HeaderMap::new()
     }
 }
 
 pub struct WebViewStore {
-    pub webview: Option<Arc<WebView>>,
+    pub webview: Option<Rc<WebView>>,
     pub page_loaded: bool,
 }
 
@@ -267,11 +263,11 @@ impl WebViewStore {
         }
     }
 
-    pub fn set_webview(&mut self, webview: Arc<WebView>) {
+    pub fn set_webview(&mut self, webview: Rc<WebView>) {
         self.webview = Some(webview);
     }
 
-    pub fn get_webview(&self) -> Result<Arc<WebView>, AuthenticatorError> {
+    pub fn get_webview(&self) -> Result<Rc<WebView>, AuthenticatorError> {
         match &self.webview {
             Some(webview) => Ok(webview.clone()),
             None => Err(AuthenticatorError::WebViewNotAssigned),

@@ -88,6 +88,6 @@ pub struct UserStateData {
 
 impl UserStateData {
     pub fn is_expired(&self) -> bool {
-        return Utc::now() >= self.exp;
+        Utc::now() >= self.exp
     }
 }

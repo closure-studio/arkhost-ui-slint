@@ -36,8 +36,8 @@ impl AccountController {
             .request_controller
             .send_api_request(
                 ApiOperation::Login {
-                    email: account.into(),
-                    password: password.into(),
+                    email: account,
+                    password,
                     resp,
                 },
                 &mut rx,
@@ -55,7 +55,7 @@ impl AccountController {
             }
             Err(e) => {
                 self.app_state_controller
-                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{:?}", e).into()));
+                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{:?}", e)));
             }
         }
     }
@@ -82,7 +82,7 @@ impl AccountController {
                 self.app_state_controller.exec(|x| {
                     x.set_login_state(
                         LoginState::Errored,
-                        format!("自动登录失败，请重试或检查网络环境\n{:?}", e).into(),
+                        format!("自动登录失败，请重试或检查网络环境\n{:?}", e),
                     )
                 });
             }
@@ -91,11 +91,12 @@ impl AccountController {
 
     pub async fn start_sse_event_loop(&self) {
         let stop_connection_token = CancellationToken::new();
-        if let Some(_) = self
+        if self
             .stop_connections
             .lock()
             .unwrap()
             .replace(stop_connection_token.clone().drop_guard())
+            .is_some()
         {
             println!("[Controller] Terminated connections in previous session");
         }

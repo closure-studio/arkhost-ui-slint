@@ -352,7 +352,7 @@ impl GameController {
                         .await
                         .as_ref()
                         .and_then(|x| x.get(char_illust_filename))
-                        .map(|x| x.clone())
+                        .cloned()
                         .unwrap_or_else(|| {
                             CharPack {
                                 name: "".into(),
@@ -465,8 +465,7 @@ impl GameController {
         }
 
         if should_refresh_val.load(Ordering::Acquire) {
-            self.retrieve_logs(id.into(), GameLogLoadRequestType::Later)
-                .await;
+            self.retrieve_logs(id, GameLogLoadRequestType::Later).await;
         }
     }
 }

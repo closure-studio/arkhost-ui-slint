@@ -194,7 +194,7 @@ impl Controller {
         let game_details = self.arkhost_client.get_game(&account).await?;
         let game_ref = user_model.get_game(&account).await?;
         game_ref.game.write().await.details = Some(game_details);
-        Ok(user_model.get_game(&account).await?)
+        user_model.get_game(&account).await
     }
 
     pub async fn retrieve_log(
@@ -251,7 +251,7 @@ impl Controller {
         game.log_cursor_back = game.logs.last().map_or(0, |x| x.id);
 
         drop(game);
-        Ok(user_model.get_game(&account).await?)
+        user_model.get_game(&account).await
     }
 
     pub async fn start_game(&self, account: String, captcha_token: String) -> CommandResult<()> {

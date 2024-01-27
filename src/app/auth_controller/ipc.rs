@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use super::AuthController;
 use super::Command;
+use crate::app::ipc::AuthenticatorServerSideChannel;
 use crate::app::ipc::{AuthenticatorConnection, AuthenticatorMessage};
 use crate::app::webview::auth::{AuthAction, AuthResult};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_channel::ipc::IpcOneShotServer;
-use ipc_channel::ipc::IpcSender;
 use subprocess::Popen;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
@@ -141,10 +141,7 @@ impl IpcAuthController {
 
     fn spawn_auth_process(&mut self) -> anyhow::Result<Arc<Mutex<AuthProcess>>> {
         let (ipc_server, ipc_server_name): (
-            IpcOneShotServer<(
-                IpcSender<AuthenticatorMessage>,
-                IpcSender<IpcSender<AuthenticatorMessage>>,
-            )>,
+            IpcOneShotServer<AuthenticatorServerSideChannel>,
             String,
         ) = IpcOneShotServer::new().unwrap();
 

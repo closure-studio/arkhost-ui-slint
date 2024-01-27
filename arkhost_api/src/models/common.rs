@@ -96,7 +96,7 @@ where
 {
     fn to_response_data(self) -> ResponseData<T> {
         ResponseData {
-            success: self.error.err == None,
+            success: self.error.err.is_none(),
             data: self.data,
             internal_code: self.error.code,
             internal_message: self.error.err,

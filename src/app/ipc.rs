@@ -32,26 +32,25 @@ pub struct AuthenticatorConnection {
     pub rx_client_receiver: IpcStream<AuthenticatorMessage>,
 }
 
+pub type AuthenticatorServerSideChannel = (
+    IpcSender<AuthenticatorMessage>,
+    IpcSender<IpcSender<AuthenticatorMessage>>,
+);
+
 impl AuthenticatorConnection {
     /// 使用例：
     /// ```
     /// use ipc_channel::ipc::{self, IpcOneShotServer, IpcReceiver, IpcSender};
-    /// 
+    ///
     /// let (ipc_server, ipc_server_name): (
-    ///     IpcOneShotServer<(
-    ///         IpcSender<AuthenticatorMessage>,
-    ///         IpcSender<IpcSender<AuthenticatorMessage>>,
-    ///     )>,
+    ///     IpcOneShotServer<AuthenticatorServerSideChannel>,
     ///     String,
     /// ) = IpcOneShotServer::new()
     /// // ...
     /// let connection = AuthenticatorConnection::accept(ipc_server)?;
     /// ```
     pub fn accept(
-        ipc_server: IpcOneShotServer<(
-            IpcSender<AuthenticatorMessage>,
-            IpcSender<IpcSender<AuthenticatorMessage>>,
-        )>,
+        ipc_server: IpcOneShotServer<AuthenticatorServerSideChannel>,
     ) -> anyhow::Result<AuthenticatorConnection> {
         let (_, (tx_client_sender, rx_client_sender_sender)) = ipc_server.accept()?;
         let (rx_client_sender, rx_client_receiver): (
@@ -102,6 +101,8 @@ impl AuthenticatorConnection {
     }
 
     pub fn close(&self) {
-        _ = self.tx_client_sender.send(AuthenticatorMessage::CloseRequested);
+        _ = self
+            .tx_client_sender
+            .send(AuthenticatorMessage::CloseRequested);
     }
 }

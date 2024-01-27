@@ -5,7 +5,7 @@ use crate::app::webview::auth::consts;
 use argh::FromArgs;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
-use std::sync::Arc;
+use std::rc::Rc;
 use std::thread;
 use thiserror::Error;
 use winit::window::WindowLevel;
@@ -91,7 +91,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         auth::AuthParams::ArkHostAuth {
             user: args.account.unwrap(),
         },
-        Arc::new(Box::new(Listener {
+        Rc::new(Box::new(Listener {
             event_loop_proxy: event_loop.create_proxy(),
         })),
     );
@@ -110,7 +110,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         .webview
         .write()
         .unwrap()
-        .set_webview(Arc::new(webview));
+        .set_webview(Rc::new(webview));
 
     let proxy = event_loop.create_proxy();
 

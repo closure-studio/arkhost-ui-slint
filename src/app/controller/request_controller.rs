@@ -1,9 +1,12 @@
 use super::api_model::ApiModel;
-use super::{ApiOperation, ApiCommand, AuthCommand, AssetCommand, ApiResult, AuthResult, AssetResult, ApiError};
-use tokio::sync::oneshot;
-use tokio::sync::mpsc;
+use super::{
+    ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult, AuthCommand,
+    AuthResult,
+};
 use std::fmt::Debug;
 use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 pub struct RequestController {
     pub api_model: Arc<ApiModel>,
@@ -15,7 +18,10 @@ pub struct RequestController {
 impl RequestController {
     pub async fn send_api_command(&self, op: ApiOperation) -> ApiResult<()> {
         self.tx_api_controller
-            .send(ApiCommand { user: self.api_model.user.clone(), op })
+            .send(ApiCommand {
+                user: self.api_model.user.clone(),
+                op,
+            })
             .await
             .map_err(ApiError::CommandSendError::<ApiCommand>)?;
 
@@ -31,8 +37,8 @@ impl RequestController {
         T: 'static + Send + Sync + Debug,
     {
         self.send_api_command(op).await?;
-        let recv = rx.await.map_err(ApiError::<T>::RespRecvError)?;
-        recv
+
+        rx.await.map_err(ApiError::<T>::RespRecvError)?
     }
 
     pub async fn send_auth_request(
@@ -41,8 +47,7 @@ impl RequestController {
         rx: &mut oneshot::Receiver<anyhow::Result<AuthResult>>,
     ) -> anyhow::Result<AuthResult> {
         self.tx_auth_controller.send(command).await?;
-        let auth_res = rx.await?;
-        Ok(auth_res?)
+        rx.await?
     }
 
     pub async fn send_asset_command(&self, command: AssetCommand) -> AssetResult<()> {
@@ -63,7 +68,7 @@ impl RequestController {
         T: 'static + Send + Sync + Debug,
     {
         self.send_asset_command(command).await?;
-        let recv = rx.await.map_err(ApiError::<T>::RespRecvError)?;
-        recv
+
+        rx.await.map_err(ApiError::<T>::RespRecvError)?
     }
 }

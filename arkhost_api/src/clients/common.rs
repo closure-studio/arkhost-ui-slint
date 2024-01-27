@@ -165,7 +165,7 @@ impl UserState for UserStateMemStorage {
     }
 
     fn get_login_state(&self) -> Option<String> {
-        return self.jwt.clone();
+        self.jwt.clone()
     }
 
     fn erase_login_state(&mut self) {
@@ -180,7 +180,7 @@ pub trait UserStateDataSource {
 impl<T: UserState> UserStateDataSource for T {
     fn get_user_state_data(&self) -> Option<UserStateData> {
         if let Some(token) = self.get_login_state() {
-            let mut iter = token.rsplitn(3, '.').into_iter();
+            let mut iter = token.rsplitn(3, '.');
             if let (Some(_), Some(payload), Some(_), None) =
                 (iter.next(), iter.next(), iter.next(), iter.next())
             {

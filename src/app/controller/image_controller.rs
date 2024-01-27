@@ -84,7 +84,7 @@ impl ImageController {
             (
                 image_ref.asset_path.clone(),
                 image_ref.cache_key.clone(),
-                image_ref.format.clone(),
+                image_ref.format,
             )
         };
         let (resp, mut rx) = oneshot::channel();

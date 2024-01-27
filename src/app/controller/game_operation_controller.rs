@@ -205,7 +205,7 @@ impl GameOperationController {
             AuthResult::ArkHostCaptchaTokenReCaptcha { token, .. } => token,
             AuthResult::ArkHostCaptchaTokenGeeTest { token, .. } => token,
             _ => {
-                return Err(anyhow!("unexpected auth result: {auth_result:?}").into());
+                return Err(anyhow!("unexpected auth result: {auth_result:?}"));
             }
         };
 
