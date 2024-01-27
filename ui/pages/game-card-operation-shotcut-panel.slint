@@ -49,9 +49,11 @@ component StartGameButton inherits GameOperationShortcutButton {
     in property <bool> compact: false;
 
     type: ButtonType.StartGame;
-    icon: StyleMetrics.dark-color-scheme 
-        ? @image-url("../images/game_card_shortcut_start.svg")
-        : @image-url("../images/game_card_shortcut_start_light.svg");
+    primary: true;
+    // primary=true时在dark-color-theme且enabled=true时字体为深色（在fluent主题下测试）
+    icon: StyleMetrics.dark-color-scheme && self.enabled 
+        ? @image-url("../images/game_card_shortcut_start_light.svg")
+        : @image-url("../images/game_card_shortcut_start.svg");
     text: !compact 
         ? @tr("启动") 
         : "";
@@ -71,7 +73,7 @@ component StopGameButton inherits GameOperationShortcutButton {
 
 // component RestartGameButton inherits GameOperationShortcutButton {
 //     in property <bool> compact: false;
-    
+//    
 //     type: ButtonType.RestartGame;
 //     icon: StyleMetrics.dark-color-scheme 
 //         ? @image-url("../images/game_card_shortcut_restart.svg")

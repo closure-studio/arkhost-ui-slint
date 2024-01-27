@@ -1,0 +1,186 @@
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
+import { UserTier } from "../user-info.slint";
+
+export struct SlotTierCardData {
+    background-fill: brush,
+    deco-fill: brush,
+    deco-fill-alternative: brush,
+    stripe-fill: brush,
+
+    tier-name: string,
+    can-upgrade: bool,
+    upgrade-text: string,
+    next-tier: UserTier
+}
+
+export component SlotTierCard inherits Rectangle {
+    in property <SlotTierCardData> data;
+    private property <length> foreground-area-length: deco-touch-area.has-hover
+        ? root.width - 170px
+        : root.width - 50px;
+
+    private property <brush> accent-color: StyleMetrics.dark-color-scheme
+        ? data.background-fill.brighter(100%)
+        : data.background-fill.brighter(50%);
+
+    callback on-upgrade-tier(UserTier);
+    
+    border-radius: 10px;
+    background: StyleMetrics.dark-color-scheme
+        ? #242424
+        : StyleMetrics.window-background;
+    drop-shadow-blur: StyleMetrics.dark-color-scheme
+        ? 0px
+        : 5px;
+    drop-shadow-color: darkgray;
+    clip: true;
+
+    deco-weird-stripes := Image {
+        source: @image-url("../images/slot_deco_weird_stripes.svg");
+        source-clip-y: 18;
+        source-clip-height: 200;
+
+        opacity: deco-touch-area.has-hover
+            ? 1.0
+            : 0.5;
+
+        animate opacity { duration: 0.25s; easing: ease; }
+
+        colorize: data.stripe-fill;
+
+        height: 150px;
+        width: 330px;
+        x: root.width - 180px;
+        z: 90;
+    }
+
+    deco-fill := Rectangle {
+        background: deco-touch-area.has-hover
+            ? data.deco-fill-alternative
+            : data.deco-fill;
+
+        height: root.height;
+        width: 350px;
+        x: root.width - 180px;
+        y: 0;
+        z: 89;
+
+        animate background { duration: 0.25s; easing: ease; }
+
+        deco-touch-area := TouchArea {
+            clicked => {
+                if (data.can-upgrade && data.next-tier != UserTier.Invalid) {
+                    on-upgrade-tier(data.next-tier);
+                }
+            }
+        }
+    }
+
+    foregroung-area := Rectangle {
+        height: root.height;
+        width: foreground-area-length;
+        x: 0;
+        z: 101;
+
+        border-radius: 10px;
+        clip: true;
+
+        animate width { duration: 0.25s; easing: ease; }
+
+        HorizontalLayout {
+            padding: 10px;
+            spacing: 10px;
+            alignment: start;
+
+            VerticalLayout {
+                alignment: center;
+
+                Image {
+                    source: @image-url("../images/slot_icon_tier.svg");
+                    width: 30px;
+                    height: 30px;
+
+                    colorize: accent-color;
+                }
+            }
+
+            Text {
+                font-size: 15px;
+                text: "你是可露希尔旗舰店【" + data.tier-name + "】级会员！";
+                color: accent-color;
+                animate color { duration: 0.25s; easing: ease; }
+
+                vertical-alignment: center;
+            }
+
+            x: 0px;
+            width: root.width - 100px;
+            height: parent.height;
+            z: 101;
+        }
+    
+        Rectangle {
+            background: data.background-fill;
+            animate background { duration: 0.25s; easing: ease; }
+    
+            width: root.width - 30px;
+            height: parent.height;
+            x: 0px;
+            z: 99;
+        }
+
+        Rectangle {
+            background: StyleMetrics.window-background;
+            opacity: 0.8;
+
+            width: root.width - 30px;
+            height: parent.height;
+            x: 0px;
+            z: 100;
+        }
+    }
+
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 10px;
+        alignment: space-between;
+
+        VerticalLayout {
+            alignment: center;
+
+            Image {
+                source: data.can-upgrade
+                    ? @image-url("../images/slot_icon_upgrade_required.svg")
+                    : @image-url("../images/slot_icon_verified.svg");
+                colorize: whitesmoke;
+
+                opacity: data.can-upgrade
+                    ? 0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad))
+                    : 1;
+
+                width: 30px;
+                height: 30px;
+            }
+        }
+
+        Text {
+            font-size: 14px;
+            color: whitesmoke;
+            
+            text: data.upgrade-text;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+
+        animate x {
+            duration: 0.25s;
+            easing: ease;
+        }
+
+        x: foreground-area-length;
+        width: parent.width - self.x;
+        z: 101;
+    }
+
+    height: 50px;
+}

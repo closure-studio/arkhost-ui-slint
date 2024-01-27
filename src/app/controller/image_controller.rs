@@ -121,7 +121,7 @@ impl ImageController {
                         .write()
                         .await
                         .insert(image_ref.read().await.asset_path.clone());
-                    eprintln!("Error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_ref.read().await, e);
+                    eprintln!("[Controller] Error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_ref.read().await, e);
                 }
             }
         }

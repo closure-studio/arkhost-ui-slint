@@ -124,7 +124,9 @@ export component GameCardDoctorInfo inherits Rectangle {
 
                     text: info.details.loaded 
                         ? info.ap + " / " + info.details.max-ap
-                        : info.ap;
+                        : info.ap == "0"
+                            ? "-"
+                            : info.ap;
                     row: 0;
                     col: 0;
                 }

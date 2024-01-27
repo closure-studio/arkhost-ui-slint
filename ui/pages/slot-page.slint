@@ -1,0 +1,124 @@
+import { ScrollView , VerticalBox} from "std-widgets.slint";
+import { MockData } from "../mock-data.slint";
+import { SlotInfo } from "../slot-info.slint";
+import { BannerNotification } from "../components/banner-notification.slint";
+import { SlotCard } from "slot-card.slint";
+import { SlotTierCard } from "slot-tier-card.slint";
+import { UserInfo, UserTier, UserProgress } from "../user-info.slint";
+import { SlotTierConsts } from "../slot-tier-consts.slint";
+import { UserCard } from "user-card.slint";
+import { Callbacks } from "../callbacks.slint";
+
+export component SlotPage {
+    in property <[SlotInfo]> slot-info-list: [
+        MockData.slot-info,
+        MockData.slot-info,
+        MockData.slot-info,
+    ];
+    in property <UserInfo> user-info: MockData.user-info;
+
+    private property <bool> double-column-layout : self.width >= 1200px;
+
+    scroll-view := ScrollView {
+        HorizontalLayout {
+            alignment: center;
+            spacing: 10px; 
+            
+            page-layout := Rectangle {
+                private property <length> single-column-slots-start-y:
+                    user-info-area.min-height;
+
+                user-info-area := VerticalLayout {
+                    alignment: start;
+                    padding-top: 10px;
+                    spacing: 10px;
+
+                    BannerNotification {
+                        background-color: #00649ebb;
+                        accent-color: #ebf3ff;
+                        has-action: false;
+                        text: @tr("该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
+                    }
+
+                    if user-info.progress == UserProgress.Initial: BannerNotification {
+                        background-color: #00649ebb;
+                        accent-color: #ebf3ff;
+                        text: @tr("你还没有添加第一个游戏账号，是否开启向导？");
+    
+                        has-action: true;
+                        action-text: @tr("[开启向导]");
+                        action-icon: @image-url("../images/slot_tutor_start.svg");
+                    }
+                    
+                    slot-tier-card := SlotTierCard {
+                        data: SlotTierConsts.get-tier-card-data(user-info.tier);
+
+                        on-upgrade-tier(next-tier) => {
+                            if (next-tier == UserTier.SmsVerified) {
+                                user-card.open-sms-verify-dialog();
+                            } else if (next-tier == UserTier.QQVerified) {
+                                user-card.open-qq-verify-dialog();
+                            }
+                        }
+                    }
+    
+                    user-card := UserCard {
+                        user-info: user-info;
+                    }
+    
+                    animate width { duration: 0.25s; easing: ease; }
+
+                    x: 0px;
+                    y: 0px;
+                    width: double-column-layout
+                        ? 550px
+                        : 640px;
+                }
+    
+                slot-info-area := VerticalLayout {
+                    alignment: start;
+                    padding-top: 10px;
+                    padding-bottom: 10px;
+                    spacing: 10px;
+    
+                    for slot-info in slot-info-list: SlotCard {
+                        info: slot-info;
+                        slot-saved(uuid, update-draft) => { Callbacks.update-slot(uuid, update-draft); }
+                        reset-slot-update-request-state(uuid) => { Callbacks.reset-slot-update-request-state(uuid); }
+                    }
+
+                    states [
+                        single-column when !double-column-layout: {
+                            x: 0px;
+                            y: single-column-slots-start-y;
+
+                            in {
+                                animate x { delay: 0.5s; duration: 0.25s; easing: ease; }
+                            }
+                        }
+                        double-column when double-column-layout: {
+                            x: user-info-area.width + 10px;
+                            y: 0px;
+
+                            in {
+                                animate y { delay: 0.5s; duration: 0.25s; easing: ease; }
+                            }
+                        }
+                    ]
+                    width: min(root.width, 640px);
+                }
+
+                states [
+                    single-column when !double-column-layout: {
+                        width: 640px;
+                        height: user-info-area.min-height + slot-info-area.min-height;
+                    }
+                    double-column when double-column-layout: {
+                        width: user-info-area.width + slot-info-area.width + 10px;
+                        height: max(user-info-area.min-height, slot-info-area.min-height);
+                    }
+                ]
+            }
+        }
+    }
+}

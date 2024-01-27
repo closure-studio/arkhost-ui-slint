@@ -1,0 +1,79 @@
+import { FontGlobals } from "../font-globals.slint";
+import { Button , VerticalBox} from "std-widgets.slint";
+
+export component BannerNotification inherits Rectangle {
+    in property <color> background-color: #9e8c00bc;
+    in property <color> accent-color: #fffaeb;
+    in property <string> text: "你还没有添加第一个游戏账号，请前往添加";
+    in property <bool> has-action: false;
+    in property <string> action-text;
+    in property <image> action-icon: @image-url("../images/banner_notification_apply.svg");
+    callback action();
+
+    background: background-color;
+    border-radius: 10px;
+    clip: true;
+
+    HorizontalLayout {
+        alignment: space-between;
+        padding: 10px;
+        padding-left: 15px;
+        padding-right: 15px;
+        Text {
+            text: text;
+            font-family: FontGlobals.alphanumeric-text-sans;
+            font-size: 15px;
+            color: accent-color;
+            vertical-alignment: center;
+        }
+        
+        if has-action: Rectangle {
+            clip: true;
+
+            HorizontalLayout {
+                spacing: 5px;
+                alignment: end;
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Image {
+                        width: 22px;
+                        height: 22px;
+    
+                        source: action-icon;
+                        colorize: accent-color;
+                    }
+                }
+
+                Text {
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 15px;
+                    text: action-text;
+
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+
+                    states [
+                        up when !touch-area.has-hover && !touch-area.pressed: {
+                            color: accent-color;
+                            in { animate color { duration: 0.15s; } }
+                        }
+                        hover when touch-area.has-hover && !touch-area.pressed: {
+                            color: accent-color.darker(20%);
+                            in { animate color { duration: 0.15s; } }
+                        }
+                        down when touch-area.pressed: {
+                            color: accent-color.darker(40%);
+                            in { animate color { duration: 0.15s; } }
+                        }
+                    ]
+                }
+            }
+
+            touch-area := TouchArea {
+                clicked => { action(); }
+            }
+        }
+    }
+}

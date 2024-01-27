@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use serde_repr::Deserialize_repr;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::{serde_as, TimestampSeconds};
 
 use super::common::NullableData;
@@ -19,6 +19,14 @@ pub enum GameStatus {
     ErrorBattleFailed = 5,
     ErrorCaptchaTimedOut = 6,
     Captcha = 999,
+}
+
+#[derive(Default, PartialEq, Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(i32)]
+pub enum GamePlatform {
+    #[default]
+    Official = 1,
+    Bilibili = 2,
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -49,6 +57,8 @@ pub struct GameInfo {
 pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
 pub enum GameSseEvent {
     Game(Vec<GameInfo>),
+    Close,
+    Unrecognized(String)
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]

@@ -33,14 +33,22 @@ export component LoginWindow {
         }
     }
 
-    vbox := VerticalBox {
+    function do-login() {
+        if (use-auth) {
+            auth-requested();
+        } else {
+            login-requested(account-input.text, password-input.text);
+        }  
+    }
+
+    VerticalBox {
         alignment: start;
 
         HorizontalBox {
             alignment: start;
             
             register := Button {
-                text: @tr("注册...");
+                text: @tr("注册…");
                 icon: StyleMetrics.dark-color-scheme
                     ? @image-url("images/ext_link.svg")
                     : @image-url("images/ext_link_light.svg");
@@ -87,6 +95,9 @@ export component LoginWindow {
                 input-type: InputType.password;
 
                 placeholder-text: use-auth ? @tr("已记住登录状态") : @tr("密码");
+                accepted => {
+                    do-login();
+                }
             }
         }
 
@@ -94,15 +105,12 @@ export component LoginWindow {
             alignment: center;
 
             Button {
+                primary: true;
                 enabled: !logging;
                 text: @tr("登录");
                 width: parent.width - 40px;
                 clicked => {
-                    if (use-auth) {
-                        auth-requested();
-                    } else {
-                        login-requested(account-input.text, password-input.text);
-                    }
+                    do-login()
                 }
             }
         }

@@ -1,4 +1,6 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
+import { SlotInfo, SlotState, SlotUpdateRequestState, SlotUpdateDraftType, SlotPlatform } from "slot-info.slint";
+import { UserInfo, UserStatus, UserTier, UserProgress} from "user-info.slint";
 
 export global MockData {
     out property <GameInfo> game-info: {
@@ -9,7 +11,7 @@ export global MockData {
         status-text: "",
         ap: "135",
         battle-map: "1-7",
-        game-state: GameState.Running,
+        game-state: GameState.Stopped,
         options: {
 
         },
@@ -36,5 +38,46 @@ export global MockData {
             secretary: "澄闪",
             social-point: "300"
         }
+    };
+
+    out property <SlotInfo> slot-info: {
+        uuid: "00000000-0000-0000-0000-000000000000",
+        state: SlotState.Synchronized,
+        // game-account: "13344445555",
+        // game-account-split: ["13344445555", ""],
+        game-account: "LeaderOne@rhodes-island.org",
+        game-account-split: ["LeaderOne", "@rhodes-island.org"],
+        platform: SlotPlatform.Official,
+        description: "可露希尔托管凭证 · 基础型",
+        verify-rules: [
+            {
+                has-result: true,
+                fulfilled: false,
+                description: "仅限添加归属认证手机号",
+                status-text: "无法绑定验证账号（接受过本平台短信的手机号“19988887777”）以外的账号到该账号位"
+            },
+            {
+                has-result: true,
+                fulfilled: true,
+                description: "仅限添加手机号账号",
+                status-text: "已通过验证"
+            }
+        ],
+        last-verify: {
+            type: SlotUpdateDraftType.Update,
+            game-account: "18877776666",
+            platform: SlotPlatform.Bilibili,
+            password: "secret"
+        }
+    };
+
+    out property <UserInfo> user-info: {
+        nickname: "doctor@rhodes-island.org",
+        status: UserStatus.Normal,
+        tier: UserTier.QQVerified,
+        progress: UserProgress.QQVerified,
+        phone: "12345",
+        qq: "67890",
+        qq-verify-code-cached: "verifyCode:kfc-crazy-thursday-v-me-50"
     };
 }

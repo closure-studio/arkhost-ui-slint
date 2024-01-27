@@ -1,0 +1,677 @@
+import { GridBox, Button, HorizontalBox, VerticalBox, StyleMetrics, GroupBox , LineEdit, ComboBox, Spinner, ListView} from "std-widgets.slint";
+import { 
+    SlotInfo,
+    SlotRequirement, 
+    SlotState, 
+    SlotPlatform, 
+    SlotUpdateRequestState,
+    SlotUpdateDraft, 
+    SlotUpdateDraftType, 
+    SlotInfoUtils 
+} from "../slot-info.slint";
+import { MockData } from "../mock-data.slint";
+import { FontGlobals } from "../font-globals.slint";
+
+component SlotRequirementItem inherits Rectangle {
+    in property <SlotRequirement> requirement;
+
+    layout := VerticalLayout {
+        alignment: start;
+        spacing: 4px;
+
+        HorizontalLayout {
+            alignment: start;
+
+            Rectangle {
+                background: gray.with-alpha(20%);
+        
+                border-radius: 5px;
+        
+                badge := HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+        
+                    if requirement.has-result : VerticalLayout {
+                        alignment: center;
+        
+                        Image {
+                            colorize: StyleMetrics.default-text-color;
+            
+                            height: requirement-text.min-height + 2px;
+                            width: self.height;
+                            states [
+                                success when requirement.fulfilled: {
+                                    source: @image-url("../images/slot_icon_check.svg");
+                                    colorize: #59b72a;
+                                }
+                                fail when !requirement.fulfilled: {
+                                    source: @image-url("../images/slot_icon_cross.svg");
+                                    colorize: #dd3324;
+                                }
+                            ]
+                        }
+                    }
+        
+                    requirement-text := Text {
+                        font-size: 13px;
+                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        text: requirement.description;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+        
+                width: badge.min-width + 10px;
+                height: badge.min-height + 10px;
+            }
+        }
+
+        if requirement.has-result && requirement.status-text != "" : HorizontalLayout {
+            padding-left: 10px;
+            padding-bottom: 5px;
+            spacing: 5px;
+            Text {
+                font-size: 13px;
+                color: StyleMetrics.default-text-color.transparentize(20%);
+                text: "- " + requirement.status-text;
+                wrap: word-wrap;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+component SlotRequirementArea inherits VerticalLayout {
+    in property <SlotInfo> info: MockData.slot-info;
+
+    GroupBox {
+        title: ""; // initial value
+
+        VerticalLayout {
+            padding-bottom: 5px;
+            alignment: start;
+            spacing: 5px;
+
+            for requirement in info.verify-rules : SlotRequirementItem {
+                requirement: requirement;
+            }
+        }
+
+        states [
+            unchanged when info.last-verify.type == SlotUpdateDraftType.Unchanged: {
+                title: @tr("提交条件");
+            }
+            has-last-verify when info.last-verify.type == SlotUpdateDraftType.Update: {
+                title: 
+                    @tr("提交条件（验证于上一次提交：") 
+                    + SlotInfoUtils.get-server-display-name(info.platform)
+                    + info.last-verify.game-account + @tr("）");
+            }
+        ]
+    }
+}
+
+component SlotUpdateArea inherits VerticalLayout {
+    in property <SlotInfo> info: MockData.slot-info;
+    out property <bool> editing:
+        update-draft.type != SlotUpdateDraftType.Unchanged;
+    out property <bool> has-unsaved-changes: 
+        editing && info.update-request-state != SlotUpdateRequestState.Success;
+
+    private property <SlotUpdateDraft> update-draft: {
+        type: SlotUpdateDraftType.Unchanged,
+        game-account: info.game-account,
+        platform: info.platform,
+        password: ""
+    };
+    private property <SlotPlatform> new-platform: update-draft.platform;
+    private property <string> new-game-account: update-draft.game-account; 
+    private property <string> new-password: update-draft.password;
+    private property <bool> requesting:
+        info.update-request-state == SlotUpdateRequestState.Requesting;
+
+    public function reset-update-draft() {
+        update-draft.type = SlotUpdateDraftType.Unchanged;
+        update-draft.game-account = info.game-account;
+        new-game-account = info.game-account;
+        update-draft.platform = info.platform;
+        new-platform = info.platform;
+        update-draft.password = "";
+        new-password = "";
+    }
+
+    pure function validate-update-draft() -> bool {
+        if (update-draft.type == SlotUpdateDraftType.Unchanged) {
+            true
+        } else if (update-draft.type == SlotUpdateDraftType.Update) {
+            new-platform != SlotPlatform.None
+            && new-game-account != ""
+            && new-password != ""
+        } else if (update-draft.type == SlotUpdateDraftType.Delete) {
+            true
+        } else {
+            false
+        }
+    }
+
+    pure function is-new-account() -> bool {
+        info.state == SlotState.Empty 
+        || new-platform != info.platform 
+        || new-game-account != info.game-account
+    }
+
+    callback slot-saved(string, SlotUpdateDraft);
+    callback reset-slot-update-request-state(string);
+
+    alignment: start;
+
+    VerticalLayout {
+        spacing: 15px;
+
+        if !editing : HorizontalLayout {
+            spacing: 10px;
+
+            modify-check-box := Button {
+                enabled: !editing;
+                text: info.state != SlotState.Empty
+                    ? @tr("修改/重新提交")
+                    : @tr("提交新账号");
+                checkable: true;
+                checked: false;
+                clicked => { 
+                    update-draft.type = SlotUpdateDraftType.Update;
+                    reset-slot-update-request-state(info.uuid);
+                }
+            }
+
+            delete-check-box := Button {
+                enabled: 
+                    !editing
+                    && info.state != SlotState.Empty;
+                text: @tr("删除");
+                checkable: true;
+                checked: false;
+                clicked => { 
+                    update-draft.type = SlotUpdateDraftType.Delete;
+                    reset-slot-update-request-state(info.uuid);
+                }
+            }
+        }
+
+        // update slot
+        if update-draft.type == SlotUpdateDraftType.Update: GridLayout {
+            private property <string> official-server-name: 
+                SlotInfoUtils.get-server-display-name(SlotPlatform.Official);
+            private property <string> bilibili-server-name: 
+                SlotInfoUtils.get-server-display-name(SlotPlatform.Bilibili);
+            private property <string> server-name-placeholder: @tr("请选择服务器");
+
+            spacing: 15px;
+
+            ComboBox {
+                enabled: !requesting;
+                model: [
+                    official-server-name,
+                    bilibili-server-name
+                ];
+                current-value: update-draft.platform == SlotPlatform.None
+                    ? server-name-placeholder
+                    : SlotInfoUtils.get-server-display-name(update-draft.platform);
+
+                selected(value) => {  
+                    if (value == official-server-name) {
+                        new-platform = SlotPlatform.Official
+                    } else if (value == bilibili-server-name) {
+                        new-platform = SlotPlatform.Bilibili
+                    }
+                }
+
+                row: 0;
+            }
+
+            LineEdit {
+                enabled: !requesting;
+                font-size: 14px;
+                placeholder-text: @tr("账号");
+                text: update-draft.game-account;
+
+                edited(value) => {
+                    new-game-account = value;
+                }
+
+                row: 1;
+            }
+
+            LineEdit {
+                enabled: !requesting;
+                font-size: 14px;
+                placeholder-text: is-new-account()
+                    ? @tr("密码（请确认正确无误）")
+                    : @tr("新密码（请确认正确无误）");
+                text: update-draft.password;
+
+                edited(value) => {
+                    new-password = value;
+                }
+
+                row: 2;
+            }
+        }
+
+        // confirm area
+        if editing : HorizontalLayout {
+            spacing: 15px;
+
+            Button {
+                enabled: 
+                    !requesting 
+                    && validate-update-draft() 
+                    && info.update-request-state != SlotUpdateRequestState.Success;
+                primary: true;
+                clicked => { 
+                    update-draft.platform = new-platform;
+                    update-draft.game-account = new-game-account;
+                    update-draft.password = new-password;
+                    slot-saved(info.uuid, update-draft);
+                }
+
+                states [
+                    success when info.update-request-state == SlotUpdateRequestState.Success: {
+                        text: @tr("提交成功");
+                    }
+                    delete when update-draft.type == SlotUpdateDraftType.Delete: {
+                        text: @tr("确认删除");
+                    }
+                    insert when is-new-account(): {
+                        text: @tr("提交新账号");
+                    }
+                    update when !is-new-account(): {
+                        text: @tr("更新密码/重新提交");
+                    }
+                ]
+            }
+
+            Button {
+                enabled: !requesting;
+                clicked => { 
+                    reset-update-draft();
+                    reset-slot-update-request-state(info.uuid);
+                }
+
+                states [
+                    suceess-confirm when info.update-request-state == SlotUpdateRequestState.Success: {
+                        text: @tr("返回");
+                    }
+                    cancel when info.update-request-state != SlotUpdateRequestState.Success: {
+                        text: @tr("放弃修改");
+                    }
+                ]
+            }
+        }
+
+        if requesting : HorizontalLayout {
+            alignment: center;
+            padding: 10px;
+            spacing: 10px;
+
+            Spinner {
+                indeterminate: true;
+                width: parent.height;
+                height: parent.height;
+            }
+
+            Text {
+                vertical-alignment: center;
+                height: parent.height;
+
+                states [
+                    delete when update-draft.type == SlotUpdateDraftType.Delete: {
+                        text: @tr("正在删除……");
+                    }
+                    insert when is-new-account(): {
+                        text: @tr("正在提交……");
+                    }
+                    update when !is-new-account(): {
+                        text: @tr("正在更新……");
+                    }
+                ]
+            }
+
+            height: 32px;
+        }
+
+        if info.update-result != "" : VerticalLayout {
+            padding-top: 10px;
+            padding-bottom: 10px;
+
+            Text {
+                font-size: 13px;
+                text: info.update-result;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+component CardView inherits Rectangle {
+    in property <SlotInfo> info: MockData.slot-info;
+
+    private property <bool> has-account: info.state != SlotState.Empty;
+    
+    border-radius: 10px;
+    background: StyleMetrics.dark-color-scheme
+        ? #242424
+        : StyleMetrics.window-background;
+    drop-shadow-blur: StyleMetrics.dark-color-scheme
+        ? 0px
+        : 5px;
+    drop-shadow-color: darkgray;
+    clip: true;
+
+    Rectangle {
+        HorizontalLayout {
+            alignment: space-between;
+
+            VerticalLayout {
+                alignment: start;
+                padding: 15px;
+                spacing: 5px;
+        
+                Text {
+                    font-family: FontGlobals.dotted;
+                    font-size: 54px;
+                    text: has-account
+                        ? info.game-account-split[0] + "\n" + info.game-account-split[1]
+                        : "Empty";
+    
+                    opacity: 0.6;
+                }
+        
+                Text {
+                    font-family: FontGlobals.dotted;
+                    font-size: 54px;
+                    text: "> " + SlotInfoUtils.get-server-display-name-alternative(info.platform);
+
+                    opacity: 0.3;
+                }
+            }
+        }
+
+        x: 0;
+        y: 0;
+        z: 0;
+    }
+
+    Rectangle {
+        background: StyleMetrics.dark-color-scheme
+            ? #18181855
+            : #bbbbbb33;
+
+        VerticalLayout {
+            alignment: start;
+            padding-top: 5px;
+            padding-left: 10px;
+            padding-right: 10px;
+
+            Text {
+                font-family: FontGlobals.alphanumeric-text-sans;
+                font-size: 20px;
+                horizontal-alignment: right;
+    
+                text: has-account
+                    ? info.game-account
+                    : @tr("未添加");
+                opacity: 0.7;
+            }
+
+            Text {
+                font-family: FontGlobals.alphanumeric-text-sans;
+                font-size: 13px;
+                horizontal-alignment: right;
+    
+                text: SlotInfoUtils.get-server-display-name(info.platform);
+                opacity: 0.7;
+            }
+        }
+
+        x: 0px;
+        y: 160px;
+        z: 1;
+        width: root.width;
+        height: root.height - self.y;
+    }
+
+    // synchronizing mask
+    if info.state == SlotState.HasPendingUpdate : Rectangle {
+        background: dimgray.with-alpha(60%);
+
+        HorizontalLayout {
+            alignment: center;
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 10px;
+
+            sync-state-sign := Image {
+                colorize: whitesmoke;
+                source: @image-url("../images/slot_icon_synchronizing.svg");
+                rotation-angle: Math.mod(animation-tick(), 2s) / 2s * 360deg;
+
+                width: 24px;
+                height: 24px;
+            }
+
+            sync-state-text := Text {
+                font-size: 13px;
+                color: whitesmoke;
+                vertical-alignment: center;
+                text: @tr("可露希尔服务器正在处理托管提交……");
+            }
+
+            height: 24px;
+        }
+
+        z: 100;
+        width: root.width;
+        height: root.height;
+    }
+
+    Image {
+        source: @image-url("../images/closure_drone_outline.png");
+        colorize: StyleMetrics.default-text-color;
+
+        opacity: 0.2;
+        width: 50px;
+        height: 50px;
+
+        x: 15px;
+        y: root.height - self.x - self.width;
+        z: 2;
+    }
+
+    height: 240px;
+}
+
+export component SlotCard inherits Rectangle {
+    in property <SlotInfo> info: MockData.slot-info;
+    in-out property <bool> expanded: false;
+
+    private property <length> collapsed-drop-menu-height: 40px;
+
+    callback slot-saved <=> slot-update-area.slot-saved;
+    callback reset-slot-update-request-state <=>
+        slot-update-area.reset-slot-update-request-state;
+    
+    border-color: grey.with-alpha(25%);
+    border-radius: 10px;
+    border-width: 1px;
+
+    card-view := CardView {
+        info: info;
+
+        x: 0;
+        y: 0;
+    }
+
+    drop-menu := VerticalLayout {
+
+        Rectangle {
+            clip: true;
+
+            operation-area := VerticalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-bottom: 20px;
+
+                // Requirement area
+                slot-requirement-area := SlotRequirementArea {
+                    info: info;
+                }
+
+                // Update area
+                slot-update-area := SlotUpdateArea {
+                    info: info;
+                }
+            }
+
+            animate height { duration: 0.25s; easing: ease; }
+            height: expanded
+                ? operation-area.min-height
+                : 0;
+        }
+
+        HorizontalLayout {
+            padding-left: 15px;
+            padding-right: 15px;
+
+            alignment: space-between;
+
+            // Slot description label
+            Text {
+                font-family: FontGlobals.alphanumeric-text-sans;
+                font-size: 13px;
+                vertical-alignment: center;
+    
+                text: info.description;
+                opacity: 0.7;
+                height: collapsed-drop-menu-height;
+            }
+
+            // sync state
+            if info.state == SlotState.Synchronized && !slot-update-area.has-unsaved-changes : VerticalLayout {
+                alignment: center;
+
+                HorizontalLayout {
+                    alignment: center;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 10px;
+
+                    sync-state-sign := Image {
+                        colorize: StyleMetrics.default-text-color;
+                        source: @image-url("../images/slot_icon_synchronized.svg");
+    
+                        width: 24px;
+                        height: 24px;
+                    }
+
+                    sync-state-text := Text {
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        text: @tr("已成功提交托管");
+                    }
+
+                    height: 24px;
+                }
+            }
+
+            // Toggle button
+            Rectangle {
+                VerticalLayout {
+                    alignment: center;
+
+                    HorizontalLayout {
+                        alignment: center;
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 10px;
+            
+                        toggle-menu-sign := Image {
+                            colorize: StyleMetrics.default-text-color;
+        
+                            width: 24px;
+                            height: 24px;
+                        }
+    
+                        toggle-menu-text := Text {
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+
+                        height: 24px;
+                    }
+
+                    z: 1;
+                }
+
+                toggle-menu-touch-area := TouchArea {
+                    clicked => {
+                        if (!expanded) {
+                            expanded = true;
+                        } else if (expanded && !slot-update-area.has-unsaved-changes) {
+                            expanded = false;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: StyleMetrics.dark-color-scheme
+                    ? #3c3c3c
+                    : StyleMetrics.window-background.darker(10%);
+
+                    animate opacity { duration: 0.15s; easing: ease; }
+
+                    states [
+                        up when !toggle-menu-touch-area.has-hover: {
+                            opacity: 0;
+                        }
+                        hover when toggle-menu-touch-area.has-hover && !toggle-menu-touch-area.pressed: {
+                            opacity: 0.7;
+                        }
+                        down when toggle-menu-touch-area.pressed: {
+                            opacity: 1;
+                        }
+                    ]
+
+                    z: 0;
+                    width: parent.width;
+                    height: parent.height - 2px;
+                }
+            }
+        }
+
+        x: 0;
+        y: card-view.height;
+        width: root.width;
+        height: expanded
+            ? operation-area.min-height + collapsed-drop-menu-height
+            : collapsed-drop-menu-height;
+
+        states [
+            collapsed when !expanded: {
+                toggle-menu-sign.source: @image-url("../images/double_arrow_down.svg");
+                toggle-menu-text.text: @tr("展开更多");
+            }
+            retractable when expanded && !slot-update-area.has-unsaved-changes: {
+                toggle-menu-sign.source: @image-url("../images/double_arrow_up.svg");
+                toggle-menu-text.text: @tr("收起面板");
+            }
+            has-unsaved-changes when expanded && slot-update-area.has-unsaved-changes: {
+                toggle-menu-sign.source: @image-url("../images/slot_icon_unsaved.svg");
+                toggle-menu-text.text: @tr("游戏登记未提交");
+            }
+        ]
+    }
+
+    height: card-view.height + drop-menu.min-height;
+}

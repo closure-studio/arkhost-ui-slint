@@ -1,13 +1,21 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
+import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
 import { ScrollView , VerticalBox, Spinner} from "std-widgets.slint";
+import { BannerNotification } from "../components/banner-notification.slint";
 
 export enum FetchGamesState {
     NotFetched,
     Fetching,
     Fetched,
     Retrying
+}
+
+export enum SseConnectState {
+    Disconnected,
+    DisconnectedOccupiedElsewhere,
+    Connected
 }
 
 component FetchGamesIndicator inherits VerticalBox {
@@ -50,28 +58,73 @@ component FetchGamesIndicator inherits VerticalBox {
 }
 
 export component GameInfoPage {
-    in property <[GameInfo]> game-info-list;
+    in property <[GameInfo]> game-info-list: [
+        MockData.game-info,
+        MockData.game-info,
+        MockData.game-info,
+    ];
     in property <FetchGamesState> fetch-games-state;
+    in property <SseConnectState> sse-connect-state;
     private property <string> fetch-games-status-text;
 
+    callback goto-slot-page(); // TODO: 把导航回调放到全局
+
     ScrollView {
-        VerticalBox {
-            alignment: start;
+        HorizontalLayout {
+            alignment: space-around;
 
-            for game-info in game-info-list: GameCard {
-                info: game-info;
+            VerticalBox {
+                alignment: start;
+                padding-left: 10px;
+                padding-right: 15px;
+                padding-top: 10px;
+                spacing: 10px;
 
-                start-game(id) => { Callbacks.start-game(id); }
-                stop-game(id) => { Callbacks.stop-game(id); }
-                restart-game(id) => { Callbacks.restart-game(id); }
-                save-options(id, options) => { Callbacks.save-options(id, options); }
-                load-logs(id, type) => { Callbacks.load-logs(id, type); }
-                view-changed(id, type) => { Callbacks.view-changed(id, type); }
-            }
-
-            FetchGamesIndicator {
-                game-info-list: game-info-list;
-                fetch-games-state: fetch-games-state;
+                width: min(root.width, 1440px);
+    
+                if sse-connect-state != SseConnectState.Connected: BannerNotification {
+                    background-color: #8d7800ee;
+                    accent-color: #fffceb;
+                    has-action: true;
+                    action-text: @tr("[重新连接]");
+                    action => { Callbacks.reconnect-sse(); }
+    
+                    states [
+                        disconnected when sse-connect-state == SseConnectState.Disconnected: {
+                            text: @tr("与服务器的连接已断开，请重新连接");
+                        }
+                        disconnected-occupied-elaswhere when 
+                            sse-connect-state == SseConnectState.DisconnectedOccupiedElsewhere: {
+                            text: @tr("你已经在其他地方打开可露希尔终端，请重新连接");
+                        }
+                    ]
+                }
+    
+                if fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: BannerNotification {
+                    background-color: #00649ebb;
+                    accent-color: #ebf3ff;
+                    text: @tr("你还没有添加任何游戏账号，请前往【账号管理】添加");
+                    has-action: true;
+                    action-text: @tr("[转到账号管理]");
+                    action-icon: @image-url("../images/ext_link.svg");
+                    action => { goto-slot-page(); }
+                }
+    
+                for game-info in game-info-list: GameCard {
+                    info: game-info;
+    
+                    start-game(id) => { Callbacks.start-game(id); }
+                    stop-game(id) => { Callbacks.stop-game(id); }
+                    restart-game(id) => { Callbacks.restart-game(id); }
+                    save-options(id, options) => { Callbacks.save-options(id, options); }
+                    load-logs(id, type) => { Callbacks.load-logs(id, type); }
+                    view-changed(id, type) => { Callbacks.view-changed(id, type); }
+                }
+    
+                FetchGamesIndicator {
+                    game-info-list: game-info-list;
+                    fetch-games-state: fetch-games-state;
+                }
             }
         }
     }

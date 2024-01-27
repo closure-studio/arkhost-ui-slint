@@ -1,10 +1,11 @@
-import { Button, VerticalBox , HorizontalBox , TabWidget } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, TabWidget, StyleMetrics } from "std-widgets.slint";
 import { GameInfo } from "game-info.slint";
 import { LoginWindow, LoginState } from "login-window.slint";
-import { GameInfoPage, FetchGamesState } from "pages/game-info-page.slint";
+import { GameInfoPage, FetchGamesState, SseConnectState } from "pages/game-info-page.slint";
 import { AboutPage } from "pages/about-page.slint";
 import { Callbacks } from "callbacks.slint";
 import { ClosureStudioLogoSingleRow } from "components/closure-studio-logo.slint";
+import { SlotPage } from "pages/slot-page.slint";
 
 export component AppWindow inherits Window {
     title: @tr("Closure Studio");
@@ -12,13 +13,13 @@ export component AppWindow inherits Window {
 
     in property <[GameInfo]> game-info-list;
     in property <FetchGamesState> fetch-games-state;
+    in property <SseConnectState> sse-connect-state;
     in-out property <LoginState> login-state;
     in-out property <string> login-status-text;
 
     callback login-requested <=> login-window.login-requested;
     callback auth-requested <=> login-window.auth-requested;
     callback register-requested <=> login-window.register-requested;
-    callback open-ext-link(string);
 
     public function set-use-auth(account: string, use-auth-val: bool) {
         login-window.set-use-auth(account, use-auth-val);
@@ -31,20 +32,41 @@ export component AppWindow inherits Window {
     callback load-logs <=> Callbacks.load-logs;
     callback view-changed <=> Callbacks.view-changed;
 
+    callback open-ext-link <=> Callbacks.open-ext-link;
+
+    callback reconnect-sse <=> Callbacks.reconnect-sse;
+
     preferred-width: 1280px;
     preferred-height: 800px;
+
+    background: StyleMetrics.dark-color-scheme
+        ? StyleMetrics.window-background
+        : StyleMetrics.window-background.darker(5%);
 
     VerticalLayout {
         visible: login-state == LoginState.Logged;
 
-        TabWidget {
+        page-tab := TabWidget {
             Tab {
-                title: @tr("账号管理");
+                title: @tr("Dashboard");
     
                 VerticalLayout {
                     game-info-page := GameInfoPage {
                         game-info-list: game-info-list;
                         fetch-games-state: fetch-games-state;
+                        sse-connect-state: sse-connect-state;
+
+                        goto-slot-page => { page-tab.current-index = 1; }
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("账号管理");
+
+                VerticalLayout {
+                    slot-page := SlotPage {
+
                     }
                 }
             }

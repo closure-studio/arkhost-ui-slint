@@ -1,0 +1,28 @@
+import { StyleMetrics } from "std-widgets.slint";
+
+export component LoadingPlaceholder inherits Rectangle {
+    pure function get-flash-ratio-unclamped() -> float {
+        Math.mod(animation-tick(), 1.5s) / 1s * 150% - 25%
+    }
+
+    pure function get-flash-ratio() -> float {
+        Math.clamp(get-flash-ratio-unclamped(), 0%, 100%);
+    }
+
+    pure function get-flash-left-ratio() -> float {
+        Math.clamp(get-flash-ratio-unclamped() - 25%, 0%, 100%);
+    }
+
+    pure function get-flash-right-ratio() -> float {
+        Math.clamp(get-flash-ratio-unclamped() + 25%, 0%, 100%);
+    }
+
+    pure function get-gradient(angle: angle) -> brush {
+        @linear-gradient(angle, 
+            #ffffff01 get-flash-left-ratio(), 
+            StyleMetrics.default-text-color.transparentize(90%) get-flash-ratio(), 
+            #ffffff01 get-flash-right-ratio())
+    }
+
+    background: get-gradient(135deg);
+}

@@ -1,0 +1,82 @@
+export enum SlotUpdateDraftType {
+    Unchanged,
+    Update,
+    Delete,
+}
+
+export enum SlotPlatform {
+    None,
+    Official,
+    Bilibili
+}
+
+export struct SlotUpdateDraft {
+    type: SlotUpdateDraftType,
+    game-account: string,
+    platform: SlotPlatform,
+    password: string
+}
+
+export enum SlotState {
+    Empty,
+    UnknownSyncState,
+    HasPendingUpdate,
+    Synchronized
+}
+
+export enum SlotUpdateRequestState {
+    Idle,
+    Requesting,
+    Success,
+    Fail
+}
+
+export struct SlotRequirement {
+    has-result: bool,
+    fulfilled: bool,
+    description: string,
+    status-text: string
+}
+
+export struct SlotInfo {
+    update-request-state: SlotUpdateRequestState,
+    update-result: string,
+
+    order: int,
+    uuid: string,
+    state: SlotState,
+    game-account: string,
+    game-account-split: [string],
+    platform: SlotPlatform,
+    updated-at: string,
+
+    description: string,
+    verify-rules: [SlotRequirement],
+    last-verify: SlotUpdateDraft
+}
+
+export global SlotInfoUtils {
+    pure public function get-server-display-name(server: SlotPlatform) -> string {
+        if (server == SlotPlatform.None) {
+            return @tr("-");
+        } else if (server == SlotPlatform.Official) {
+            return @tr("官服 [G]");
+        } else if (server == SlotPlatform.Bilibili) {
+            return @tr("BiliBili服 [B]");
+        } else {
+            return @tr("未知服务器");
+        }
+    }
+
+    pure public function get-server-display-name-alternative(server: SlotPlatform) -> string {
+        if (server == SlotPlatform.None) {
+            return @tr("-");
+        } else if (server == SlotPlatform.Official) {
+            return @tr("HYPERGRYPH");
+        } else if (server == SlotPlatform.Bilibili) {
+            return @tr("BiliBili");
+        } else {
+            return @tr("Unknown");
+        }
+    }
+}

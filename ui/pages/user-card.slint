@@ -1,0 +1,349 @@
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , GroupBox, LineEdit, TextEdit, StandardButton} from "std-widgets.slint";
+import { UserInfo, UserInfoUtils, UserIdApiRequestState } from "../user-info.slint";
+import { MockData } from "../mock-data.slint";
+import { Callbacks } from "../callbacks.slint";
+import { FontGlobals } from "../font-globals.slint";
+
+component SmsVerifyArea inherits VerticalLayout {
+    in property <UserInfo> user-info;
+    in property <bool> requesting;
+
+    public function open-dialog() {
+        if (!UserInfoUtils.is-sms-verified(user-info) && !sms-dialog-open) {
+            sms-dialog-open = true;
+        }
+    }
+
+    private property <bool> sms-dialog-open: false;
+    
+    if !sms-dialog-open : GroupBox {
+        title: @tr("手机认证");
+        
+        HorizontalLayout {
+            spacing: 10px;
+
+            if UserInfoUtils.is-sms-verified(user-info) : LineEdit {
+                font-size: 14px;
+                read-only: true;
+                text: user-info.phone;
+                placeholder-text: "未认证";
+            }
+
+            Button {
+                enabled: true; // 初始值，会被states修改
+
+                clicked => { open-dialog(); }
+                width: 200px;
+
+                states [
+                    busy when requesting: {
+                        enabled: false;
+                        text: @tr("请稍后");
+                    }
+                    sms-unverified when !UserInfoUtils.is-sms-verified(user-info) : {
+                        enabled: true;
+                        text: @tr("提交手机验证码");
+                    }
+                    sms-verified when UserInfoUtils.is-sms-verified(user-info) : {
+                        enabled: false;
+                        text: @tr("已完成");
+                    }
+                ]
+            }
+        }
+    }
+
+    if !UserInfoUtils.is-sms-verified(user-info) && sms-dialog-open: VerticalLayout {
+        function submit-sms-verify-code() {
+            Callbacks.submit-sms-verify-code(sms-verify-code-input.text);
+        }
+
+        padding-top: 20px;
+        spacing: 15px;
+
+        sms-verify-code-input := LineEdit {
+            font-size: 16px;
+            enabled: !requesting;
+            horizontal-alignment: center;
+            input-type: number;
+            placeholder-text: @tr("请输入发送到【归属认证手机号】的验证码");
+            accepted => { submit-sms-verify-code(); }
+        }
+
+        HorizontalLayout {
+            alignment: end;
+            spacing: 10px;
+
+            Button {
+                enabled: !requesting;
+                text: @tr("取消");
+                clicked => { 
+                    sms-verify-code-input.text = "";
+                    sms-dialog-open = false; 
+                }
+            }
+
+            Button {
+                enabled: !requesting;
+                text: @tr("提交");
+                primary: true;
+                clicked => { submit-sms-verify-code(); }
+            }
+        }
+    }
+}
+
+component QQVerifyArea inherits VerticalLayout {
+    in property <UserInfo> user-info;
+    in property <bool> requesting;
+
+    private property <bool> qq-dialog-open: false;
+    private property <bool> qq-verify-code-copied: false;
+
+    public function open-dialog() {
+        if (!UserInfoUtils.is-qq-verified(user-info) && !qq-dialog-open) {
+            Callbacks.fetch-qq-verify-code();
+            qq-verify-code-copied = false;
+            qq-dialog-open = true; 
+        }
+    }
+
+    if !qq-dialog-open : GroupBox {
+        title: @tr("QQ认证");
+
+        HorizontalLayout {
+            spacing: 10px;
+
+            if UserInfoUtils.is-qq-verified(user-info) : LineEdit {
+                font-size: 14px;
+                read-only: true;
+                text: user-info.qq;
+                placeholder-text: "未认证";
+            }
+
+            open-dialog-btn := Button {
+                enabled: true; // 初始值，会被states修改
+                width: 200px;
+                clicked => {
+                    open-dialog();
+                }
+
+                states [
+                    busy when requesting: {
+                        enabled: false;
+                        text: @tr("请稍后");
+                    }
+                    sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
+                        enabled: false;
+                        text: @tr("请先完成归属手机号认证");
+                    }
+                    qq-unverified when !UserInfoUtils.is-qq-verified(user-info): {
+                        enabled: true;
+                        text: @tr("获取QQ验证代码");
+                    }
+                    verified when UserInfoUtils.is-qq-verified(user-info): {
+                        enabled: false;
+                        text: @tr("已完成");
+                    }
+                ]
+            }
+        }
+    }
+
+    if !UserInfoUtils.is-qq-verified(user-info) 
+        && qq-dialog-open 
+        && user-info.qq-verify-code-cached != "" : VerticalLayout {
+        padding-top: 20px;
+        spacing: 15px;
+
+        Text {
+            font-size: 14px;
+            text: @tr("请前去可露希尔官方QQ群粘贴并发送整条验证码至群内进行验证。");
+            color: StyleMetrics.default-text-color.transparentize(30%);
+            wrap: word-wrap;
+        }
+
+        Button {
+            padding: 30px;
+            enabled: !requesting;
+
+            text: @tr("复制QQ验证代码");
+            primary: !qq-verify-code-copied;
+
+            clicked => { 
+                qq-verify-code-text.select-all();
+                qq-verify-code-text.copy();
+                qq-verify-code-copied = true;
+            }
+        }
+
+        VerticalLayout {
+            alignment: start;
+            spacing: 15px;
+
+            Text {
+                font-size: 14px;
+                text: @tr("QQ验证代码已经复制到你的剪切板。\n如果你的剪切板为空，请框选复制下方的验证码文本：");
+                color: StyleMetrics.default-text-color.transparentize(30%);
+                wrap: word-wrap;
+            }
+
+            qq-verify-code-text := TextInput {
+                font-size: 15px;
+                text: user-info.qq-verify-code-cached;
+                horizontal-alignment: center;
+                read-only: true;
+            }
+
+            visible: qq-verify-code-copied;
+            height: !qq-verify-code-copied 
+                ? 0px
+                : 75px;
+        }
+
+        HorizontalLayout {
+            padding-top: 10px;
+
+            alignment: space-between;
+
+            Button {
+                text: @tr("获取加群链接…");
+                icon: StyleMetrics.dark-color-scheme
+                    ? @image-url("../images/ext_link.svg")
+                    : @image-url("../images/ext_link_light.svg");
+
+                clicked => { Callbacks.open-ext-link(@tr("https://www.arknights.host")); }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                spacing: 10px;
+
+                Button {
+                    enabled: !requesting;
+                    text: @tr("取消");
+                    clicked => { qq-dialog-open = false; }
+                }
+
+                Button {
+                    enabled: !requesting;
+                    text: @tr("刷新QQ验证状态");
+                    primary: qq-verify-code-copied;
+                    clicked => { Callbacks.refresh-user-info(); }
+                }
+            }
+        }
+    }
+}
+
+export component UserCard inherits Rectangle {
+    in property <UserInfo> user-info: MockData.user-info;
+    private property <bool> requesting: user-info.id-api-request-state == UserIdApiRequestState.Requesting;
+
+    public function open-qq-verify-dialog() {
+        qq-verify-area.open-dialog();
+    }
+
+    public function open-sms-verify-dialog() {
+        sms-verify-area.open-dialog();
+    }
+
+    border-radius: 10px;
+    background: StyleMetrics.dark-color-scheme
+        ? #242424
+        : StyleMetrics.window-background;
+    drop-shadow-blur: StyleMetrics.dark-color-scheme
+        ? 0px
+        : 5px;
+    drop-shadow-color: darkgray;
+    clip: true;
+
+    layout := VerticalLayout {
+        alignment: start;
+        padding: 20px;
+
+        GridLayout {
+            spacing: 10px;
+
+            Rectangle {
+                width: 64px;
+                height: 64px;
+    
+                border-radius: 24px;
+                clip: true;
+    
+                Image {
+                    // 博士头像
+                    source: @image-url("../images/closure_logo.png");
+                    width: 64px;
+                    height: 64px;
+                }
+
+                row: 0;
+                col: 0;
+            }
+
+            VerticalLayout {
+                spacing: 2px;
+
+                Text {
+                    font-size: 11px;
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    color: StyleMetrics.default-text-color.transparentize(30%);
+                    text: "Doctor ID";
+                    vertical-alignment: bottom;
+
+                    height: 22px;
+                }
+
+                Text {
+                    font-size: 20px;
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    text: user-info.nickname;
+                    overflow: clip;
+                    vertical-alignment: top;
+                }
+
+                row: 0;
+                col: 1;
+            }
+
+            VerticalLayout {
+                alignment: center;
+
+                Button {
+                    enabled: !requesting;
+                    text: requesting
+                        ? @tr("刷新中")
+                        : @tr("刷新");
+                    
+                    icon: StyleMetrics.dark-color-scheme
+                        ? @image-url("../images/user_card_refresh.svg")
+                        : @image-url("../images/user_card_refresh_light.svg");
+
+                    clicked => { Callbacks.refresh-user-info(); }
+    
+                    width: 90px;
+                    height: 30px;
+                }
+
+                row: 0;
+                col: 2;
+            }
+        }
+
+        sms-verify-area := SmsVerifyArea {
+            user-info: user-info;
+            requesting: requesting;
+        }
+
+        qq-verify-area := QQVerifyArea {
+            user-info: user-info;
+            requesting: requesting;
+        }
+    }
+
+    height: layout.min-height;
+    animate height { duration: 0.25s; easing: ease; }
+}
+

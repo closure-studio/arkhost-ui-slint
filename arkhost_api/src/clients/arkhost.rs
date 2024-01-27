@@ -160,12 +160,17 @@ impl EventSourceClient {
             .map_err(anyhow::Error::from)
             .try_filter_map(|ev| async {
                 match ev {
-                    es::SSE::Event(ev) => match ev.event_type.as_ref() {
-                        api::sse::SSE_EVENT_TYPE_GAME => {
+                    es::SSE::Event(ev) => match ev.event_type.as_str() {
+                        api::sse::EVENT_TYPE_GAME => {
                             let games = serde_json::de::from_str::<Vec<GameInfo>>(&ev.data)?;
                             Ok(Some(GameSseEvent::Game(games)))
                         }
-                        _ => Err(anyhow!("unexpected event type {}", ev.event_type)),
+                        api::sse::EVENT_TYPE_CLOSE => {
+                            Ok(Some(GameSseEvent::Close))
+                        }
+                        other => {
+                            Ok(Some(GameSseEvent::Unrecognized(other.into())))
+                        },
                     },
                     es::SSE::Comment(_) => Ok(None), // Error on unexpected comment?
                 }

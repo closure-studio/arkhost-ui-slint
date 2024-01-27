@@ -1,0 +1,48 @@
+export enum UserTier {
+    Invalid,
+    Basic,
+    SmsVerified,
+    QQVerified
+}
+
+export enum UserStatus {
+    SmsUnverfied,
+    Banned,
+    Normal,
+    ManuallyVerfied
+}
+
+export enum UserProgress {
+    Invalid,
+    Initial,
+    SmsVerifySlotAdded,
+    SmsVerified,
+    QQVerified
+}
+
+export enum UserIdApiRequestState {
+    Idle,
+    Requesting
+}
+
+export struct UserInfo {
+    id-api-request-state: UserIdApiRequestState,
+
+    nickname: string,
+    status: UserStatus,
+    tier: UserTier,
+    progress: UserProgress,
+    phone: string,
+    qq: string,
+    qq-verify-code-cached: string
+}
+
+export global UserInfoUtils {
+    public pure function is-sms-verified(user-info: UserInfo) -> bool {
+        user-info.phone != ""
+    }
+
+    public pure function is-qq-verified(user-info: UserInfo) -> bool  {
+        user-info.qq != ""
+    }
+}

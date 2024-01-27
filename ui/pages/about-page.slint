@@ -3,32 +3,42 @@ import { ClosureStudioLogoStacked } from "../components/closure-studio-logo.slin
 import { FontGlobals } from "../font-globals.slint";
 
 export component AboutPage {
-    ScrollView {
+    VerticalLayout {
         VerticalBox {
-            alignment: start;
-            spacing: 24px;
+            alignment: center;
 
-            HorizontalBox {
-                spacing: 24px;
-
-                ClosureStudioLogoStacked {
-                    single-row-size: 60px;
-                }
+            ClosureStudioLogoStacked {
+                single-row-size: 60px;
             }
 
-            HorizontalBox {
-                alignment: center;
-                spacing: 24px;
+            Text {
+                font-family: FontGlobals.alphanumeric-text-sans;
+                font-size: 16px;
+                vertical-alignment: top;
+                horizontal-alignment: center;
 
-                VerticalLayout {
-                    alignment: space-around;
+                text: "2023 Closure Studio\n<github.com/closure-studio>";
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+            spacing: 24px;
+            height: 128px;
+
+            VerticalLayout {
+                spacing: 5px;
+                alignment: center;
+
+                HorizontalLayout {
+                    alignment: center;
 
                     Rectangle {
                         width: 72px;
                         height: 72px;
     
                         clip: true;
-                        border-radius: 15px;
+                        border-radius: 10px;
                         Image {
                             source: @image-url("../images/closure_logo_ferris.png");
     
@@ -40,21 +50,16 @@ export component AboutPage {
 
                 Text {
                     font-family: FontGlobals.alphanumeric-text-sans;
-                    font-size: 16px;
-                    vertical-alignment: center;
-                    horizontal-alignment: left;
+                    font-size: 12px;
+                    vertical-alignment: top;
+                    horizontal-alignment: center;
     
-                    text: "(c) 2023 Closure Studio <github.com/closure-studio>";
-                }
-
-                AboutSlint {
-                    width: 128px;
+                    text: "Powered by Rust";
                 }
             }
 
-            HorizontalBox {
-                alignment: center;
-                spacing: 24px;
+            AboutSlint {
+                width: 128px;
             }
         }
     }

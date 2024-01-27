@@ -88,7 +88,7 @@ pub fn try_response_data<T>(
     resp: impl ResponseWrapper<T>,
 ) -> Result<T, ResponseError<T>>
 where
-    T: Clone + Debug,
+    T: Clone + Debug + Default,
 {
     map_try_response_data(status_code, resp, |x| Ok(x))
 }
@@ -99,7 +99,7 @@ pub fn map_try_response_data<T, R>(
     op: impl FnOnce(T) -> Result<R, T>,
 ) -> Result<R, ResponseError<T>>
 where
-    T: Clone + Debug,
+    T: Clone + Debug + Default,
 {
     fn make_err<T: Clone + Debug>(
         status_code: StatusCode,

@@ -1,0 +1,51 @@
+import { UserTier } from "user-info.slint";
+import { SlotTierCardData } from "pages/slot-tier-card.slint";
+
+export global SlotTierConsts {
+    out property <SlotTierCardData> tier-basic: {
+        background-fill: @linear-gradient(315deg, #384452 0%, #1d3a63 100%),
+        deco-fill: #2a2a2a,
+        deco-fill-alternative: #2a2a2a,
+        stripe-fill: @linear-gradient(55deg, #2e353b16 20%, #2d475fc9 50%),
+
+        tier-name: @tr("深海杰斯顿"),
+        can-upgrade: true,
+        upgrade-text: "[完成归属认证]",
+        next-tier: UserTier.SmsVerified
+    };
+    
+    out property <SlotTierCardData> tier-one: {
+        background-fill: @linear-gradient(35deg, #42587c 0%, #2f5f5f 100%),
+        deco-fill: @linear-gradient(35deg, #4d6893 0%, #04d6d645 100%),
+        deco-fill-alternative: @linear-gradient(75deg, #4d6893 0%, #04d6d645 100%),
+        stripe-fill: @linear-gradient(65deg, #4d68930c 20%, #04deff40 50%),
+
+        tier-name: @tr("海上杰斯顿"),
+        can-upgrade: true,
+        upgrade-text: "[完成QQ认证]",
+        next-tier: UserTier.QQVerified
+    };
+
+    out property <SlotTierCardData> tier-max: {
+        background-fill: @linear-gradient(315deg, #1e2f83 0%, #431a61 100%),
+        deco-fill: @linear-gradient(30deg, #223247e2 0%, #223247e2 20%, #660146e5 60%, #660146e5 100%),
+        deco-fill-alternative: @linear-gradient(45deg, #223247e2 0%, #660146e5 60%, #660146e5 100%),
+        stripe-fill: @linear-gradient(135deg, #006eff0b 20%, #e700b12b 50%),
+
+        tier-name: @tr("空中杰斯顿"),
+        upgrade-text: "已完成所有认证",
+        can-upgrade: false
+    };
+
+    public pure function get-tier-card-data(tier: UserTier) -> SlotTierCardData {
+        if (tier == UserTier.Basic) {
+            tier-basic
+        } else if (tier == UserTier.SmsVerified) {
+            tier-one
+        } else if (tier == UserTier.QQVerified) {
+            tier-max
+        } else {
+            tier-basic
+        }
+    }
+}

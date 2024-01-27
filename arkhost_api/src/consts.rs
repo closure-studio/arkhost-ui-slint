@@ -31,14 +31,23 @@ pub mod arkhost {
         }
 
         pub mod sse {
-            pub const SSE_EVENT_TYPE_GAME: &str = "game";
+            pub const EVENT_TYPE_GAME: &str = "game";
+            pub const EVENT_TYPE_CLOSE: &str = "close";
         }
     }
 }
 
 pub mod quota {
     pub const API_BASE_URL: &str = "https://registry.closure.setonink.com";
-    pub mod api {}
+    pub mod api {
+        pub mod user {
+            pub const ME: &str = "api/slots/me";
+        }
+        pub mod slots {
+            pub const SLOTS: &str = "api/slots/slots";
+            pub const GAME_ACCOUNT: &str = "api/slots/gameAccount";
+        }
+    }
 }
 
 pub mod asset {

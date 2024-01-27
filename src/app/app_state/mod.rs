@@ -72,6 +72,12 @@ impl AppState {
         })
     }
 
+    pub fn set_sse_connect_state(&self, state: SseConnectState) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            ui.set_sse_connect_state(state);
+        })
+    }
+
     pub fn set_use_auth(&self, account: String, use_auth: bool) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
             ui.invoke_set_use_auth(account.into(), use_auth);

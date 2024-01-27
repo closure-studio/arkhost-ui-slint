@@ -60,6 +60,7 @@ impl UserModel {
                 cur_game.info = game_info;
                 game_ref.order.store(i as i32, Ordering::Release);
             } else {
+                // store只在这个函数里获取game_map的写锁时发生，所以不会有retain中途某个game的order被改变导致泄露
                 game_map.retain(|_, v| v.order.load(Ordering::Acquire) != i as i32);
                 game_map.insert(
                     account,
@@ -70,6 +71,7 @@ impl UserModel {
                 );
             }
         }
+        // 同上
         game_map.retain(|_, v| v.order.load(Ordering::Acquire) < games_len as i32);
     }
 

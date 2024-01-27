@@ -107,7 +107,7 @@ impl ControllerHub {
 
     pub fn attach(self: Arc<Self>, app: &AppWindow) {
         app.on_register_requested(|| {
-            ext_link::open_ext_link("https://arknights.host");
+            ext_link::open_ext_link("https://www.arknights.host");
         });
         app.on_open_ext_link(|str| {
             ext_link::open_ext_link(&str);
@@ -259,6 +259,17 @@ impl ControllerHub {
                     )
                 });
             })
+        }
+
+        {
+            let this = self.clone();
+
+            app.on_reconnect_sse(move || {
+                let this = this.to_owned();
+                tokio::spawn(async move {
+                    this.account_controller.start_sse_event_loop().await;
+                });
+            });
         }
 
         {

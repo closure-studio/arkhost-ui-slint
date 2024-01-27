@@ -9,7 +9,7 @@ use crate::app::{
 };
 use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, GameStatus};
-use futures_util::{future::join_all, FutureExt, TryStreamExt};
+use futures_util::{future::join_all, TryStreamExt};
 use serde::Deserialize;
 use slint::Model;
 use tokio::{
@@ -109,13 +109,16 @@ impl GameController {
         self.refreshing.store(false, Ordering::Release);
     }
 
-    pub async fn connect_games_sse(&self, stop: CancellationToken) -> anyhow::Result<()> {
+    pub async fn run_sse_event_loop(&self, stop: CancellationToken) -> anyhow::Result<()> {
         self.app_state_controller
             .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetching));
         let (resp, rx) = oneshot::channel();
         self.request_controller
             .send_api_command(ApiOperation::ConnectGameEventSource { resp })
             .await?;
+
+        self.app_state_controller
+            .exec(|x| x.set_sse_connect_state(SseConnectState::Connected));
 
         let mut stream = rx.await??;
         tokio::select! {
@@ -136,10 +139,21 @@ impl GameController {
                                     self.app_state_controller
                                         .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
                                 }
+                            },
+                            GameSseEvent::Close => {
+                                println!("[Controller] Games SSE connection closed on occupied");
+                                self.app_state_controller
+                                    .exec(|x| x.set_sse_connect_state(SseConnectState::DisconnectedOccupiedElsewhere));
+                                break;
+                            },
+                            GameSseEvent::Unrecognized(ev_type) => {
+                                println!("[Controller] Unrecognized SSE event: {ev_type}");
                             }
                         },
-                        Ok(_) => {},
+                        Ok(None) => { /* 处理None? */ },
                         Err(e) => {
+                            self.app_state_controller
+                                .exec(|x| x.set_sse_connect_state(SseConnectState::Disconnected));
                             eprintln!("[Controller] Error in game SSE connection: {e:?}");
                             break;
                         }
@@ -201,7 +215,7 @@ impl GameController {
                 let challenge = game.info.captcha_info.challenge.clone();
                 _ = self
                     .game_operation_controller
-                    .try_preform_game_captcha(account.clone(), gt, challenge)
+                    .try_preform_game_captcha(account, gt, challenge)
                     .await;
             }
 
@@ -365,39 +379,33 @@ impl GameController {
     pub async fn try_ensure_resources(&self) {
         let has_stage_data = self.stage_data.read().await.is_some();
         let has_char_pack_summary = self.char_pack_summaries.read().await.is_some();
-        let mut load_resource_tasks = vec![];
 
-        if !has_stage_data {
-            let path = arkhost_api::consts::asset::api::gamedata("excel/stage_table.json");
-            load_resource_tasks.push(
-                self.load_json_table::<StageTable>(path, None)
-                    .then(|x| async {
-                        if let Some(stage_data) = x {
-                            _ = self.stage_data.write().await.insert(stage_data);
-                        }
-                    })
-                    .boxed(),
-            );
-        }
-
-        if !has_char_pack_summary {
-            let path = arkhost_api::consts::asset::api::charpack("summary.json");
-            load_resource_tasks.push(
-                self.load_json_table::<CharPackSummaryTable>(path, None)
-                    .then(|x| async {
-                        if let Some(char_pack_summary) = x {
-                            _ = self
-                                .char_pack_summaries
-                                .write()
-                                .await
-                                .insert(char_pack_summary);
-                        }
-                    })
-                    .boxed(),
-            );
-        }
-
-        join_all(load_resource_tasks).await;
+        tokio::join!(
+            async {
+                if !has_stage_data {
+                    let path = arkhost_api::consts::asset::api::gamedata("excel/stage_table.json");
+                    let stage_data = self.load_json_table::<StageTable>(path, None).await;
+                    if let Some(stage_data) = stage_data {
+                        _ = self.stage_data.write().await.insert(stage_data);
+                    }
+                }
+            },
+            async {
+                if !has_char_pack_summary {
+                    let path = arkhost_api::consts::asset::api::charpack("summary.json");
+                    let char_pack_summary = self
+                        .load_json_table::<CharPackSummaryTable>(path, None)
+                        .await;
+                    if let Some(char_pack_summary) = char_pack_summary {
+                        _ = self
+                            .char_pack_summaries
+                            .write()
+                            .await
+                            .insert(char_pack_summary);
+                    }
+                }
+            }
+        );
     }
 
     async fn load_json_table<T>(&self, path: String, cache_key: Option<String>) -> Option<T>

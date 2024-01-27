@@ -1,4 +1,5 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
+import { SlotUpdateDraft, SlotUpdateRequestState } from "slot-info.slint";
 
 export global Callbacks {
     callback start-game(string);
@@ -7,4 +8,15 @@ export global Callbacks {
     callback save-options(string, GameOptions);
     callback load-logs(string, GameLogLoadRequestType);
     callback view-changed(string, GameInfoViewType);
+    callback reconnect-sse();
+
+    callback refresh-user-info();
+    callback refresh-slot-info();
+    callback submit-sms-verify-code(string);
+    callback fetch-qq-verify-code();
+
+    callback update-slot(string, SlotUpdateDraft);
+    callback reset-slot-update-request-state(string);
+
+    callback open-ext-link(string);
 }

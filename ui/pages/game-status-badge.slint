@@ -3,36 +3,43 @@ import { GameInfo, GameState } from "../game-info.slint";
 
 component GameStatusBadgeBase inherits Rectangle {
     in property <GameInfo> info;
+    in property <bool> enable-icon-blinking: true;
 
     out property <brush> status-color;
     out property <string> status-text;
     out property <image> status-icon;
+    out property <bool> status-icon-blinking;
 
     states [
         logging when info.game-state == GameState.Logging: {
             status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
             status-text: @tr("登录中");
             status-icon: @image-url("../images/game_status_logging.svg");
+            status-icon-blinking: true;
         }
         running when info.game-state == GameState.Running: {
             status-color: @linear-gradient(15deg, #59b72a 0%, #5db813 100%);
             status-text: @tr("运行中");
             status-icon: @image-url("../images/game_status_running.svg");
+            status-icon-blinking: false;
         }
         faulted when info.game-state == GameState.Faulted: {
             status-color: @linear-gradient(15deg, #dd4f24 0%, #db4321 100%);
             status-text: info.status-text;
             status-icon: @image-url("../images/game_status_faulted.svg");
+            status-icon-blinking: false;
         }
         stopped when info.game-state == GameState.Stopped: {
             status-color: #494949;
             status-text: @tr("已停止");
             status-icon: @image-url("../images/game_status_stopped.svg");
+            status-icon-blinking: false;
         }
         captcha when info.game-state == GameState.Captcha: {
             status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
             status-text: @tr("需要人机验证");
             status-icon: @image-url("../images/game_status_captcha.svg");
+            status-icon-blinking: true;
         }
     ]
 }
@@ -43,9 +50,8 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
         ? 0px
         : 15px;
 
-    border-color: self.status-color;
     border-radius: self.height * 0.25;
-    border-width: self.height * 0.08;
+    background: self.status-color;
 
     animate background { duration: 200ms; }
 
@@ -57,7 +63,7 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
 
         Image {
             source: root.status-icon;
-            colorize: StyleMetrics.default-text-color;
+            colorize: whitesmoke;
             width: 24px;
             height: 24px;
         }
@@ -74,8 +80,10 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
 
 export component GameStatusBadgeWide inherits GameStatusBadgeBase {
     border-radius: 4px;
-    border-width: 1px;
-    border-color: StyleMetrics.default-text-color.transparentize(30%);
+    background: StyleMetrics.dark-color-scheme
+        ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+        : StyleMetrics.window-background.darker(20%).transparentize(50%);
+
     clip: true;
 
     HorizontalBox {
@@ -86,9 +94,11 @@ export component GameStatusBadgeWide inherits GameStatusBadgeBase {
         Image {
             source: root.status-icon;
             colorize: StyleMetrics.default-text-color;
+            opacity: root.enable-icon-blinking && root.status-icon-blinking
+                ? 0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad))
+                : 1;
             width: 26px;
             height: 26px;
-
             horizontal-stretch: 0;
         }
 
