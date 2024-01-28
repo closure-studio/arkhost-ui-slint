@@ -99,10 +99,10 @@ component SlotRequirementArea inherits VerticalLayout {
         }
 
         states [
-            unchanged when info.last-verify.type == SlotUpdateDraftType.Unchanged: {
+            unchanged when info.last-verify.update-type == SlotUpdateDraftType.Unchanged: {
                 title: @tr("提交条件");
             }
-            has-last-verify when info.last-verify.type == SlotUpdateDraftType.Update: {
+            has-last-verify when info.last-verify.update-type == SlotUpdateDraftType.Update: {
                 title: 
                     @tr("提交条件（验证于上一次提交：") 
                     + SlotInfoUtils.get-server-display-name(info.platform)
@@ -115,12 +115,12 @@ component SlotRequirementArea inherits VerticalLayout {
 component SlotUpdateArea inherits VerticalLayout {
     in property <SlotInfo> info: MockData.slot-info;
     out property <bool> editing:
-        update-draft.type != SlotUpdateDraftType.Unchanged;
+        update-draft.update-type != SlotUpdateDraftType.Unchanged;
     out property <bool> has-unsaved-changes: 
         editing && info.update-request-state != SlotUpdateRequestState.Success;
 
     private property <SlotUpdateDraft> update-draft: {
-        type: SlotUpdateDraftType.Unchanged,
+        update-type: SlotUpdateDraftType.Unchanged,
         game-account: info.game-account,
         platform: info.platform,
         password: ""
@@ -132,7 +132,7 @@ component SlotUpdateArea inherits VerticalLayout {
         info.update-request-state == SlotUpdateRequestState.Requesting;
 
     public function reset-update-draft() {
-        update-draft.type = SlotUpdateDraftType.Unchanged;
+        update-draft.update-type = SlotUpdateDraftType.Unchanged;
         update-draft.game-account = info.game-account;
         new-game-account = info.game-account;
         update-draft.platform = info.platform;
@@ -142,13 +142,13 @@ component SlotUpdateArea inherits VerticalLayout {
     }
 
     pure function validate-update-draft() -> bool {
-        if (update-draft.type == SlotUpdateDraftType.Unchanged) {
+        if (update-draft.update-type == SlotUpdateDraftType.Unchanged) {
             true
-        } else if (update-draft.type == SlotUpdateDraftType.Update) {
+        } else if (update-draft.update-type == SlotUpdateDraftType.Update) {
             new-platform != SlotPlatform.None
             && new-game-account != ""
             && new-password != ""
-        } else if (update-draft.type == SlotUpdateDraftType.Delete) {
+        } else if (update-draft.update-type == SlotUpdateDraftType.Delete) {
             true
         } else {
             false
@@ -180,7 +180,7 @@ component SlotUpdateArea inherits VerticalLayout {
                 checkable: true;
                 checked: false;
                 clicked => { 
-                    update-draft.type = SlotUpdateDraftType.Update;
+                    update-draft.update-type = SlotUpdateDraftType.Update;
                     reset-slot-update-request-state(info.uuid);
                 }
             }
@@ -193,14 +193,14 @@ component SlotUpdateArea inherits VerticalLayout {
                 checkable: true;
                 checked: false;
                 clicked => { 
-                    update-draft.type = SlotUpdateDraftType.Delete;
+                    update-draft.update-type = SlotUpdateDraftType.Delete;
                     reset-slot-update-request-state(info.uuid);
                 }
             }
         }
 
         // update slot
-        if update-draft.type == SlotUpdateDraftType.Update: GridLayout {
+        if update-draft.update-type == SlotUpdateDraftType.Update: GridLayout {
             private property <string> official-server-name: 
                 SlotInfoUtils.get-server-display-name(SlotPlatform.Official);
             private property <string> bilibili-server-name: 
@@ -268,7 +268,6 @@ component SlotUpdateArea inherits VerticalLayout {
                     !requesting 
                     && validate-update-draft() 
                     && info.update-request-state != SlotUpdateRequestState.Success;
-                primary: true;
                 clicked => { 
                     update-draft.platform = new-platform;
                     update-draft.game-account = new-game-account;
@@ -279,15 +278,19 @@ component SlotUpdateArea inherits VerticalLayout {
                 states [
                     success when info.update-request-state == SlotUpdateRequestState.Success: {
                         text: @tr("提交成功");
+                        primary: false;
                     }
-                    delete when update-draft.type == SlotUpdateDraftType.Delete: {
+                    delete when update-draft.update-type == SlotUpdateDraftType.Delete: {
                         text: @tr("确认删除");
+                        primary: true;
                     }
                     insert when is-new-account(): {
                         text: @tr("提交新账号");
+                        primary: true;
                     }
                     update when !is-new-account(): {
                         text: @tr("更新密码/重新提交");
+                        primary: true;
                     }
                 ]
             }
@@ -302,9 +305,11 @@ component SlotUpdateArea inherits VerticalLayout {
                 states [
                     suceess-confirm when info.update-request-state == SlotUpdateRequestState.Success: {
                         text: @tr("返回");
+                        primary: true;
                     }
                     cancel when info.update-request-state != SlotUpdateRequestState.Success: {
                         text: @tr("放弃修改");
+                        primary: false;
                     }
                 ]
             }
@@ -326,7 +331,7 @@ component SlotUpdateArea inherits VerticalLayout {
                 height: parent.height;
 
                 states [
-                    delete when update-draft.type == SlotUpdateDraftType.Delete: {
+                    delete when update-draft.update-type == SlotUpdateDraftType.Delete: {
                         text: @tr("正在删除……");
                     }
                     insert when is-new-account(): {
@@ -380,18 +385,20 @@ component CardView inherits Rectangle {
         
                 Text {
                     font-family: FontGlobals.dotted;
-                    font-size: 54px;
+                    font-size: 56px;
                     text: has-account
                         ? info.game-account-split[0] + "\n" + info.game-account-split[1]
                         : "Empty";
+                    overflow: clip;
     
-                    opacity: 0.6;
+                    opacity: 0.7;
                 }
         
                 Text {
                     font-family: FontGlobals.dotted;
-                    font-size: 54px;
+                    font-size: 56px;
                     text: "> " + SlotInfoUtils.get-server-display-name-alternative(info.platform);
+                    overflow: clip;
 
                     opacity: 0.3;
                 }

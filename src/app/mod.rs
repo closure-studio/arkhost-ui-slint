@@ -1,7 +1,7 @@
 /// API请求控制器
 pub mod api_controller;
-/// API数据模型
-pub mod api_model;
+/// 运行时API数据模型
+pub mod rt_api_model;
 /// 验证控制器，用于在WebView窗口中进行用户验证/游戏验证
 pub mod auth_controller;
 /// UI控制器类，用于在Rust运行时和UI组件之间传输数据和执行操作

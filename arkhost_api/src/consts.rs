@@ -2,17 +2,20 @@ pub const CLIENT_IDENTIFIER: &str = "arkhost-ui-slint";
 pub const CLIENT_USER_AGENT: &str = "ArkHostApp/1.0";
 
 pub mod passport {
-    pub const API_BASE_URL: &str = "https://passport.closure.setonink.com/";
+    pub const API_BASE_URL: &str = "https://passport.ltsc.vip/";
     pub mod api {
         pub mod v1 {
             pub const LOGIN: &str = "api/v1/login";
             pub const INFO: &str = "api/v1/info";
+            pub const REFRESH_TOKEN: &str = "api/v1/refreshToken";
+            pub const VERIFY_SMS: &str = "api/v1/phone";
+            pub const QQ_VERIFY_CODE: &str = "api/v1/qq";
         }
     }
 }
 
 pub mod arkhost {
-    pub const API_BASE_URL: &str = "https://api.arknights.host/";
+    pub const API_BASE_URL: &str = "https://api.ltsc.vip/";
     pub mod api {
         pub const GAMES: &str = "game";
         pub const GAMES_SSE: &str = "sse/games";
@@ -38,15 +41,19 @@ pub mod arkhost {
 }
 
 pub mod quota {
-    pub const API_BASE_URL: &str = "https://registry.closure.setonink.com";
+    pub const API_BASE_URL: &str = "https://registry.ltsc.vip/";
     pub mod api {
-        pub mod user {
-            pub const ME: &str = "api/slots/me";
+        pub mod users {
+            pub const ME: &str = "api/users/me";
         }
         pub mod slots {
             pub const SLOTS: &str = "api/slots/slots";
             pub const GAME_ACCOUNT: &str = "api/slots/gameAccount";
         }
+    }
+
+    pub mod error_code {
+        pub const CAPTCHA_ERROR: i32 = -1100;
     }
 }
 

@@ -30,10 +30,10 @@ pub enum UnauthorizedError {
     BannedUser,
 }
 
-#[derive(Error, Debug)]
-#[error("请求错误\n- 状态码: {status_code}{}{}{}{}{}",
+#[derive(Default, Error, Debug)]
+#[error("请求错误{}\n- 状态码: {status_code}{}{}{}{}",
+    .internal_message.as_ref().map_or("".into(), |x| format!("：{x}")),
     .internal_status_code.as_ref().map_or("".into(), |x| format!("\n- 内部代码: {x}")),
-    .internal_message.as_ref().map_or("".into(), |x| format!("\n- 信息: {x}")),
     .raw_data.as_ref().map_or("".into(), |x| format!("\n- 原始数据:\n{x}")),
     .raw_response.as_ref().map_or("".into(), |x| format!("\n- 原始数据:\n{x:?}")),
     .source_error.as_ref().map_or("".into(), |x| format!("\n- 错误源（若非网络问题等外部因素，请提交Bug）\n{:?}", *x))
@@ -177,7 +177,7 @@ pub trait UserStateDataSource {
     fn get_user_state_data(&self) -> Option<UserStateData>;
 }
 
-impl<T: UserState> UserStateDataSource for T {
+impl <T: UserState + ?Sized> UserStateDataSource for T {
     fn get_user_state_data(&self) -> Option<UserStateData> {
         if let Some(token) = self.get_login_state() {
             let mut iter = token.rsplitn(3, '.');
@@ -212,4 +212,11 @@ pub fn get_common_headers() -> reqwest::header::HeaderMap {
     );
 
     headers
+}
+
+pub fn build_client_with_common_options() -> reqwest::ClientBuilder {
+    reqwest::ClientBuilder::new()
+        .min_tls_version(reqwest::tls::Version::TLS_1_2)
+        .max_tls_version(reqwest::tls::Version::TLS_1_3)
+        .http1_only()
 }

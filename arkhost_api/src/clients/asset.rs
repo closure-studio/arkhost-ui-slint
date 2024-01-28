@@ -1,5 +1,7 @@
 use reqwest::Url;
 
+use super::common;
+
 pub struct AssetClient {
     base_url: Url,
     pub client: reqwest_middleware::ClientWithMiddleware,
@@ -14,8 +16,8 @@ impl AssetClient {
     }
 
     pub fn get_client_builder_with_default_settings() -> reqwest::ClientBuilder {
-        let client_builder = reqwest::ClientBuilder::new();
-        let mut headers = super::common::get_common_headers();
+        let client_builder = common::build_client_with_common_options();
+        let mut headers = common::get_common_headers();
         headers.insert(
             "Referer",
             reqwest::header::HeaderValue::from_static(crate::consts::asset::REFERER_URL),

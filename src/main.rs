@@ -9,7 +9,7 @@ use app::asset_controller::AssetController;
 use app::auth_controller::ipc::IpcAuthController;
 
 use app::auth_controller::AuthController;
-use app::controller::api_model::ApiModel;
+use app::controller::rt_api_model::RtApiModel;
 use app::ui::*;
 use app::utils::data_dir::get_data_dir;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
@@ -22,10 +22,12 @@ use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
 use tokio_util::sync::CancellationToken;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use tokio::{self, sync::mpsc};
 
 fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
     let client = AuthClient::get_client_builder_with_default_settings()
+        .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
 
@@ -43,6 +45,7 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
 
 fn create_asset_client() -> AssetClient {
     let client = AssetClient::get_client_builder_with_default_settings()
+        .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
 
@@ -118,7 +121,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
     let hub = Arc::new(ControllerHub::new(
         AppState::new(ui.as_weak()),
-        Arc::new(ApiModel::new()),
+        Arc::new(RtApiModel::new()),
         tx_api_command.clone(),
         tx_auth_command.clone(),
         tx_asset_command.clone(),
@@ -133,7 +136,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             app_state.set_use_auth(state.account, true).exec();
             let hub = hub.clone();
             tokio::spawn(async move {
-                hub.account_controller.auth().await
+                hub.session_controller.auth().await
             });
         }
     }

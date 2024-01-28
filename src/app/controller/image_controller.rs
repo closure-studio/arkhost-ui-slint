@@ -1,7 +1,7 @@
 use crate::app::{
-    api_model,
     app_state::model::{ImageDataRaw, ImageDataRef},
     asset_controller::AssetRef,
+    rt_api_model,
 };
 
 use image::ImageFormat;
@@ -27,7 +27,7 @@ impl ImageController {
 
     pub async fn load_game_avatar_if_empty(
         &self,
-        game: &api_model::GameEntry,
+        game: &rt_api_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {
@@ -53,7 +53,7 @@ impl ImageController {
 
     pub async fn load_game_char_illust_if_empty(
         &self,
-        game: &api_model::GameEntry,
+        game: &rt_api_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {

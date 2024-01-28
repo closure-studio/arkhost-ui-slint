@@ -34,7 +34,7 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<FetchGamesResult>>(resp).await?;
+        let json: ResponseWrapperNested<FetchGamesResult> = try_response_json(resp).await?;
 
         Ok(map_try_response_data(status_code, json, |x| match x {
             NullableData::Data(games) => Ok(games),
@@ -52,7 +52,7 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<GameDetails>>(resp).await?;
+        let json: ResponseWrapperNested<GameDetails> = try_response_json(resp).await?;
 
         Ok(try_response_data(status_code, json)?)
     }
@@ -67,7 +67,7 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<GetLogResponse>>(resp).await?;
+        let json: ResponseWrapperNested<GetLogResponse> = try_response_json(resp).await?;
 
         Ok(try_response_data(status_code, json)?)
     }
@@ -83,7 +83,7 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<()>>(resp).await?;
+        let json: ResponseWrapperNested<()> = try_response_json(resp).await?;
 
         Ok(try_response_data(status_code, json)?)
     }
@@ -123,7 +123,7 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<()>>(resp).await?;
+        let json: ResponseWrapperNested<()> = try_response_json(resp).await?;
 
         Ok(try_response_data(status_code, json)?)
     }
@@ -158,7 +158,7 @@ impl EventSourceClient {
                 match ev {
                     es::SSE::Event(ev) => match ev.event_type.as_str() {
                         api::sse::EVENT_TYPE_GAME => {
-                            let games = serde_json::de::from_str::<Vec<GameInfo>>(&ev.data)?;
+                            let games: Vec<GameInfo> = serde_json::de::from_str(&ev.data)?;
                             Ok(Some(GameSseEvent::Game(games)))
                         }
                         api::sse::EVENT_TYPE_CLOSE => Ok(Some(GameSseEvent::Close)),

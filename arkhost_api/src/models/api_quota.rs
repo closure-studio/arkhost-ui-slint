@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use serde_with::serde_as;
 
 use serde::{Deserialize, Serialize};
 
 use super::{
     api_arkhost::GamePlatform,
     api_passport::{UserPermissions, UserStatus},
+    common::ResponseData,
 };
 
 #[derive(Deserialize, Clone, Debug)]
@@ -14,6 +14,14 @@ pub struct Slot {
     pub uuid: String,
     pub rule_flags: Vec<RuleFlag>,
     pub game_account: Option<String>,
+}
+
+impl Slot {
+    pub fn get_user_tier_availability_rank(&self) -> i32 {
+        self.rule_flags
+            .iter()
+            .fold(0, |acc, x| acc | x.get_user_tier_availability_rank())
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -30,12 +38,12 @@ pub enum UpdateSlotAccountRequest {
     },
 }
 
-#[serde_as]
+pub type UpdateSlotAccountResponse = ResponseData<SlotRuleValidationResult>;
+
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SlotRuleValidationResult {
     pub available: bool,
-    #[serde_as(as = "HashMap<serde_with::json::JsonString, _>")]
     pub results: HashMap<RuleFlag, RuleValidationResult>,
 }
 
@@ -76,4 +84,37 @@ pub enum RuleFlagId {
 pub enum RuleFlag {
     Id(RuleFlagId),
     Other(String),
+}
+
+// TODO: 以metadata方式获取
+impl RuleFlag {
+    pub fn get_user_tier_availability_rank(&self) -> i32 {
+        match self {
+            RuleFlag::Id(rule_flag_id) => match rule_flag_id {
+                RuleFlagId::SlotAccountSmsVerified => user_tier_availability_rank::TIER_BASIC,
+                RuleFlagId::SlotUserSmsVerified => user_tier_availability_rank::TIER_SMS_VERIFIED,
+                RuleFlagId::SlotUserQQVerified => user_tier_availability_rank::TIER_QQ_VERIFIED,
+                RuleFlagId::SlotAccountIsPhone => 0,
+            },
+            RuleFlag::Other(_) => 0,
+        }
+    }
+
+    pub fn get_default_description(&self) -> String {
+        match self {
+            RuleFlag::Id(rule_flag_id) => match rule_flag_id {
+                RuleFlagId::SlotAccountSmsVerified => "仅限归属认证用帐号（可接收验证短信）".into(),
+                RuleFlagId::SlotUserSmsVerified => "进行归属认证后可用".into(),
+                RuleFlagId::SlotUserQQVerified => "进行QQ认证后可用".into(),
+                RuleFlagId::SlotAccountIsPhone => "游戏账号需为手机号".into(),
+            },
+            RuleFlag::Other(id) => format!("其他（{id}）"),
+        }
+    }
+}
+
+pub mod user_tier_availability_rank {
+    pub const TIER_BASIC: i32 = 1 << 2;
+    pub const TIER_SMS_VERIFIED: i32 = 1 << 1;
+    pub const TIER_QQ_VERIFIED: i32 = 1 << 0;
 }

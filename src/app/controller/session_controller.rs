@@ -5,27 +5,32 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    app_state_controller::AppStateController, game_controller::GameController,
-    request_controller::RequestController, ApiOperation,
+    app_state_controller::AppStateController, game_controller::GameController, request_controller::RequestController, rt_api_model::RtApiModel, slot_controller::SlotController, ApiOperation
 };
 
-pub struct AccountController {
+pub struct SessionController {
+    pub rt_api_model: Arc<RtApiModel>,
     pub app_state_controller: Arc<AppStateController>,
     pub request_controller: Arc<RequestController>,
     pub game_controller: Arc<GameController>,
+    pub slot_controller: Arc<SlotController>,
     pub stop_connections: Mutex<Option<DropGuard>>,
 }
 
-impl AccountController {
+impl SessionController {
     pub fn new(
+        rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
         request_controller: Arc<RequestController>,
         game_controller: Arc<GameController>,
+        slot_controller: Arc<SlotController>
     ) -> Self {
         Self {
+            rt_api_model,
             app_state_controller,
             request_controller,
             game_controller,
+            slot_controller,
             stop_connections: Mutex::new(None),
         }
     }
@@ -44,10 +49,9 @@ impl AccountController {
             )
             .await
         {
-            Ok(user) => {
+            Ok(()) => {
                 println!(
-                    "[Controller] Logged in with password authorization, running post-login callback... [{} {}]",
-                    user.user_email, user.uuid
+                    "[Controller] Logged in with password authorization, running post-login callback...",
                 );
                 self.on_login().await;
                 self.app_state_controller
@@ -69,10 +73,9 @@ impl AccountController {
             .send_api_request(ApiOperation::Auth { resp }, &mut rx)
             .await
         {
-            Ok(user) => {
+            Ok(()) => {
                 println!(
-                    "[Controller] Logged in with token authorization, running post-login callback... [{} {}]",
-                    user.user_email, user.uuid
+                    "[Controller] Logged in with token authorization, running post-login callback..."
                 );
                 self.on_login().await;
                 self.app_state_controller
@@ -113,7 +116,9 @@ impl AccountController {
     }
 
     async fn on_login(&self) {
+        self.rt_api_model.user.clear().await;
         self.game_controller.try_ensure_resources().await;
+        self.slot_controller.refresh_slots().await;
         self.start_sse_event_loop().await;
     }
 }

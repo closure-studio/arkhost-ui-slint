@@ -1,23 +1,26 @@
-pub mod account_controller;
-pub mod api_model;
 pub mod app_state_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
 pub mod request_controller;
+pub mod rt_api_model;
+pub mod session_controller;
+pub mod slot_controller;
+pub mod user_controller;
 extern crate alloc;
 
-use self::api_model::ApiModel;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
 use self::request_controller::RequestController;
-use self::{account_controller::AccountController, app_state_controller::AppStateController};
-use super::app_state::model::GameOptionsModel;
+use self::rt_api_model::RtApiModel;
+use self::slot_controller::SlotController;
+use self::{app_state_controller::AppStateController, session_controller::SessionController};
+use super::app_state::mapping::{GameOptionsMapping, SlotUpdateDraftMapping};
 use super::app_state::AppState;
 use super::ui::*;
 use super::utils::ext_link;
-use slint::Model;
+use slint::{Model, SharedString};
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -55,15 +58,16 @@ pub struct ControllerHub {
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
     pub image_controller: Arc<ImageController>,
-    pub account_controller: Arc<AccountController>,
+    pub session_controller: Arc<SessionController>,
     pub game_controller: Arc<GameController>,
+    pub slot_controller: Arc<SlotController>,
     pub game_operation_controller: Arc<GameOperationController>,
 }
 
 impl ControllerHub {
     pub fn new(
         app_state: AppState,
-        api_model: Arc<ApiModel>,
+        rt_api_model: Arc<RtApiModel>,
         tx_api_controller: mpsc::Sender<ApiCommand>,
         tx_auth_controller: mpsc::Sender<AuthCommand>,
         tx_asset_controller: mpsc::Sender<AssetCommand>,
@@ -73,7 +77,7 @@ impl ControllerHub {
             app_state: app_state.clone(),
         });
         let request_controller = Arc::new(RequestController {
-            api_model: api_model.clone(),
+            rt_api_model: rt_api_model.clone(),
             tx_api_controller,
             tx_auth_controller,
             tx_asset_controller,
@@ -83,24 +87,33 @@ impl ControllerHub {
             app_state_controller.clone(),
             request_controller.clone(),
         ));
+        let slot_controller = Arc::new(SlotController::new(
+            rt_api_model.clone(),
+            app_state_controller.clone(),
+            request_controller.clone(),
+        ));
         let game_controller = Arc::new(GameController::new(
-            api_model,
+            rt_api_model.clone(),
             app_state_controller.clone(),
             request_controller.clone(),
             image_controller.clone(),
+            slot_controller.clone(),
             game_operation_controller.clone(),
         ));
-        let account_controller = Arc::new(AccountController::new(
+        let session_controller = Arc::new(SessionController::new(
+            rt_api_model.clone(),
             app_state_controller.clone(),
             request_controller.clone(),
             game_controller.clone(),
+            slot_controller.clone(),
         ));
         Self {
             app_state: app_state.clone(),
             app_state_controller,
             image_controller,
-            account_controller,
+            session_controller,
             game_controller,
+            slot_controller,
             game_operation_controller,
         }
     }
@@ -136,7 +149,7 @@ impl ControllerHub {
 
                 let this = this.clone();
                 tokio::spawn(async move {
-                    this.account_controller
+                    this.session_controller
                         .login(account.into(), password.into())
                         .await;
                 });
@@ -149,7 +162,7 @@ impl ControllerHub {
             app.on_auth_requested(move || {
                 let this = this.clone();
                 tokio::spawn(async move {
-                    this.account_controller.auth().await;
+                    this.session_controller.auth().await;
                 });
             });
         }
@@ -214,7 +227,7 @@ impl ControllerHub {
                     x.set_game_save_state(id.clone().into(), GameOptionSaveState::Saving)
                 });
 
-                let config_fields = GameOptionsModel::from_ui(&options).to_game_options();
+                let config_fields = GameOptionsMapping::from_ui(&options).to_game_options();
 
                 let this = this.clone();
                 tokio::spawn(async move {
@@ -267,7 +280,49 @@ impl ControllerHub {
             app.on_reconnect_sse(move || {
                 let this = this.to_owned();
                 tokio::spawn(async move {
-                    this.account_controller.start_sse_event_loop().await;
+                    this.session_controller.start_sse_event_loop().await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
+
+            app.on_refresh_user_info(move || {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.slot_controller.refresh_slots().await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
+
+            app.on_update_slot(move |id, update_draft| {
+                let this = this.clone();
+                let update_request = SlotUpdateDraftMapping::from_ui(&update_draft);
+                if let Some(update_request) = update_request {
+                    let id = id.to_string();
+                    tokio::spawn(async move {
+                        this.slot_controller.update_slot(id, update_request).await;
+                    });
+                } else {
+                    eprintln!("[Controller] Unprocessable update draft: {update_draft:?}; please file a bug");
+                }
+            })
+        }
+
+        {
+            let this = self.clone();
+
+            app.on_reset_slot_update_request_state(move |id| {
+                this.app_state_controller.exec(move |x| {
+                    x.exec_with_slot_by_id(id.into(), move |slot_info_list, i, mut slot_info| {
+                        slot_info.update_request_state = SlotUpdateRequestState::Idle;
+                        slot_info.update_result = SharedString::default();
+                        slot_info_list.set_row_data(i, slot_info);
+                    })
                 });
             });
         }

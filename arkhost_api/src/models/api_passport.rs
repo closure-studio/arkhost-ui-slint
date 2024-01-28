@@ -91,3 +91,14 @@ impl UserStateData {
         Utc::now() >= self.exp
     }
 }
+
+#[derive(Default, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshTokenResponse {
+    pub token: String
+}
+
+#[derive(Default, Serialize, Clone, Debug)]
+pub struct SubmitSmsVerifyCodeRequest {
+    pub code: String
+}

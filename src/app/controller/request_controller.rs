@@ -1,4 +1,4 @@
-use super::api_model::ApiModel;
+use super::rt_api_model::RtApiModel;
 use super::{
     ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult, AuthCommand,
     AuthResult,
@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 pub struct RequestController {
-    pub api_model: Arc<ApiModel>,
+    pub rt_api_model: Arc<RtApiModel>,
     pub tx_api_controller: mpsc::Sender<ApiCommand>,
     pub tx_auth_controller: mpsc::Sender<AuthCommand>,
     pub tx_asset_controller: mpsc::Sender<AssetCommand>,
@@ -19,7 +19,7 @@ impl RequestController {
     pub async fn send_api_command(&self, op: ApiOperation) -> ApiResult<()> {
         self.tx_api_controller
             .send(ApiCommand {
-                user: self.api_model.user.clone(),
+                user: self.rt_api_model.user.clone(),
                 op,
             })
             .await

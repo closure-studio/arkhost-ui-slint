@@ -1,7 +1,9 @@
 use crate::consts::passport::api;
-use crate::models::api_passport::{LoginRequest, LoginResponse, User, UserStatus};
-use crate::models::common::{NullableData, ResponseWrapperNested};
+use crate::clients::common::UserStateDataSource;
+use crate::models::api_passport::{LoginRequest, LoginResponse, RefreshTokenResponse, SubmitSmsVerifyCodeRequest, User, UserStateData};
+use crate::models::common::{NullableData, ResponseNestedAny, ResponseWrapperNested};
 use reqwest::Url;
+use std::ops::Deref;
 use std::{
     fmt::Debug,
     sync::{Arc, RwLock},
@@ -33,7 +35,7 @@ impl AuthClient {
     }
 
     pub fn get_client_builder_with_default_settings() -> reqwest::ClientBuilder {
-        let client_builder = reqwest::ClientBuilder::new();
+        let client_builder = common::build_client_with_common_options();
         let headers = common::get_common_headers();
         client_builder
             .default_headers(headers)
@@ -41,7 +43,7 @@ impl AuthClient {
             .brotli(true)
     }
 
-    pub async fn login(&self, email: String, password: String) -> ApiResult<User> {
+    pub async fn login(&self, email: String, password: String) -> ApiResult<()> {
         let login_request = LoginRequest { email, password };
 
         let resp = self
@@ -52,7 +54,7 @@ impl AuthClient {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<LoginResponse>>(resp).await?;
+        let json: ResponseWrapperNested<LoginResponse> = try_response_json(resp).await?;
 
         let login_result = map_try_response_data(status_code, json, |data| match data {
             NullableData::Data(login_result) => Ok(login_result),
@@ -62,12 +64,8 @@ impl AuthClient {
             .write()
             .unwrap()
             .set_login_state(login_result.token.clone());
-        let user_info = self.get_user_info().await?;
-        if user_info.status == UserStatus::Banned {
-            return Err(UnauthorizedError::BannedUser.into());
-        }
 
-        Ok(user_info)
+        Ok(())
     }
 
     pub fn logout(&self) {
@@ -83,9 +81,53 @@ impl AuthClient {
             .await?;
 
         let status_code = resp.status();
-        let json = try_response_json::<ResponseWrapperNested<User>>(resp).await?;
+        let json: ResponseWrapperNested<User> = try_response_json(resp).await?;
 
         Ok(try_response_data(status_code, json)?)
+    }
+
+    pub async fn submit_sms_verify_code(&self, req: &SubmitSmsVerifyCodeRequest) -> ApiResult<()> {
+        let resp = self
+            .client
+            .post(self.base_url.join(api::v1::VERIFY_SMS)?)
+            .bearer_auth(self.get_jwt()?)
+            .json(req)
+            .send()
+            .await?;
+
+        let status_code = resp.status();
+        let json: ResponseNestedAny = try_response_json(resp).await?;
+        _ = try_response_data(status_code, json)?;
+        Ok(())
+    }
+
+    pub async fn get_qq_verify_code(&self) -> ApiResult<String> {
+        let resp = self
+            .client
+            .get(self.base_url.join(api::v1::QQ_VERIFY_CODE)?)
+            .bearer_auth(self.get_jwt()?)
+            .send()
+            .await?;
+
+        let status_code = resp.status();
+        let json: ResponseWrapperNested<String> = try_response_json(resp).await?;
+        Ok(try_response_data(status_code, json)?)
+    }
+
+    pub async fn refresh_token(&self) -> ApiResult<()> {
+        let resp = self
+            .client
+            .get(self.base_url.join(api::v1::REFRESH_TOKEN)?)
+            .bearer_auth(self.get_jwt()?)
+            .send()
+            .await?;
+
+        let status_code = resp.status();
+        let json: ResponseWrapperNested<RefreshTokenResponse> = try_response_json(resp).await?;
+
+        let resp = try_response_data(status_code, json)?;
+        self.user_state.write().unwrap().set_login_state(resp.token);
+        Ok(())
     }
 
     pub fn get_jwt(&self) -> Result<String, UnauthorizedError> {
@@ -93,5 +135,9 @@ impl AuthClient {
             Some(jwt) => Ok(jwt),
             None => Err(UnauthorizedError::MissingUserCredentials),
         }
+    }
+
+    pub fn get_user_state_data(&self) -> Option<UserStateData> {
+        self.user_state.read().unwrap().deref().get_user_state_data()
     }
 }

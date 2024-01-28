@@ -1,10 +1,13 @@
 use crate::app::{
     api_controller::RetrieveLogSpec,
-    api_model,
-    app_state::model::{CharIllust, GameInfoModel, ImageDataRaw, ImageDataRef},
+    app_state::{
+        mapping::GameInfoMapping,
+        model::{CharIllust, ImageDataRaw, ImageDataRef},
+    },
     asset_controller::AssetRef,
     controller::RefreshLogsCondition,
     game_data::{CharPack, CharPackSummaryTable, StageTable},
+    rt_api_model,
     ui::*,
 };
 use anyhow::anyhow;
@@ -27,9 +30,13 @@ use std::{
 };
 
 use super::{
-    api_model::ApiModel, app_state_controller::AppStateController,
-    game_operation_controller::GameOperationController, image_controller::ImageController,
-    request_controller::RequestController, ApiOperation, AssetCommand,
+    app_state_controller::AppStateController,
+    game_operation_controller::GameOperationController,
+    image_controller::ImageController,
+    request_controller::RequestController,
+    rt_api_model::RtApiModel,
+    slot_controller::SlotController,
+    ApiOperation, AssetCommand,
 };
 
 #[derive(Default, Debug)]
@@ -46,19 +53,21 @@ pub struct GameController {
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
     refreshing: AtomicBool,
 
-    api_model: Arc<ApiModel>,
+    rt_api_model: Arc<RtApiModel>,
     app_state_controller: Arc<AppStateController>,
     request_controller: Arc<RequestController>,
     image_controller: Arc<ImageController>,
+    slot_controller: Arc<SlotController>,
     game_operation_controller: Arc<GameOperationController>,
 }
 
 impl GameController {
     pub fn new(
-        api_model: Arc<ApiModel>,
+        rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
         request_controller: Arc<RequestController>,
         image_controller: Arc<ImageController>,
+        slot_controller: Arc<SlotController>,
         game_operation_controller: Arc<GameOperationController>,
     ) -> Self {
         Self {
@@ -67,10 +76,11 @@ impl GameController {
             char_pack_summaries: RwLock::new(None),
             refreshing: AtomicBool::new(false),
 
-            api_model,
+            rt_api_model,
             app_state_controller,
             request_controller,
             image_controller,
+            slot_controller,
             game_operation_controller,
         }
     }
@@ -94,6 +104,7 @@ impl GameController {
             .await
         {
             Ok(_) => {
+                self.slot_controller.refresh_slots_by_rt_model().await;
                 self.try_fetch_all_game_details().await;
                 self.process_game_list_changes(refresh_log_cond).await;
                 self.app_state_controller
@@ -130,7 +141,8 @@ impl GameController {
                             GameSseEvent::Game(games) => {
                                 println!("[Controller] Games SSE connection received {} games", games.len());
 
-                                self.api_model.user.handle_retrieve_games_result(games).await;
+                                self.rt_api_model.user.handle_retrieve_games_result(games).await;
+                                self.slot_controller.refresh_slots_by_rt_model().await;
                                 self.try_fetch_all_game_details().await;
                                 self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
@@ -172,7 +184,7 @@ impl GameController {
 
     pub async fn try_fetch_all_game_details(&self) {
         let mut games_to_fetch_details: Vec<String> = Vec::new();
-        for game_ref in self.api_model.get_game_map_read().await.values() {
+        for game_ref in self.rt_api_model.get_game_map_read().await.values() {
             let game = game_ref.game.read().await;
             if game.info.status.code == api_arkhost::GameStatus::Running {
                 games_to_fetch_details.push(game.info.status.account.clone());
@@ -203,8 +215,8 @@ impl GameController {
     }
 
     pub async fn process_game_list_changes(&self, refresh_log_cond: super::RefreshLogsCondition) {
-        let mut game_list: Vec<(i32, String, GameInfoModel)> = Vec::new();
-        let game_map = self.api_model.get_game_map_read().await;
+        let mut game_list: Vec<(i32, String, GameInfoMapping)> = Vec::new();
+        let game_map = self.rt_api_model.get_game_map_read().await;
 
         let mut load_images_task = vec![];
         for game_ref in game_map.values() {
@@ -222,7 +234,7 @@ impl GameController {
             game_list.push((
                 game_ref.order.load(Ordering::Acquire),
                 game.info.status.account.clone(),
-                GameInfoModel::from(&game),
+                GameInfoMapping::from(&game),
             ));
 
             load_images_task.push(async {
@@ -289,9 +301,9 @@ impl GameController {
         {
             Ok(game_ref) => {
                 let game = &game_ref.game.read().await;
-                let model = GameInfoModel::from(game);
+                let mapping = GameInfoMapping::from(game);
                 self.app_state_controller
-                    .exec(|x| x.update_game_view(id, Some(model), true));
+                    .exec(|x| x.update_game_view(id, Some(mapping), true));
             }
             Err(e) => {
                 eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
@@ -301,7 +313,7 @@ impl GameController {
         }
     }
 
-    pub async fn try_ensure_game_images(&self, game: &api_model::GameEntry, id: String) {
+    pub async fn try_ensure_game_images(&self, game: &rt_api_model::GameEntry, id: String) {
         let game_resource_entry;
         {
             let mut game_resource_map = self.game_resource_map.write().await;

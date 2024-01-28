@@ -3,8 +3,11 @@ use reqwest::Url;
 use crate::{
     consts::quota::api,
     models::{
-        api_quota::{Slot, SlotRuleValidationResult, UpdateSlotAccountRequest, User},
-        common::{ResponseWrapperEmbed, ResponseWrapperEmbedUnion},
+        api_quota::{
+            Slot, SlotRuleValidationResult, UpdateSlotAccountRequest, UpdateSlotAccountResponse,
+            User,
+        },
+        common::{ResponseWrapper, ResponseWrapperEmbed, ResponseWrapperEmbedUnion},
     },
 };
 
@@ -29,7 +32,7 @@ impl Client {
         let resp = self
             .auth_client
             .client
-            .get(self.base_url.join(api::user::ME)?)
+            .get(self.base_url.join(api::users::ME)?)
             .bearer_auth(self.auth_client.get_jwt()?)
             .send()
             .await?;
@@ -58,22 +61,24 @@ impl Client {
     pub async fn update_slot_account(
         &self,
         uuid: &str,
+        captcha_token: &str,
         request: &UpdateSlotAccountRequest,
-    ) -> ApiResult<ResponseWrapperEmbed<SlotRuleValidationResult>> {
+    ) -> ApiResult<UpdateSlotAccountResponse> {
         let mut url = self.base_url.join(api::slots::GAME_ACCOUNT)?;
         url.query_pairs_mut().append_pair("uuid", uuid);
 
-        let result = self
+        let result: ResponseWrapperEmbed<SlotRuleValidationResult> = self
             .auth_client
             .client
             .post(url)
             .bearer_auth(self.auth_client.get_jwt()?)
+            .header("Token", captcha_token)
             .json(&request)
             .send()
             .await?
             .json()
             .await?;
 
-        Ok(result)
+        Ok(result.to_response_data())
     }
 }

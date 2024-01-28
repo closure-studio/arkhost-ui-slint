@@ -103,6 +103,7 @@ impl AuthResolver {
 
     pub fn settle_auth(&self, id: &str) {
         self.pending_auth.write().unwrap().remove(id);
+        self.on_next_action_ready();
     }
 
     pub fn on_page_loaded(&self, ev: PageLoadEvent) {

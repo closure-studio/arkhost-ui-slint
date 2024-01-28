@@ -35,7 +35,7 @@ impl GameOperationController {
         let mut success = false;
         let (resp1, rx1) = oneshot::channel();
         let (resp2, rx2) = oneshot::channel();
-        let auth_methods = vec![
+        let auth_methods = [
             (
                 AuthCommand::AuthArkHostBackground {
                     resp: resp1,

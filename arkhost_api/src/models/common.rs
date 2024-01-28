@@ -63,6 +63,8 @@ where
     }
 }
 
+pub type ResponseNestedAny = ResponseWrapperNested<serde_json::Value>;
+
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct ErrorInfoEmbed {
     #[serde(alias = "error")] // Celebrate validation error response

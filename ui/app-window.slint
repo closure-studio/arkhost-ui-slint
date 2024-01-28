@@ -1,5 +1,7 @@
 import { Button, VerticalBox, HorizontalBox, TabWidget, StyleMetrics } from "std-widgets.slint";
 import { GameInfo } from "game-info.slint";
+import { SlotInfo } from "slot-info.slint";
+import { UserInfo } from "user-info.slint";
 import { LoginWindow, LoginState } from "login-window.slint";
 import { GameInfoPage, FetchGamesState, SseConnectState } from "pages/game-info-page.slint";
 import { AboutPage } from "pages/about-page.slint";
@@ -14,6 +16,8 @@ export component AppWindow inherits Window {
     in property <[GameInfo]> game-info-list;
     in property <FetchGamesState> fetch-games-state;
     in property <SseConnectState> sse-connect-state;
+    in property <[SlotInfo]> slot-info-list;
+    in property <UserInfo> user-info;
     in-out property <LoginState> login-state;
     in-out property <string> login-status-text;
 
@@ -31,10 +35,17 @@ export component AppWindow inherits Window {
     callback save-options <=> Callbacks.save-options;
     callback load-logs <=> Callbacks.load-logs;
     callback view-changed <=> Callbacks.view-changed;
-
-    callback open-ext-link <=> Callbacks.open-ext-link;
-
     callback reconnect-sse <=> Callbacks.reconnect-sse;
+
+    callback refresh-user-info <=> Callbacks.refresh-user-info;
+    callback refresh-slot-info <=> Callbacks.refresh-slot-info;
+    callback submit-sms-verify-code <=> Callbacks.submit-sms-verify-code;
+    callback fetch-qq-verify-code <=> Callbacks.fetch-qq-verify-code;
+
+    callback update-slot <=> Callbacks.update-slot;
+    callback reset-slot-update-request-state <=> Callbacks.reset-slot-update-request-state;
+    
+    callback open-ext-link <=> Callbacks.open-ext-link;
 
     preferred-width: 1280px;
     preferred-height: 800px;
@@ -66,7 +77,8 @@ export component AppWindow inherits Window {
 
                 VerticalLayout {
                     slot-page := SlotPage {
-
+                        slot-info-list: slot-info-list;
+                        user-info: user-info;
                     }
                 }
             }

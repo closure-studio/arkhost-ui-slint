@@ -1,6 +1,10 @@
+pub mod mapping;
 pub mod model;
 
-use self::model::{CharIllust, GameInfoModel, ImageData};
+use self::{
+    mapping::{GameInfoMapping, SlotInfoMapping, UserInfoMapping},
+    model::{CharIllust, ImageData},
+};
 use super::ui::*;
 use slint::{Model, ModelRc, Timer, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
@@ -63,7 +67,9 @@ impl AppState {
 
     pub fn set_login_state(&self, state: LoginState, mut status_text: String) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
-            status_text.push(' '); // slint word wrap bug
+            if !status_text.is_empty() {
+                status_text.push(' '); // slint word wrap bug
+            }
             ui.set_login_state(state);
             ui.set_login_status_text(status_text.into());
         })
@@ -112,6 +118,33 @@ impl AppState {
         })
     }
 
+    pub fn set_user_id_api_request_state(&self, state: UserIdApiRequestState) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            let mut user_info = ui.get_user_info();
+            user_info.id_api_request_state = state;
+            ui.set_user_info(user_info);
+        })
+    }
+
+    pub fn set_slot_update_request_state(
+        &self,
+        id: String,
+        state: SlotUpdateRequestState,
+        status_text: Option<String>
+    ) -> AppStateAsyncOp {
+        self.exec_with_slot_by_id(id, move |slot_info_list, i, mut slot_info| {
+            slot_info.update_request_state = state;
+            if let Some(mut status_text) = status_text {
+                if !status_text.is_empty() {
+                    status_text.push(' '); // slint word wrap bug
+                }
+                slot_info.update_result = status_text.into();
+            }
+
+            slot_info_list.set_row_data(i, slot_info);
+        })
+    }
+
     pub fn set_game_images(
         &self,
         id: String,
@@ -145,35 +178,31 @@ impl AppState {
 
     pub fn update_game_views(
         &self,
-        mut game_list: Vec<(i32, String, GameInfoModel)>,
+        mut game_list: Vec<(i32, String, GameInfoMapping)>,
         update_logs: bool,
     ) -> AppStateAsyncOp {
         game_list.sort_by_key(|(order, _, _)| *order);
         self.exec_in_event_loop(move |ui| {
-            let current_game_info_list = ui.get_game_info_list();
-            if game_list.len() == current_game_info_list.row_count()
-                && current_game_info_list
+            let game_info_list = ui.get_game_info_list();
+            if game_list.len() == game_info_list.row_count()
+                && game_info_list
                     .iter()
                     .enumerate()
                     .all(|(i, x)| x.id == game_list[i].1)
             {
-                current_game_info_list
-                    .iter()
-                    .enumerate()
-                    .for_each(|(i, mut x)| {
-                        let (_, _, game_info_represent) = &game_list[i];
-                        game_info_represent.mutate(&mut x, update_logs);
-                        current_game_info_list.set_row_data(i, x);
-                    });
+                game_info_list.iter().enumerate().for_each(|(i, mut x)| {
+                    let (_, _, game_info_mapping) = &game_list[i];
+                    game_info_mapping.mutate(&mut x, update_logs);
+                    game_info_list.set_row_data(i, x);
+                });
                 return;
             }
 
             let game_info_list: Vec<GameInfo> = game_list
                 .iter()
-                .map(|(_, _, rep)| rep.create_game_info())
+                .map(|(_, _, mapping)| mapping.create_game_info())
                 .collect();
-            let model = Rc::new(VecModel::from(game_info_list));
-            ui.set_game_info_list(ModelRc::from(model));
+            ui.set_game_info_list(Rc::new(VecModel::from(game_info_list)).into());
             println!("[AppState] Recreated rows on game list changed");
         })
     }
@@ -181,18 +210,99 @@ impl AppState {
     pub fn update_game_view(
         &self,
         id: String,
-        model: Option<GameInfoModel>,
+        mapping: Option<GameInfoMapping>,
         update_logs: bool,
     ) -> AppStateAsyncOp {
         self.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
             if update_logs {
                 game_info.log_loaded = GameLogLoadState::Loaded;
             }
-            if let Some(model) = model {
-                model.mutate(&mut game_info, update_logs);
+            if let Some(mapping) = mapping {
+                mapping.mutate(&mut game_info, update_logs);
             }
             game_info_list.set_row_data(i, game_info);
         })
+    }
+    pub fn exec_with_game_by_id(
+        &self,
+        id: String,
+        func: impl FnOnce(ModelRc<GameInfo>, usize, GameInfo) + Send + 'static,
+    ) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            let game_info_list = ui.get_game_info_list();
+            match Self::find_game_by_id(&game_info_list, &id) {
+                Some((i, game_info)) => func(game_info_list, i, game_info),
+                None => { /* TODO: report error */ }
+            }
+        })
+    }
+
+    pub fn update_slot_info_list(
+        &self,
+        mut slot_list: Vec<(i32, String, SlotInfoMapping)>,
+    ) -> AppStateAsyncOp {
+        slot_list.sort_by_key(|(order, _, _)| *order);
+        self.exec_in_event_loop(move |ui| {
+            let slot_info_list = ui.get_slot_info_list();
+            if slot_list.len() == slot_info_list.row_count()
+                && slot_info_list
+                    .iter()
+                    .enumerate()
+                    .all(|(i, x)| x.uuid == slot_list[i].1)
+            {
+                slot_info_list.iter().enumerate().for_each(|(i, mut x)| {
+                    let (_, _, slot_info_mapping) = &slot_list[i];
+                    slot_info_mapping.mutate(&mut x);
+                    slot_info_list.set_row_data(i, x);
+                });
+                return;
+            }
+
+            let slot_info_list: Vec<SlotInfo> = slot_list
+                .iter()
+                .map(|(_, _, mapping)| mapping.create_slot_info())
+                .collect();
+            ui.set_slot_info_list(Rc::from(VecModel::from(slot_info_list)).into());
+            println!("[AppState] Recreated rows on slot list changed");
+        })
+    }
+
+    pub fn update_slot_info(&self, uuid: String, mapping: SlotInfoMapping) -> AppStateAsyncOp {
+        self.exec_with_slot_by_id(uuid, move |slot_info_list, i, mut slot_info| {
+            mapping.mutate(&mut slot_info);
+            slot_info_list.set_row_data(i, slot_info);
+        })
+    }
+
+    pub fn exec_with_slot_by_id(
+        &self,
+        id: String,
+        func: impl FnOnce(ModelRc<SlotInfo>, usize, SlotInfo) + Send + 'static,
+    ) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            let slot_info_list = ui.get_slot_info_list();
+            match Self::find_slot_by_id(&slot_info_list, &id) {
+                Some((i, slot_info)) => {
+                    func(slot_info_list, i, slot_info);
+                }
+                None => { /* TODO: report error */ }
+            }
+        })
+    }
+
+    pub fn update_user_info(&self, mapping: UserInfoMapping) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            let mut user_info = ui.get_user_info();
+            mapping.mutate(&mut user_info);
+            ui.set_user_info(user_info);
+        })
+    }
+
+    pub fn exec_in_event_loop(
+        &self,
+        func: impl FnOnce(AppWindow) + Send + 'static,
+    ) -> AppStateAsyncOp {
+        AppStateAsyncOp::create(&self.ui, func)
     }
 
     fn find_game_by_id(game_info_list: &ModelRc<GameInfo>, id: &str) -> Option<(usize, GameInfo)> {
@@ -203,24 +313,11 @@ impl AppState {
             .take()
     }
 
-    pub fn exec_with_game_by_id(
-        &self,
-        id: String,
-        func: impl FnOnce(ModelRc<GameInfo>, usize, GameInfo) + Send + 'static,
-    ) -> AppStateAsyncOp {
-        self.exec_in_event_loop(move |ui| {
-            let game_info_list = ui.get_game_info_list();
-            match AppState::find_game_by_id(&game_info_list, &id) {
-                Some((i, game_info)) => func(game_info_list, i, game_info),
-                None => { /* report error here */ }
-            }
-        })
-    }
-
-    pub fn exec_in_event_loop(
-        &self,
-        func: impl FnOnce(AppWindow) + Send + 'static,
-    ) -> AppStateAsyncOp {
-        AppStateAsyncOp::create(&self.ui, func)
+    fn find_slot_by_id(slot_info_list: &ModelRc<SlotInfo>, id: &str) -> Option<(usize, SlotInfo)> {
+        slot_info_list
+            .iter()
+            .enumerate()
+            .find(|(_i, x)| x.uuid.as_str() == id)
+            .take()
     }
 }
