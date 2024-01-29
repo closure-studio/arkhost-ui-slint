@@ -2,7 +2,7 @@ pub mod app_state_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
-pub mod request_controller;
+pub mod sender;
 pub mod rt_api_model;
 pub mod session_controller;
 pub mod slot_controller;
@@ -12,12 +12,13 @@ extern crate alloc;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
-use self::request_controller::RequestController;
+use self::sender::Sender;
 use self::rt_api_model::RtApiModel;
 use self::slot_controller::SlotController;
 use self::{app_state_controller::AppStateController, session_controller::SessionController};
 use super::app_state::mapping::{GameOptionsMapping, SlotUpdateDraftMapping};
 use super::app_state::AppState;
+use super::auth_controller::AuthContext;
 use super::ui::*;
 use super::utils::ext_link;
 use slint::{Model, SharedString};
@@ -69,33 +70,33 @@ impl ControllerHub {
         app_state: AppState,
         rt_api_model: Arc<RtApiModel>,
         tx_api_controller: mpsc::Sender<ApiCommand>,
-        tx_auth_controller: mpsc::Sender<AuthCommand>,
+        tx_auth_controller: mpsc::Sender<AuthContext>,
         tx_asset_controller: mpsc::Sender<AssetCommand>,
     ) -> Self {
         let app_state = Arc::new(Mutex::new(app_state));
         let app_state_controller = Arc::new(AppStateController {
             app_state: app_state.clone(),
         });
-        let request_controller = Arc::new(RequestController {
+        let sender = Arc::new(Sender {
             rt_api_model: rt_api_model.clone(),
             tx_api_controller,
             tx_auth_controller,
             tx_asset_controller,
         });
-        let image_controller = Arc::new(ImageController::new(request_controller.clone()));
+        let image_controller = Arc::new(ImageController::new(sender.clone()));
         let game_operation_controller = Arc::new(GameOperationController::new(
             app_state_controller.clone(),
-            request_controller.clone(),
+            sender.clone(),
         ));
         let slot_controller = Arc::new(SlotController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
-            request_controller.clone(),
+            sender.clone(),
         ));
         let game_controller = Arc::new(GameController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
-            request_controller.clone(),
+            sender.clone(),
             image_controller.clone(),
             slot_controller.clone(),
             game_operation_controller.clone(),
@@ -103,7 +104,7 @@ impl ControllerHub {
         let session_controller = Arc::new(SessionController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
-            request_controller.clone(),
+            sender.clone(),
             game_controller.clone(),
             slot_controller.clone(),
         ));

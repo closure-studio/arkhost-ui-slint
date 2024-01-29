@@ -19,7 +19,7 @@ pub struct ResponseErrorInfo {
 }
 
 pub trait ResponseErrorInfoSource {
-    fn get_error_info(&self) -> ResponseErrorInfo;
+    fn error_info(&self) -> ResponseErrorInfo;
 }
 
 #[derive(Error, Debug)]
@@ -54,7 +54,7 @@ impl<TRes> ResponseErrorInfoSource for ResponseError<TRes>
 where
     TRes: Debug,
 {
-    fn get_error_info(&self) -> ResponseErrorInfo {
+    fn error_info(&self) -> ResponseErrorInfo {
         ResponseErrorInfo {
             status_code: self.status_code,
             internal_status_code: self.internal_status_code,
@@ -144,7 +144,7 @@ where
 
 pub trait UserState: Debug + Send + Sync {
     fn set_login_state(&mut self, jwt: String);
-    fn get_login_state(&self) -> Option<String>;
+    fn login_state(&self) -> Option<String>;
     fn erase_login_state(&mut self);
 }
 
@@ -164,7 +164,7 @@ impl UserState for UserStateMemStorage {
         self.jwt = Some(jwt);
     }
 
-    fn get_login_state(&self) -> Option<String> {
+    fn login_state(&self) -> Option<String> {
         self.jwt.clone()
     }
 
@@ -174,12 +174,12 @@ impl UserState for UserStateMemStorage {
 }
 
 pub trait UserStateDataSource {
-    fn get_user_state_data(&self) -> Option<UserStateData>;
+    fn user_state_data(&self) -> Option<UserStateData>;
 }
 
 impl <T: UserState + ?Sized> UserStateDataSource for T {
-    fn get_user_state_data(&self) -> Option<UserStateData> {
-        if let Some(token) = self.get_login_state() {
+    fn user_state_data(&self) -> Option<UserStateData> {
+        if let Some(token) = self.login_state() {
             let mut iter = token.rsplitn(3, '.');
             if let (Some(_), Some(payload), Some(_), None) =
                 (iter.next(), iter.next(), iter.next(), iter.next())
@@ -200,7 +200,7 @@ impl <T: UserState + ?Sized> UserStateDataSource for T {
     }
 }
 
-pub fn get_common_headers() -> reqwest::header::HeaderMap {
+pub fn common_headers() -> reqwest::header::HeaderMap {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "X-Platform",
@@ -214,7 +214,7 @@ pub fn get_common_headers() -> reqwest::header::HeaderMap {
     headers
 }
 
-pub fn build_client_with_common_options() -> reqwest::ClientBuilder {
+pub fn client_builder_with_common_options() -> reqwest::ClientBuilder {
     reqwest::ClientBuilder::new()
         .min_tls_version(reqwest::tls::Version::TLS_1_2)
         .max_tls_version(reqwest::tls::Version::TLS_1_3)

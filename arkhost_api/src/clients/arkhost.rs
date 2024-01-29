@@ -29,7 +29,7 @@ impl Client {
             .auth_client
             .client
             .get(self.base_url.join(api::GAMES)?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .send()
             .await?;
 
@@ -47,7 +47,7 @@ impl Client {
             .auth_client
             .client
             .get(self.base_url.join(&api::game(account))?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .send()
             .await?;
 
@@ -62,7 +62,7 @@ impl Client {
             .auth_client
             .client
             .get(self.base_url.join(&api::game_log(account, offset))?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .send()
             .await?;
 
@@ -77,7 +77,7 @@ impl Client {
             .auth_client
             .client
             .post(self.base_url.join(&api::game_login(account))?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .header("Token", captcha_token)
             .send()
             .await?;
@@ -117,7 +117,7 @@ impl Client {
             .auth_client
             .client
             .post(self.base_url.join(&api::game_config(account))?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .json(&request)
             .send()
             .await?;
@@ -148,9 +148,9 @@ impl EventSourceClient {
     pub fn connect_games_sse(&self) -> anyhow::Result<SseStream<anyhow::Result<GameSseEvent>>> {
         let mut url = self.base_url.join(api::GAMES_SSE)?;
         url.query_pairs_mut()
-            .append_pair("token", &self.auth_client.get_jwt()?);
+            .append_pair("token", &self.auth_client.jwt()?);
 
-        let client = Self::get_default_client(url.as_str())?;
+        let client = Self::default_client(url.as_str())?;
         let stream = client
             .stream()
             .map_err(anyhow::Error::from)
@@ -171,9 +171,9 @@ impl EventSourceClient {
         Ok(stream.boxed())
     }
 
-    pub fn get_default_client(url: &str) -> anyhow::Result<impl es::Client> {
+    pub fn default_client(url: &str) -> anyhow::Result<impl es::Client> {
         let mut builder = es::ClientBuilder::for_url(url)?;
-        for (k, v) in common::get_common_headers() {
+        for (k, v) in common::common_headers() {
             if let Some(header_name) = k {
                 builder = builder.header(header_name.as_str(), v.to_str()?)?;
             }

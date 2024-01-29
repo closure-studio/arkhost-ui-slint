@@ -82,7 +82,7 @@ impl AuthResolver {
     }
 
     pub fn preform(&self, action: AuthAction) -> anyhow::Result<()> {
-        let webview = self.webview.read().unwrap().get_webview()?;
+        let webview = self.webview.read().unwrap().webview()?;
         match action {
             AuthAction::ArkHostRestrictedActionBackground { ref id, .. }
             | AuthAction::ArkHostRestrictedActionCaptcha { ref id, .. }
@@ -141,7 +141,7 @@ impl AuthResolver {
     }
 
     fn on_next_action_ready(&self) {
-        if let Err(e) = match self.webview.read().unwrap().get_webview() {
+        if let Err(e) = match self.webview.read().unwrap().webview() {
             Err(e) => Err(e.into()),
             Ok(webview) => {
                 let pending_auth = self.pending_auth.read().unwrap();
@@ -186,7 +186,7 @@ impl Authenticator {
             AuthParams::GeeTestAuth {} | AuthParams::ArkHostAuth { .. } => {
                 builder = builder.with_url_and_headers(
                     consts::ARKHOST_VERIFY_URL,
-                    Authenticator::get_request_headers(),
+                    Self::request_headers(),
                 )?;
             }
         }
@@ -238,15 +238,15 @@ impl Authenticator {
     }
 
     pub fn reload(&self) -> anyhow::Result<()> {
-        let webview = self.webview.read().unwrap().get_webview()?;
+        let webview = self.webview.read().unwrap().webview()?;
         webview.load_url_with_headers(
             consts::ARKHOST_VERIFY_URL,
-            Authenticator::get_request_headers(),
+            Authenticator::request_headers(),
         );
         Ok(())
     }
 
-    fn get_request_headers() -> HeaderMap {
+    fn request_headers() -> HeaderMap {
         HeaderMap::new()
     }
 }
@@ -268,7 +268,7 @@ impl WebViewStore {
         self.webview = Some(webview);
     }
 
-    pub fn get_webview(&self) -> Result<Rc<WebView>, AuthenticatorError> {
+    pub fn webview(&self) -> Result<Rc<WebView>, AuthenticatorError> {
         match &self.webview {
             Some(webview) => Ok(webview.clone()),
             None => Err(AuthenticatorError::WebViewNotAssigned),

@@ -1,21 +1,22 @@
+use crate::app::auth_controller::AuthContext;
+
 use super::rt_api_model::RtApiModel;
 use super::{
-    ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult, AuthCommand,
-    AuthResult,
+    ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-pub struct RequestController {
+pub struct Sender {
     pub rt_api_model: Arc<RtApiModel>,
     pub tx_api_controller: mpsc::Sender<ApiCommand>,
-    pub tx_auth_controller: mpsc::Sender<AuthCommand>,
+    pub tx_auth_controller: mpsc::Sender<AuthContext>,
     pub tx_asset_controller: mpsc::Sender<AssetCommand>,
 }
 
-impl RequestController {
+impl Sender {
     pub async fn send_api_command(&self, op: ApiOperation) -> ApiResult<()> {
         self.tx_api_controller
             .send(ApiCommand {
@@ -39,15 +40,6 @@ impl RequestController {
         self.send_api_command(op).await?;
 
         rx.await.map_err(ApiError::<T>::RespRecvError)?
-    }
-
-    pub async fn send_auth_request(
-        &self,
-        command: AuthCommand,
-        rx: &mut oneshot::Receiver<anyhow::Result<AuthResult>>,
-    ) -> anyhow::Result<AuthResult> {
-        self.tx_auth_controller.send(command).await?;
-        rx.await?
     }
 
     pub async fn send_asset_command(&self, command: AssetCommand) -> AssetResult<()> {

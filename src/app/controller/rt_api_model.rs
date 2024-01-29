@@ -15,7 +15,7 @@ impl RtApiModel {
         }
     }
 
-    pub async fn get_game_map_read(&self) -> RwLockReadGuard<'_, GameMap> {
+    pub async fn game_map_read(&self) -> RwLockReadGuard<'_, GameMap> {
         self.user.games.read().await
     }
 }

@@ -17,10 +17,10 @@ pub struct Slot {
 }
 
 impl Slot {
-    pub fn get_user_tier_availability_rank(&self) -> i32 {
+    pub fn user_tier_availability_rank(&self) -> i32 {
         self.rule_flags
             .iter()
-            .fold(0, |acc, x| acc | x.get_user_tier_availability_rank())
+            .fold(0, |acc, x| acc | x.user_tier_availability_rank())
     }
 }
 
@@ -88,7 +88,7 @@ pub enum RuleFlag {
 
 // TODO: 以metadata方式获取
 impl RuleFlag {
-    pub fn get_user_tier_availability_rank(&self) -> i32 {
+    pub fn user_tier_availability_rank(&self) -> i32 {
         match self {
             RuleFlag::Id(rule_flag_id) => match rule_flag_id {
                 RuleFlagId::SlotAccountSmsVerified => user_tier_availability_rank::TIER_BASIC,
@@ -100,7 +100,7 @@ impl RuleFlag {
         }
     }
 
-    pub fn get_default_description(&self) -> String {
+    pub fn default_description(&self) -> String {
         match self {
             RuleFlag::Id(rule_flag_id) => match rule_flag_id {
                 RuleFlagId::SlotAccountSmsVerified => "仅限归属认证用帐号（可接收验证短信）".into(),

@@ -222,10 +222,10 @@ impl SlotInfoMapping {
 
     pub fn mutate(&self, slot_info: &mut SlotInfo) {
         slot_info.uuid = self.slot_entry.data.uuid.clone().into();
-        slot_info.description = self.get_slot_description().into();
-        slot_info.game_account = self.get_game_account_without_prefix().into();
+        slot_info.description = self.slot_description().into();
+        slot_info.game_account = self.game_account_without_prefix().into();
         slot_info.game_account_split = Rc::new(self.try_split_email()).into();
-        slot_info.platform = self.get_slot_platform();
+        slot_info.platform = self.slot_platform();
         slot_info.state = match self.slot_entry.sync_state {
             _ if self.slot_entry.data.game_account.is_none() => SlotState::Empty,
             SlotSyncState::Unknown => SlotState::UnknownSyncState,
@@ -243,7 +243,7 @@ impl SlotInfoMapping {
             requirements.push((
                 rule_flag.clone(),
                 SlotRequirement {
-                    description: rule_flag.get_default_description().into(),
+                    description: rule_flag.default_description().into(),
                     ..SlotRequirement::default()
                 },
             ));
@@ -259,7 +259,7 @@ impl SlotInfoMapping {
                     requirements.push((
                         flag.clone(),
                         SlotRequirement {
-                            description: flag.get_default_description().into(),
+                            description: flag.default_description().into(),
                             has_result: true,
                             fulfilled: result.available,
                             status_text: result.message.clone().into(),
@@ -286,8 +286,8 @@ impl SlotInfoMapping {
         slot_info
     }
 
-    fn get_slot_description(&self) -> String {
-        match self.slot_entry.data.get_user_tier_availability_rank() {
+    fn slot_description(&self) -> String {
+        match self.slot_entry.data.user_tier_availability_rank() {
             user_tier_availability_rank::TIER_BASIC => "可露希尔托管凭证 · 基础型",
             user_tier_availability_rank::TIER_SMS_VERIFIED => "可露希尔托管凭证 · 改良型",
             user_tier_availability_rank::TIER_QQ_VERIFIED => "可露希尔托管凭证 · 超级改",
@@ -296,7 +296,7 @@ impl SlotInfoMapping {
         .into()
     }
 
-    fn get_slot_platform(&self) -> SlotPlatform {
+    fn slot_platform(&self) -> SlotPlatform {
         match self
             .slot_entry
             .data
@@ -310,7 +310,7 @@ impl SlotInfoMapping {
         }
     }
 
-    fn get_game_account_without_prefix(&self) -> String {
+    fn game_account_without_prefix(&self) -> String {
         if let Some(game_account) = &self.slot_entry.data.game_account {
             game_account[1..].to_owned()
         } else {

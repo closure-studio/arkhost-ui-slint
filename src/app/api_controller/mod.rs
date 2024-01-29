@@ -188,9 +188,9 @@ impl Controller {
         account: String,
     ) -> CommandResult<GameRef> {
         let game_details = self.arkhost_client.get_game(&account).await?;
-        let game_ref = user_model.get_game(&account).await?;
+        let game_ref = user_model.find_game(&account).await?;
         game_ref.game.write().await.details = Some(game_details);
-        user_model.get_game(&account).await
+        user_model.find_game(&account).await
     }
 
     pub async fn retrieve_log(
@@ -199,7 +199,7 @@ impl Controller {
         account: String,
         spec: RetrieveLogSpec,
     ) -> CommandResult<GameRef> {
-        let game_ref = user_model.get_game(&account).await?;
+        let game_ref = user_model.find_game(&account).await?;
         let mut game = game_ref.game.write().await;
 
         match spec {
@@ -247,7 +247,7 @@ impl Controller {
         game.log_cursor_back = game.logs.last().map_or(0, |x| x.id);
 
         drop(game);
-        user_model.get_game(&account).await
+        user_model.find_game(&account).await
     }
 
     pub async fn start_game(&self, account: String, captcha_token: String) -> CommandResult<()> {
@@ -314,7 +314,7 @@ impl Controller {
             Operation::GetUserStateData { resp } => {
                 _ = resp.send(
                     self.auth_client
-                        .get_user_state_data()
+                        .user_state_data()
                         .context("no user state data found"),
                 );
             }

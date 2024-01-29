@@ -11,7 +11,7 @@ use app::auth_controller::ipc::IpcAuthController;
 use app::auth_controller::AuthController;
 use app::controller::rt_api_model::RtApiModel;
 use app::ui::*;
-use app::utils::data_dir::get_data_dir;
+use app::utils::data_dir::data_dir;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
 use app::{api_controller::Controller as ApiController, controller::ControllerHub};
 use arkhost_api::clients::asset::AssetClient;
@@ -26,7 +26,7 @@ use std::time::Duration;
 use tokio::{self, sync::mpsc};
 
 fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
-    let client = AuthClient::get_client_builder_with_default_settings()
+    let client = AuthClient::client_builder_with_default_settings()
         .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
@@ -44,7 +44,7 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
 }
 
 fn create_asset_client() -> AssetClient {
-    let client = AssetClient::get_client_builder_with_default_settings()
+    let client = AssetClient::client_builder_with_default_settings()
         .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ fn create_asset_client() -> AssetClient {
         .with(Cache(HttpCache {
             mode: CacheMode::Default,
             manager: CACacheManager {
-                path: get_data_dir().join("cache/assets/"),
+                path: data_dir().join("cache/assets/"),
             },
             options: HttpCacheOptions {
                 cache_mode_fn: Some(Arc::new(|req| {
@@ -84,7 +84,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
         UserStateFileStorage::new(UserStateFileStoreSetting::DataDirWithCurrentDirFallback);
 
     user_state.load_from_file();
-    let user_state_data_or_null = user_state.get_user_state_data();
+    let user_state_data_or_null = user_state.user_state_data();
     let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
 
     let stop = CancellationToken::new();

@@ -7,17 +7,17 @@ pub struct AppStateController {
 }
 
 impl AppStateController {
-    pub fn get_app_state(&self) -> MutexGuard<'_, AppState> {
+    pub fn app_state(&self) -> MutexGuard<'_, AppState> {
         self.app_state.lock().unwrap()
     }
 
     pub fn exec(&self, func: impl FnOnce(&AppState) -> AppStateAsyncOp) {
-        let op = func(&self.get_app_state());
+        let op = func(&self.app_state());
         op.exec();
     }
 
     pub async fn exec_wait(&self, func: impl FnOnce(&AppState) -> AppStateAsyncOp) {
-        let op = func(&self.get_app_state());
+        let op = func(&self.app_state());
         op.exec_wait().await;
     }
 }

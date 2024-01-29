@@ -33,7 +33,7 @@ use super::{
     app_state_controller::AppStateController,
     game_operation_controller::GameOperationController,
     image_controller::ImageController,
-    request_controller::RequestController,
+    sender::Sender,
     rt_api_model::RtApiModel,
     slot_controller::SlotController,
     ApiOperation, AssetCommand,
@@ -55,7 +55,7 @@ pub struct GameController {
 
     rt_api_model: Arc<RtApiModel>,
     app_state_controller: Arc<AppStateController>,
-    request_controller: Arc<RequestController>,
+    sender: Arc<Sender>,
     image_controller: Arc<ImageController>,
     slot_controller: Arc<SlotController>,
     game_operation_controller: Arc<GameOperationController>,
@@ -65,7 +65,7 @@ impl GameController {
     pub fn new(
         rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
-        request_controller: Arc<RequestController>,
+        sender: Arc<Sender>,
         image_controller: Arc<ImageController>,
         slot_controller: Arc<SlotController>,
         game_operation_controller: Arc<GameOperationController>,
@@ -78,7 +78,7 @@ impl GameController {
 
             rt_api_model,
             app_state_controller,
-            request_controller,
+            sender,
             image_controller,
             slot_controller,
             game_operation_controller,
@@ -99,12 +99,12 @@ impl GameController {
         self.app_state_controller
             .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetching));
         match self
-            .request_controller
+            .sender
             .send_api_request(ApiOperation::RetrieveGames { resp }, &mut rx)
             .await
         {
             Ok(_) => {
-                self.slot_controller.refresh_slots_by_rt_model().await;
+                self.slot_controller.submit_slot_model_to_ui().await;
                 self.try_fetch_all_game_details().await;
                 self.process_game_list_changes(refresh_log_cond).await;
                 self.app_state_controller
@@ -124,7 +124,7 @@ impl GameController {
         self.app_state_controller
             .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetching));
         let (resp, rx) = oneshot::channel();
-        self.request_controller
+        self.sender
             .send_api_command(ApiOperation::ConnectGameEventSource { resp })
             .await?;
 
@@ -142,7 +142,7 @@ impl GameController {
                                 println!("[Controller] Games SSE connection received {} games", games.len());
 
                                 self.rt_api_model.user.handle_retrieve_games_result(games).await;
-                                self.slot_controller.refresh_slots_by_rt_model().await;
+                                self.slot_controller.submit_slot_model_to_ui().await;
                                 self.try_fetch_all_game_details().await;
                                 self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
@@ -184,7 +184,7 @@ impl GameController {
 
     pub async fn try_fetch_all_game_details(&self) {
         let mut games_to_fetch_details: Vec<String> = Vec::new();
-        for game_ref in self.rt_api_model.get_game_map_read().await.values() {
+        for game_ref in self.rt_api_model.game_map_read().await.values() {
             let game = game_ref.game.read().await;
             if game.info.status.code == api_arkhost::GameStatus::Running {
                 games_to_fetch_details.push(game.info.status.account.clone());
@@ -195,7 +195,7 @@ impl GameController {
             .map(|account| async move {
                 let (resp, mut rx) = oneshot::channel();
                 let result = self
-                    .request_controller
+                    .sender
                     .send_api_request(
                         ApiOperation::RetrieveGameDetails {
                             account: account.clone(),
@@ -216,7 +216,7 @@ impl GameController {
 
     pub async fn process_game_list_changes(&self, refresh_log_cond: super::RefreshLogsCondition) {
         let mut game_list: Vec<(i32, String, GameInfoMapping)> = Vec::new();
-        let game_map = self.rt_api_model.get_game_map_read().await;
+        let game_map = self.rt_api_model.game_map_read().await;
 
         let mut load_images_task = vec![];
         for game_ref in game_map.values() {
@@ -262,7 +262,7 @@ impl GameController {
     pub async fn update_game_settings(&self, account: String, config_fields: GameConfigFields) {
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_api_request(
                 ApiOperation::UpdateGameSettings {
                     account: account.clone(),
@@ -288,7 +288,7 @@ impl GameController {
         };
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_api_request(
                 ApiOperation::RetrieveLog {
                     account: id.clone(),
@@ -426,7 +426,7 @@ impl GameController {
     {
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_asset_request(
                 AssetCommand::LoadAsset {
                     cache_key,

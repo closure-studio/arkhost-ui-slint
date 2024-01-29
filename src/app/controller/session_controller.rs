@@ -5,13 +5,13 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    app_state_controller::AppStateController, game_controller::GameController, request_controller::RequestController, rt_api_model::RtApiModel, slot_controller::SlotController, ApiOperation
+    app_state_controller::AppStateController, game_controller::GameController, sender::Sender, rt_api_model::RtApiModel, slot_controller::SlotController, ApiOperation
 };
 
 pub struct SessionController {
     pub rt_api_model: Arc<RtApiModel>,
     pub app_state_controller: Arc<AppStateController>,
-    pub request_controller: Arc<RequestController>,
+    pub sender: Arc<Sender>,
     pub game_controller: Arc<GameController>,
     pub slot_controller: Arc<SlotController>,
     pub stop_connections: Mutex<Option<DropGuard>>,
@@ -21,14 +21,14 @@ impl SessionController {
     pub fn new(
         rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
-        request_controller: Arc<RequestController>,
+        sender: Arc<Sender>,
         game_controller: Arc<GameController>,
         slot_controller: Arc<SlotController>
     ) -> Self {
         Self {
             rt_api_model,
             app_state_controller,
-            request_controller,
+            sender,
             game_controller,
             slot_controller,
             stop_connections: Mutex::new(None),
@@ -38,7 +38,7 @@ impl SessionController {
     pub async fn login(&self, account: String, password: String) {
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_api_request(
                 ApiOperation::Login {
                     email: account,
@@ -69,7 +69,7 @@ impl SessionController {
             .exec(|x| x.set_login_state(LoginState::LoggingIn, "自动登录中……".into()));
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_api_request(ApiOperation::Auth { resp }, &mut rx)
             .await
         {

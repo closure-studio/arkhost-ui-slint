@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::sync::Arc;
 
+use super::AuthContext;
 use super::AuthController;
 use super::Command;
 use crate::app::ipc::AuthenticatorServerSideChannel;
@@ -22,46 +23,70 @@ pub struct IpcAuthController {
     auth_process: Option<Arc<Mutex<AuthProcess>>>,
 }
 
+impl IpcAuthController {
+    async fn process_cmd(&mut self, cmd: Command) {
+        match cmd {
+            Command::AuthArkHostBackground { resp, action } => {
+                _ = resp.send(
+                    self.auth(
+                        AuthAction::ArkHostRestrictedActionBackground {
+                            id: "UNUSED".into(),
+                            action,
+                        },
+                        false,
+                    )
+                    .await,
+                )
+            }
+            Command::AuthArkHostCaptcha { resp, action } => {
+                _ = resp.send(
+                    self.auth(
+                        AuthAction::ArkHostRestrictedActionCaptcha {
+                            id: "UNUSED".into(),
+                            action,
+                        },
+                        false,
+                    )
+                    .await,
+                )
+            }
+            Command::AuthGeeTest {
+                resp,
+                gt,
+                challenge,
+            } => {
+                _ = resp.send(
+                    self.auth(
+                        AuthAction::GeeTestAuth {
+                            id: gt.clone(),
+                            gt,
+                            challenge,
+                        },
+                        false,
+                    )
+                    .await,
+                )
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl AuthController for IpcAuthController {
-    async fn run(&mut self, mut tx: mpsc::Receiver<super::Command>, stop: CancellationToken) {
+    async fn run(&mut self, mut tx: mpsc::Receiver<AuthContext>, stop: CancellationToken) {
         tokio::select! {
             _ = async {
-                while let Some(cmd) = tx.recv().await {
-                    match cmd {
-                        Command::AuthArkHostBackground { resp, action } => {
-                            _ = resp.send(
-                                self.auth(
-                                    AuthAction::ArkHostRestrictedActionBackground {
-                                        id: "UNUSED".into(),
-                                        action,
-                                    },
-                                    false,
-                                )
-                                .await,
-                            )
-                        }
-                        Command::AuthArkHostCaptcha { resp, action } => {
-                            _ = resp.send(
-                                self.auth(
-                                    AuthAction::ArkHostRestrictedActionCaptcha {
-                                        id: "UNUSED".into(),
-                                        action,
-                                    },
-                                    false,
-                                )
-                                .await,
-                            )
-                        },
-                        Command::AuthGeeTest { resp, gt, challenge } => {
-                            _ = resp.send(
-                                self.auth(AuthAction::GeeTestAuth { id: gt.clone(), gt, challenge }, false).await
-                            )
-                        }
-                        Command::HideWindow {} => {
-                            _ = self.set_visible(false).await;
-                        }
+                while let Some(context) = tx.recv().await {
+                    tokio::select! {
+                        _ = async {
+                            let mut rx_command = context.rx_command;
+                            while let Some(cmd) = rx_command.recv().await {
+                                self.process_cmd(cmd).await;
+                            }
+                        } => {},
+                        _ = context.stop.cancelled() => {}
                     }
+                    _ = self.set_visible(false).await;
                 }
             } => {},
             _ = stop.cancelled() => {}

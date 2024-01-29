@@ -5,38 +5,40 @@ use arkhost_api::clients::common::ResponseError;
 use arkhost_api::models::api_quota::{
     SlotRuleValidationResult, UpdateSlotAccountRequest, UpdateSlotAccountResponse,
 };
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
+use crate::app::auth_controller::AuthContext;
 use crate::app::controller::AuthCommand;
 use crate::app::ui::UserIdApiRequestState;
 
 use super::AuthResult;
 use super::{
-    app_state_controller::AppStateController, request_controller::RequestController,
+    app_state_controller::AppStateController, sender::Sender,
     rt_api_model::RtApiModel, ApiOperation,
 };
 
 pub struct SlotController {
     rt_api_model: Arc<RtApiModel>,
     app_state_controller: Arc<AppStateController>,
-    request_controller: Arc<RequestController>,
+    sender: Arc<Sender>,
 }
 
 impl SlotController {
     pub fn new(
         rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
-        request_controller: Arc<RequestController>,
+        sender: Arc<Sender>,
     ) -> Self {
         Self {
             rt_api_model,
             app_state_controller,
-            request_controller,
+            sender,
         }
     }
 
-    pub async fn refresh_slots_by_rt_model(&self) {
+    pub async fn submit_slot_model_to_ui(&self) {
         let slot_map = self.rt_api_model.user.slots.read().await;
         let mut slot_list = vec![];
         for (uuid, slot_ref) in slot_map.iter() {
@@ -58,13 +60,13 @@ impl SlotController {
 
         let (resp, mut rx) = oneshot::channel();
         if let Ok(user_state_data) = self
-            .request_controller
+            .sender
             .send_api_request(ApiOperation::GetUserStateData { resp }, &mut rx)
             .await
         {
             let (resp, mut rx) = oneshot::channel();
             match self
-                .request_controller
+                .sender
                 .send_api_request(ApiOperation::GetRegistryUserInfo { resp }, &mut rx)
                 .await
             {
@@ -84,7 +86,7 @@ impl SlotController {
                         .user
                         .handle_retrieve_slots_result(user.slots)
                         .await;
-                    self.refresh_slots_by_rt_model().await;
+                    self.submit_slot_model_to_ui().await;
                 }
                 Err(e) => {
                     println!("[Controller] Error retrieving Registry API user {e}");
@@ -123,27 +125,34 @@ impl SlotController {
             ),
         ]
         .into_iter();
-        let mut update_result = anyhow::Result::Err(anyhow!(""));
-        while let Some((auth_command, mut rx_auth_controller)) = auth_attempts.next() {
-            match &update_result {
-                Ok(_) => break,
-                Err(e) => println!("[Controller] failed attempting to update slot {id}: {e:?}"),
-            }
-
-            update_result = self
+    
+        let update_result = (|id: String, update_request: UpdateSlotAccountRequest| async move {
+            let (tx_command, rx_command) = mpsc::channel(2);
+            let stop = CancellationToken::new();
+            let _guard = stop.clone().drop_guard();
+            self.sender.tx_auth_controller.send(AuthContext {
+                rx_command,
+                stop
+            }).await?;
+            while let Some((auth_command, mut rx_auth_controller)) = auth_attempts.next() {
+                match self
                 .try_update_slot(
-                    auth_command,
                     id.clone(),
+                    auth_command,
                     update_request.clone(),
+                    &tx_command,
                     &mut rx_auth_controller,
                 )
-                .await;
-        }
-        _ = self
-            .request_controller
-            .tx_auth_controller
-            .send(AuthCommand::HideWindow {})
-            .await;
+                .await {
+                    Ok(res) => {
+                        return anyhow::Ok(res);
+                    },
+                    Err(e) => println!("[Controller] failed attempting to update slot {id}: {e:?}"),
+                }
+            }
+            
+            anyhow::bail!("all attempts failed");
+        })(id.clone(), update_request.clone()).await;
 
         match update_result {
             Ok(result) => {
@@ -205,15 +214,14 @@ impl SlotController {
 
     async fn try_update_slot(
         &self,
-        auth_command: AuthCommand,
         id: String,
+        auth_command: AuthCommand,
         update_request: UpdateSlotAccountRequest,
-        rx_auth_controller: &mut oneshot::Receiver<anyhow::Result<AuthResult>>,
+        tx_command: &mpsc::Sender<AuthCommand>,
+        rx_auth_result: &mut oneshot::Receiver<anyhow::Result<AuthResult>>,
     ) -> anyhow::Result<UpdateSlotAccountResponse> {
-        let auth_result = self
-            .request_controller
-            .send_auth_request(auth_command, rx_auth_controller)
-            .await?;
+        tx_command.send(auth_command).await?;
+        let auth_result = rx_auth_result.await??;
         let captcha_token = match auth_result {
             AuthResult::ArkHostCaptchaTokenReCaptcha { token, .. } => token,
             AuthResult::ArkHostCaptchaTokenGeeTest { token, .. } => token,
@@ -224,7 +232,7 @@ impl SlotController {
 
         let (resp, mut rx) = oneshot::channel();
         let result = self
-            .request_controller
+            .sender
             .send_api_request(
                 ApiOperation::UpdateSlotAccount {
                     slot_uuid: id,
@@ -236,7 +244,7 @@ impl SlotController {
             )
             .await?;
         match &result.internal_code {
-            Some(arkhost_api::consts::quota::error_code::CAPTCHA_ERROR) => {
+            Some(arkhost_api::consts::error_code::CAPTCHA_ERROR) => {
                 Err(anyhow!("captcha failed"))
             }
             _ => Ok(result),

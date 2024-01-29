@@ -9,18 +9,18 @@ use tokio::sync::{oneshot, RwLock};
 
 use std::{collections::HashSet, sync::Arc};
 
-use super::{request_controller::RequestController, AssetCommand};
+use super::{sender::Sender, AssetCommand};
 use anyhow::anyhow;
 
 pub struct ImageController {
-    request_controller: Arc<RequestController>,
+    sender: Arc<Sender>,
     errored_resource_urls: RwLock<HashSet<String>>,
 }
 
 impl ImageController {
-    pub fn new(request_controller: Arc<RequestController>) -> Self {
+    pub fn new(sender: Arc<Sender>) -> Self {
         Self {
-            request_controller,
+            sender,
             errored_resource_urls: RwLock::new(HashSet::new()),
         }
     }
@@ -89,7 +89,7 @@ impl ImageController {
         };
         let (resp, mut rx) = oneshot::channel();
         match self
-            .request_controller
+            .sender
             .send_asset_request(
                 AssetCommand::LoadImageRgba8 {
                     path,

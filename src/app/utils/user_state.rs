@@ -30,7 +30,7 @@ impl UserStateFileStorage {
     }
 
     pub fn load_from_file(&mut self) {
-        let path = self.get_store_path().join(FILE_NAME);
+        let path = self.store_path().join(FILE_NAME);
         let open_res = File::open(&path);
         if let Ok(mut f) = open_res {
             let mut jwt = String::new();
@@ -49,7 +49,7 @@ impl UserStateFileStorage {
             return;
         }
 
-        let dir_path = self.get_store_path();
+        let dir_path = self.store_path();
         _ = fs::create_dir_all(&dir_path);
         let path = dir_path.join(FILE_NAME);
         match File::create(&path) {
@@ -70,10 +70,10 @@ impl UserStateFileStorage {
         };
     }
 
-    pub fn get_store_path(&self) -> PathBuf {
+    pub fn store_path(&self) -> PathBuf {
         match &self.store_setting {
             UserStateFileStoreSetting::DataDirWithCurrentDirFallback => {
-                super::data_dir::get_data_dir()
+                super::data_dir::data_dir()
             }
             UserStateFileStoreSetting::Path(path) => PathBuf::from(path),
         }
@@ -86,7 +86,7 @@ impl UserState for UserStateFileStorage {
         self.save_to_file();
     }
 
-    fn get_login_state(&self) -> Option<String> {
+    fn login_state(&self) -> Option<String> {
         self.jwt.clone()
     }
 

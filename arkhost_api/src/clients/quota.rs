@@ -33,7 +33,7 @@ impl Client {
             .auth_client
             .client
             .get(self.base_url.join(api::users::ME)?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .send()
             .await?;
 
@@ -48,7 +48,7 @@ impl Client {
             .auth_client
             .client
             .get(self.base_url.join(api::slots::SLOTS)?)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .send()
             .await?;
 
@@ -71,7 +71,7 @@ impl Client {
             .auth_client
             .client
             .post(url)
-            .bearer_auth(self.auth_client.get_jwt()?)
+            .bearer_auth(self.auth_client.jwt()?)
             .header("Token", captcha_token)
             .json(&request)
             .send()

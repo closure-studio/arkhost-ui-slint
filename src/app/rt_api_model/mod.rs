@@ -147,7 +147,7 @@ impl RtUserModel {
     }
 
     pub async fn handle_retrieve_slots_result(&self, mut slots: Vec<api_quota::Slot>) {
-        slots.sort_by_key(|x| -x.get_user_tier_availability_rank());
+        slots.sort_by_key(|x| -x.user_tier_availability_rank());
         {
             let mut slot_map = self.slots.write().await;
 
@@ -224,7 +224,7 @@ impl RtUserModel {
         map.retain(|_, v| v.order().load(Ordering::Acquire) < items_len as i32);
     }
 
-    pub async fn get_game(&self, account: &str) -> anyhow::Result<GameRef> {
+    pub async fn find_game(&self, account: &str) -> anyhow::Result<GameRef> {
         match self.games.read().await.get(account) {
             None => Err(anyhow!(format!(
                 "game with account '{}' not found",

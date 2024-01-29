@@ -51,10 +51,6 @@ pub mod quota {
             pub const GAME_ACCOUNT: &str = "api/slots/gameAccount";
         }
     }
-
-    pub mod error_code {
-        pub const CAPTCHA_ERROR: i32 = -1100;
-    }
 }
 
 pub mod asset {
@@ -74,4 +70,8 @@ pub mod asset {
             format!("gamedata/{file_path}")
         }
     }
+}
+
+pub mod error_code {
+    pub const CAPTCHA_ERROR: i32 = -1100;
 }

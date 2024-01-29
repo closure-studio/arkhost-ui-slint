@@ -96,7 +96,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         })),
     );
 
-    let user_data_dir = data_dir::get_data_dir().join(consts::WEBVIEW_USER_DATA_DIR);
+    let user_data_dir = data_dir::data_dir().join(consts::WEBVIEW_USER_DATA_DIR);
     println!(
         "[WebViewSubprocess] User data directory: {}",
         user_data_dir.display()

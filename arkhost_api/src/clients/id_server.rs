@@ -34,9 +34,9 @@ impl AuthClient {
         }
     }
 
-    pub fn get_client_builder_with_default_settings() -> reqwest::ClientBuilder {
-        let client_builder = common::build_client_with_common_options();
-        let headers = common::get_common_headers();
+    pub fn client_builder_with_default_settings() -> reqwest::ClientBuilder {
+        let client_builder = common::client_builder_with_common_options();
+        let headers = common::common_headers();
         client_builder
             .default_headers(headers)
             .gzip(true)
@@ -76,7 +76,7 @@ impl AuthClient {
         let resp = self
             .client
             .get(self.base_url.join(api::v1::INFO)?)
-            .bearer_auth(self.get_jwt()?)
+            .bearer_auth(self.jwt()?)
             .send()
             .await?;
 
@@ -90,7 +90,7 @@ impl AuthClient {
         let resp = self
             .client
             .post(self.base_url.join(api::v1::VERIFY_SMS)?)
-            .bearer_auth(self.get_jwt()?)
+            .bearer_auth(self.jwt()?)
             .json(req)
             .send()
             .await?;
@@ -105,7 +105,7 @@ impl AuthClient {
         let resp = self
             .client
             .get(self.base_url.join(api::v1::QQ_VERIFY_CODE)?)
-            .bearer_auth(self.get_jwt()?)
+            .bearer_auth(self.jwt()?)
             .send()
             .await?;
 
@@ -118,7 +118,7 @@ impl AuthClient {
         let resp = self
             .client
             .get(self.base_url.join(api::v1::REFRESH_TOKEN)?)
-            .bearer_auth(self.get_jwt()?)
+            .bearer_auth(self.jwt()?)
             .send()
             .await?;
 
@@ -130,14 +130,14 @@ impl AuthClient {
         Ok(())
     }
 
-    pub fn get_jwt(&self) -> Result<String, UnauthorizedError> {
-        match self.user_state.read().unwrap().get_login_state() {
+    pub fn jwt(&self) -> Result<String, UnauthorizedError> {
+        match self.user_state.read().unwrap().login_state() {
             Some(jwt) => Ok(jwt),
             None => Err(UnauthorizedError::MissingUserCredentials),
         }
     }
 
-    pub fn get_user_state_data(&self) -> Option<UserStateData> {
-        self.user_state.read().unwrap().deref().get_user_state_data()
+    pub fn user_state_data(&self) -> Option<UserStateData> {
+        self.user_state.read().unwrap().deref().user_state_data()
     }
 }
