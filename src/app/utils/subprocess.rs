@@ -9,7 +9,7 @@ pub fn dup_current_exe(argv: &[impl AsRef<OsStr>]) -> subprocess::Result<Popen> 
         PopenConfig {
             stdout: Redirection::Merge,
             stderr: Redirection::Merge,
-            executable: Some(current_exe.as_os_str().into()),
+            executable: Some(current_exe.as_os_str().to_owned()),
             ..PopenConfig::default()
         },
     )

@@ -22,7 +22,7 @@ impl AssetClient {
             "Referer",
             reqwest::header::HeaderValue::from_static(crate::consts::asset::REFERER_URL),
         );
-        client_builder.default_headers(headers).gzip(true).brotli(true)
+        client_builder.default_headers(headers)
     }
 
     pub async fn get_content(&self, path: String) -> anyhow::Result<bytes::Bytes> {

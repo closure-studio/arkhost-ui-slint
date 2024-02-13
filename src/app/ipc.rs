@@ -27,7 +27,7 @@ pub enum AuthenticatorMessage {
 }
 
 pub struct AuthenticatorConnection {
-    /// 发送消息给当前客户端的Sender, 目前只实现单客户端
+    /// 发送消息给当前客户端（WebView连接父进程IPC服务器，属于客户端）的Sender, 目前只实现单客户端
     pub tx_client_sender: IpcSender<AuthenticatorMessage>,
     pub rx_client_receiver: IpcStream<AuthenticatorMessage>,
 }
@@ -73,7 +73,7 @@ impl AuthenticatorConnection {
             Some(Ok(AuthenticatorMessage::Acknowledged)) => Ok(()),
             _ => Err(AuthenticatorConnectionError::InvalidResponse {
                 expected: "Acknowledged".into(),
-                got: format!("{:?}", event),
+                got: format!("{event:?}"),
             }
             .into()),
         }
@@ -94,7 +94,7 @@ impl AuthenticatorConnection {
             }
             _ => Err(AuthenticatorConnectionError::InvalidResponse {
                 expected: "Result".into(),
-                got: format!("{:?}", event),
+                got: format!("{event:?}"),
             }
             .into()),
         }

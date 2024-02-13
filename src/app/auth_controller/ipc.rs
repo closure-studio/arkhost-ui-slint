@@ -1,4 +1,3 @@
-use std::ffi::OsStr;
 use std::sync::Arc;
 
 use super::AuthContext;
@@ -24,7 +23,7 @@ pub struct IpcAuthController {
 }
 
 impl IpcAuthController {
-    async fn process_cmd(&mut self, cmd: Command) {
+    async fn exec_cmd(&mut self, cmd: Command) {
         match cmd {
             Command::AuthArkHostBackground { resp, action } => {
                 _ = resp.send(
@@ -33,7 +32,7 @@ impl IpcAuthController {
                             id: "UNUSED".into(),
                             action,
                         },
-                        false,
+                        false, // 如果静默验证时出现问题，需要给用户关闭窗口来中止验证，所以不隐藏窗口
                     )
                     .await,
                 )
@@ -81,7 +80,7 @@ impl AuthController for IpcAuthController {
                         _ = async {
                             let mut rx_command = context.rx_command;
                             while let Some(cmd) = rx_command.recv().await {
-                                self.process_cmd(cmd).await;
+                                self.exec_cmd(cmd).await;
                             }
                         } => {},
                         _ = context.stop.cancelled() => {}
@@ -119,7 +118,7 @@ impl IpcAuthController {
     pub async fn auth(
         &mut self,
         action: AuthAction,
-        background: bool,
+        in_background: bool,
     ) -> anyhow::Result<AuthResult> {
         let auth_process = self.ensure_auth_process().await?;
         let mut auth_process = auth_process.lock().await;
@@ -128,7 +127,7 @@ impl IpcAuthController {
             .send_command(AuthenticatorMessage::SetVisible {
                 x: 250.,
                 y: 250.,
-                visible: !background,
+                visible: !in_background,
             })
             .await?;
         let auth_result = auth_process
@@ -170,20 +169,24 @@ impl IpcAuthController {
             String,
         ) = IpcOneShotServer::new().unwrap();
 
-        let process = crate::app::utils::subprocess::dup_current_exe(&[
-            OsStr::new(""),
-            OsStr::new("--launch-webview"),
-            OsStr::new("--account"),
-            OsStr::new("UNUSED"),
-            OsStr::new("--ipc"),
-            OsStr::new(&ipc_server_name.clone()),
+        let mut process = crate::app::utils::subprocess::dup_current_exe(&[
+            "",
+            "--launch-webview",
+            "--account",
+            "UNUSED",
+            "--ipc",
+            &ipc_server_name,
         ])?;
 
-        let connection = AuthenticatorConnection::accept(ipc_server)?;
-
-        Ok(Arc::new(Mutex::new(AuthProcess {
-            process,
-            connection,
-        })))
+        match AuthenticatorConnection::accept(ipc_server) {
+            Ok(connection) => Ok(Arc::new(Mutex::new(AuthProcess {
+                process,
+                connection,
+            }))),
+            Err(e) => {
+                _ = process.terminate();
+                Err(e)
+            }
+        }
     }
 }

@@ -46,19 +46,32 @@ bitflags! {
     }
 }
 
+pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
+pub enum GameSseEvent {
+    Game(Vec<GameInfo>),
+    Ssr(Vec<SsrRecord>),
+    Close,
+    Unrecognized(String),
+}
+
+#[serde_as]
+#[derive(Default, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SsrRecord {
+    pub nick_name: String,
+    pub avatar: Avatar,
+    pub gacha_info: String,
+    pub char_id: String,
+    #[serde_as(as = "TimestampSeconds<i64>")]
+    pub created_at: DateTime<Utc>
+}
+
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct GameInfo {
     pub status: Status,
     pub captcha_info: CaptchaChallengeInfo,
     pub game_config: GameConfigFields,
-}
-
-pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
-pub enum GameSseEvent {
-    Game(Vec<GameInfo>),
-    Close,
-    Unrecognized(String),
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]

@@ -184,10 +184,8 @@ impl Authenticator {
 
         match self.auth_params {
             AuthParams::GeeTestAuth {} | AuthParams::ArkHostAuth { .. } => {
-                builder = builder.with_url_and_headers(
-                    consts::ARKHOST_VERIFY_URL,
-                    Self::request_headers(),
-                )?;
+                builder = builder
+                    .with_url_and_headers(consts::ARKHOST_VERIFY_URL, Self::request_headers())?;
             }
         }
         {
@@ -202,14 +200,11 @@ impl Authenticator {
                         auth_resolver_ref.settle_auth(&id);
                         auth_listener_ref.on_result(result);
                     },
-                    AuthPageMessage::Log { content } => println!("[AuthWebView] {}", content),
+                    AuthPageMessage::Log { content } => println!("[AuthWebView] {content}"),
                     AuthPageMessage::ScriptInit { } => println!("[AuthWebView] Script init"),
                 },
-                Err(err) => {
-                    eprintln!(
-                        "[AuthWebView] Error: cannot deserialize auth page message: '{}', error: {}",
-                        message, err
-                    )
+                Err(e) => {
+                    eprintln!("[AuthWebView] Error: cannot deserialize auth page message: '{message}', error: {e}")
                 }
             }
         });
@@ -239,10 +234,7 @@ impl Authenticator {
 
     pub fn reload(&self) -> anyhow::Result<()> {
         let webview = self.webview.read().unwrap().webview()?;
-        webview.load_url_with_headers(
-            consts::ARKHOST_VERIFY_URL,
-            Authenticator::request_headers(),
-        );
+        webview.load_url_with_headers(consts::ARKHOST_VERIFY_URL, Authenticator::request_headers());
         Ok(())
     }
 

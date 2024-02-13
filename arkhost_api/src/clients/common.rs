@@ -177,10 +177,10 @@ pub trait UserStateDataSource {
     fn user_state_data(&self) -> Option<UserStateData>;
 }
 
-impl <T: UserState + ?Sized> UserStateDataSource for T {
+impl<T: UserState + ?Sized> UserStateDataSource for T {
     fn user_state_data(&self) -> Option<UserStateData> {
         if let Some(token) = self.login_state() {
-            let mut iter = token.rsplitn(3, '.');
+            let mut iter = token.splitn(3, '.');
             if let (Some(_), Some(payload), Some(_), None) =
                 (iter.next(), iter.next(), iter.next(), iter.next())
             {
@@ -191,7 +191,7 @@ impl <T: UserState + ?Sized> UserStateDataSource for T {
                         serde_json::de::from_slice::<UserStateData>(&x).map_err(anyhow::Error::from)
                     }) {
                     Ok(state) => return Some(state),
-                    Err(e) => eprintln!("Error deserializing JWT payload '{payload}' {e:?}"),
+                    Err(_) => {}
                 }
             }
         }

@@ -7,7 +7,8 @@ import {
     SlotUpdateRequestState,
     SlotUpdateDraft, 
     SlotUpdateDraftType, 
-    SlotInfoUtils 
+    SlotInfoUtils,
+    SlotDetailsViewState
 } from "../slot-info.slint";
 import { MockData } from "../mock-data.slint";
 import { FontGlobals } from "../font-globals.slint";
@@ -42,11 +43,11 @@ component SlotRequirementItem inherits Rectangle {
                             states [
                                 success when requirement.fulfilled: {
                                     source: @image-url("../images/slot_icon_check.svg");
-                                    colorize: #59b72a;
+                                    colorize: #8acf23;
                                 }
                                 fail when !requirement.fulfilled: {
                                     source: @image-url("../images/slot_icon_cross.svg");
-                                    colorize: #dd3324;
+                                    colorize: #dc3121;
                                 }
                             ]
                         }
@@ -99,14 +100,14 @@ component SlotRequirementArea inherits VerticalLayout {
         }
 
         states [
-            unchanged when info.last-verify.update-type == SlotUpdateDraftType.Unchanged: {
+            no-last-verify when info.last-verify.update-type != SlotUpdateDraftType.Update: {
                 title: @tr("提交条件");
             }
             has-last-verify when info.last-verify.update-type == SlotUpdateDraftType.Update: {
                 title: 
                     @tr("提交条件（验证于上一次提交：") 
-                    + SlotInfoUtils.get-server-display-name(info.platform)
-                    + info.last-verify.game-account + @tr("）");
+                    + SlotInfoUtils.get-server-display-name(info.last-verify.platform)
+                    + " " + info.last-verify.game-account + @tr("）");
             }
         ]
     }
@@ -114,8 +115,7 @@ component SlotRequirementArea inherits VerticalLayout {
 
 component SlotUpdateArea inherits VerticalLayout {
     in property <SlotInfo> info: MockData.slot-info;
-    out property <bool> editing:
-        update-draft.update-type != SlotUpdateDraftType.Unchanged;
+    out property <bool> editing: current-update-type != SlotUpdateDraftType.Unchanged;
     out property <bool> has-unsaved-changes: 
         editing && info.update-request-state != SlotUpdateRequestState.Success;
 
@@ -125,6 +125,11 @@ component SlotUpdateArea inherits VerticalLayout {
         platform: info.platform,
         password: ""
     };
+    private property <SlotUpdateDraftType> current-update-type:
+        info.override-update-draft-type != SlotUpdateDraftType.Unchanged
+            ? info.override-update-draft-type
+            : update-draft.update-type;
+
     private property <SlotPlatform> new-platform: update-draft.platform;
     private property <string> new-game-account: update-draft.game-account; 
     private property <string> new-password: update-draft.password;
@@ -142,13 +147,13 @@ component SlotUpdateArea inherits VerticalLayout {
     }
 
     pure function validate-update-draft() -> bool {
-        if (update-draft.update-type == SlotUpdateDraftType.Unchanged) {
+        if current-update-type == SlotUpdateDraftType.Unchanged {
             true
-        } else if (update-draft.update-type == SlotUpdateDraftType.Update) {
+        } else if current-update-type == SlotUpdateDraftType.Update {
             new-platform != SlotPlatform.None
             && new-game-account != ""
             && new-password != ""
-        } else if (update-draft.update-type == SlotUpdateDraftType.Delete) {
+        } else if current-update-type == SlotUpdateDraftType.Delete {
             true
         } else {
             false
@@ -175,7 +180,7 @@ component SlotUpdateArea inherits VerticalLayout {
             modify-check-box := Button {
                 enabled: !editing;
                 text: info.state != SlotState.Empty
-                    ? @tr("修改/重新提交")
+                    ? @tr("更新账密/重新提交")
                     : @tr("提交新账号");
                 checkable: true;
                 checked: false;
@@ -200,7 +205,7 @@ component SlotUpdateArea inherits VerticalLayout {
         }
 
         // update slot
-        if update-draft.update-type == SlotUpdateDraftType.Update: GridLayout {
+        if current-update-type == SlotUpdateDraftType.Update: GridLayout {
             private property <string> official-server-name: 
                 SlotInfoUtils.get-server-display-name(SlotPlatform.Official);
             private property <string> bilibili-server-name: 
@@ -220,9 +225,9 @@ component SlotUpdateArea inherits VerticalLayout {
                     : SlotInfoUtils.get-server-display-name(update-draft.platform);
 
                 selected(value) => {  
-                    if (value == official-server-name) {
+                    if value == official-server-name {
                         new-platform = SlotPlatform.Official
-                    } else if (value == bilibili-server-name) {
+                    } else if value == bilibili-server-name {
                         new-platform = SlotPlatform.Bilibili
                     }
                 }
@@ -269,6 +274,7 @@ component SlotUpdateArea inherits VerticalLayout {
                     && validate-update-draft() 
                     && info.update-request-state != SlotUpdateRequestState.Success;
                 clicked => { 
+                    update-draft.update-type = current-update-type;
                     update-draft.platform = new-platform;
                     update-draft.game-account = new-game-account;
                     update-draft.password = new-password;
@@ -280,7 +286,7 @@ component SlotUpdateArea inherits VerticalLayout {
                         text: @tr("提交成功");
                         primary: false;
                     }
-                    delete when update-draft.update-type == SlotUpdateDraftType.Delete: {
+                    delete when current-update-type == SlotUpdateDraftType.Delete: {
                         text: @tr("确认删除");
                         primary: true;
                     }
@@ -289,7 +295,7 @@ component SlotUpdateArea inherits VerticalLayout {
                         primary: true;
                     }
                     update when !is-new-account(): {
-                        text: @tr("更新密码/重新提交");
+                        text: @tr("更新账密/重新提交");
                         primary: true;
                     }
                 ]
@@ -331,7 +337,7 @@ component SlotUpdateArea inherits VerticalLayout {
                 height: parent.height;
 
                 states [
-                    delete when update-draft.update-type == SlotUpdateDraftType.Delete: {
+                    delete when current-update-type == SlotUpdateDraftType.Delete: {
                         text: @tr("正在删除……");
                     }
                     insert when is-new-account(): {
@@ -387,7 +393,9 @@ component CardView inherits Rectangle {
                     font-family: FontGlobals.dotted;
                     font-size: 56px;
                     text: has-account
-                        ? info.game-account-split[0] + "\n" + info.game-account-split[1]
+                        ? info.game-account-split[0]
+                            + (info.game-account-split[1] != "" ? "\n" : "")
+                            + info.game-account-split[1]
                         : "Empty";
                     overflow: clip;
     
@@ -444,7 +452,7 @@ component CardView inherits Rectangle {
 
         x: 0px;
         y: 160px;
-        z: 1;
+        z: 2;
         width: root.width;
         height: root.height - self.y;
     }
@@ -472,7 +480,7 @@ component CardView inherits Rectangle {
                 font-size: 13px;
                 color: whitesmoke;
                 vertical-alignment: center;
-                text: @tr("可露希尔服务器正在处理托管提交……");
+                text: @tr("可露希尔平台正在处理托管提交…");
             }
 
             height: 24px;
@@ -485,15 +493,14 @@ component CardView inherits Rectangle {
 
     Image {
         source: @image-url("../images/closure_drone_outline.png");
-        colorize: StyleMetrics.default-text-color;
+        colorize: StyleMetrics.default-text-color.with-alpha(25%);
 
-        opacity: 0.2;
         width: 50px;
         height: 50px;
 
         x: 15px;
         y: root.height - self.x - self.width;
-        z: 2;
+        z: 1;
     }
 
     height: 240px;
@@ -501,17 +508,22 @@ component CardView inherits Rectangle {
 
 export component SlotCard inherits Rectangle {
     in property <SlotInfo> info: MockData.slot-info;
-    in-out property <bool> expanded: false;
+    in-out property <bool> expanded: info.view-state == SlotDetailsViewState.Independent
+        ? expanded-independent
+        : expanded-overridden;
 
+    private property <bool> expanded-independent: false;
+    private property <bool> expanded-overridden;
     private property <length> collapsed-drop-menu-height: 40px;
 
     callback slot-saved <=> slot-update-area.slot-saved;
     callback reset-slot-update-request-state <=>
         slot-update-area.reset-slot-update-request-state;
     
-    border-color: grey.with-alpha(25%);
+    background: StyleMetrics.dark-color-scheme
+        ? #2b2b2b
+        : StyleMetrics.window-background;
     border-radius: 10px;
-    border-width: 1px;
 
     card-view := CardView {
         info: info;
@@ -593,7 +605,7 @@ export component SlotCard inherits Rectangle {
             }
 
             // Toggle button
-            Rectangle {
+            toggle-area := Rectangle {
                 VerticalLayout {
                     alignment: center;
 
@@ -623,10 +635,14 @@ export component SlotCard inherits Rectangle {
 
                 toggle-menu-touch-area := TouchArea {
                     clicked => {
-                        if (!expanded) {
-                            expanded = true;
-                        } else if (expanded && !slot-update-area.has-unsaved-changes) {
-                            expanded = false;
+                        if info.view-state != SlotDetailsViewState.Independent {
+                            return;
+                        }
+
+                        if !expanded-independent {
+                            expanded-independent = true;
+                        } else if expanded && !slot-update-area.has-unsaved-changes {
+                            expanded-independent = false;
                         }
                     }
                 }
@@ -665,20 +681,35 @@ export component SlotCard inherits Rectangle {
             : collapsed-drop-menu-height;
 
         states [
+            has-unsaved-changes when expanded && slot-update-area.has-unsaved-changes: {
+                toggle-area.visible: true;
+                toggle-menu-sign.source: @image-url("../images/slot_icon_unsaved.svg");
+                toggle-menu-text.text: @tr("修改未提交");
+            }
+            toggle-unavailable when info.view-state != SlotDetailsViewState.Independent: {
+                toggle-area.visible: false;
+            }
             collapsed when !expanded: {
+                toggle-area.visible: true;
                 toggle-menu-sign.source: @image-url("../images/double_arrow_down.svg");
                 toggle-menu-text.text: @tr("展开更多");
             }
             retractable when expanded && !slot-update-area.has-unsaved-changes: {
+                toggle-area.visible: true;
                 toggle-menu-sign.source: @image-url("../images/double_arrow_up.svg");
                 toggle-menu-text.text: @tr("收起面板");
             }
-            has-unsaved-changes when expanded && slot-update-area.has-unsaved-changes: {
-                toggle-menu-sign.source: @image-url("../images/slot_icon_unsaved.svg");
-                toggle-menu-text.text: @tr("游戏登记未提交");
-            }
         ]
     }
+
+    states [
+        collapsed-overridden when info.view-state == SlotDetailsViewState.Collapsed: {
+            expanded-overridden: false;
+        }
+        expanded-overriden when info.view-state == SlotDetailsViewState.Expanded: {
+            expanded-overridden: true;
+        }
+    ]
 
     height: card-view.height + drop-menu.min-height;
 }

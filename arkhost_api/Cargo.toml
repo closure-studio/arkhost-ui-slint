@@ -9,8 +9,8 @@ bitflags = "2.4.1"
 chrono = "0.4.31"
 futures = "0.3.29"
 # TODO: 可选TLS
-# 国内节点在reqwest的default-tls下会发生连接错误
-reqwest = { version = "0.11.22", features = ["json", "gzip", "brotli", "rustls-tls"], default-features = false }
+# 国内节点在reqwest的default-tls下会发生连接错误（TLS版本问题）
+reqwest = { version = "0.11.22", features = ["json"], default-features = false }
 reqwest-middleware = "0.2.4"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_with = { version = "3.4.0", features = ["chrono", "json"] }

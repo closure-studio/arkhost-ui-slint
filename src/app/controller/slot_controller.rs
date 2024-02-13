@@ -73,6 +73,7 @@ impl SlotController {
                 Ok(user) => {
                     let initial_slot_added = user.slots.iter().any(|x| x.game_account.is_some());
                     let user_info_mapping = UserInfoMapping {
+                        uuid: user.uuid,
                         nickname: user_state_data.account,
                         status: user.id_server_status,
                         phone: user.id_server_phone,

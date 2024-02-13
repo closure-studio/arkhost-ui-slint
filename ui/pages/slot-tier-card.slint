@@ -1,5 +1,6 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
 import { UserTier } from "../user-info.slint";
+import { FontGlobals } from "../font-globals.slint";
 
 export struct SlotTierCardData {
     background-fill: brush,
@@ -69,7 +70,7 @@ export component SlotTierCard inherits Rectangle {
 
         deco-touch-area := TouchArea {
             clicked => {
-                if (data.can-upgrade && data.next-tier != UserTier.Invalid) {
+                if data.can-upgrade && data.next-tier != UserTier.Invalid {
                     on-upgrade-tier(data.next-tier);
                 }
             }
@@ -106,6 +107,7 @@ export component SlotTierCard inherits Rectangle {
 
             Text {
                 font-size: 15px;
+                font-weight: FontGlobals.emphasis-font-weight;
                 text: "你是可露希尔旗舰店【" + data.tier-name + "】级会员！";
                 color: accent-color;
                 animate color { duration: 0.25s; easing: ease; }
@@ -152,11 +154,9 @@ export component SlotTierCard inherits Rectangle {
                 source: data.can-upgrade
                     ? @image-url("../images/slot_icon_upgrade_required.svg")
                     : @image-url("../images/slot_icon_verified.svg");
-                colorize: whitesmoke;
-
-                opacity: data.can-upgrade
-                    ? 0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad))
-                    : 1;
+                colorize: data.can-upgrade
+                    ? whitesmoke.with-alpha(0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad)))
+                    : whitesmoke;
 
                 width: 30px;
                 height: 30px;

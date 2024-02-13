@@ -30,13 +30,9 @@ use std::{
 };
 
 use super::{
-    app_state_controller::AppStateController,
-    game_operation_controller::GameOperationController,
-    image_controller::ImageController,
-    sender::Sender,
-    rt_api_model::RtApiModel,
-    slot_controller::SlotController,
-    ApiOperation, AssetCommand,
+    app_state_controller::AppStateController, game_operation_controller::GameOperationController,
+    image_controller::ImageController, rt_api_model::RtApiModel, sender::Sender,
+    slot_controller::SlotController, ApiOperation, AssetCommand,
 };
 
 #[derive(Default, Debug)]
@@ -111,7 +107,7 @@ impl GameController {
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
             }
             Err(e) => {
-                println!("[Controller] Error retrieving games {}", e);
+                println!("[Controller] Error retrieving games {e}");
                 self.app_state_controller
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Retrying));
             }
@@ -152,6 +148,9 @@ impl GameController {
                                         .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
                                 }
                             },
+                            GameSseEvent::Ssr(ssr_list) => {
+                                println!("[Controller] Games SSE connection received {} ssr records", ssr_list.len());
+                            },
                             GameSseEvent::Close => {
                                 println!("[Controller] Games SSE connection closed on occupied");
                                 self.app_state_controller
@@ -162,7 +161,10 @@ impl GameController {
                                 println!("[Controller] Unrecognized SSE event: {ev_type}");
                             }
                         },
-                        Ok(None) => { /* 处理None? */ },
+                        Ok(None) => {
+                            eprintln!("[Controller] Unexpected empty event in game SSE connection");
+                            /* 处理None? */
+                        },
                         Err(e) => {
                             self.app_state_controller
                                 .exec(|x| x.set_sse_connect_state(SseConnectState::Disconnected));

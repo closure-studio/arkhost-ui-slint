@@ -26,7 +26,7 @@ export component LoginWindow {
         use-auth-val: bool
     ) {
         use-auth = use-auth-val;
-        if (use-auth-val) {
+        if use-auth-val {
             account-input.text = account;
         } else {
             password-input.text = "";
@@ -34,139 +34,124 @@ export component LoginWindow {
     }
 
     function do-login() {
-        if (use-auth) {
+        if use-auth {
             auth-requested();
         } else {
             login-requested(account-input.text, password-input.text);
         }  
     }
 
-    VerticalBox {
-        alignment: start;
+    VerticalLayout {
+        alignment: space-between;
 
-        HorizontalBox {
+        VerticalBox {
             alignment: start;
-            
-            register := Button {
-                text: @tr("注册…");
-                icon: StyleMetrics.dark-color-scheme
-                    ? @image-url("images/ext_link.svg")
-                    : @image-url("images/ext_link_light.svg");
-            }
-        }
-
-        ClosureStudioLogoStacked {
-            single-row-size: 60px;
-        }
-
-        HorizontalBox {
-            alignment: center;
-
-            Text {
-                font-size: 18px;
-                vertical-alignment: center;
-                horizontal-alignment: left;
-
-                text: @tr("登录可露希尔通行证");
-            }
-        }
-
-        HorizontalBox {
-            alignment: center;
-
-            account-input := LineEdit {
-                enabled: !use-auth && !logging;
-                width: parent.width - 40px;
-                height: 42px;
-                horizontal-alignment: left;
-
-                placeholder-text: @tr("账号");
-            }
-        }
-
-        HorizontalBox {
-            alignment: center;
-
-            password-input := LineEdit {
-                enabled: !use-auth && !logging;
-                width: parent.width - 40px;
-                height: 42px;
-                horizontal-alignment: left;
-                input-type: InputType.password;
-
-                placeholder-text: use-auth ? @tr("已记住登录状态") : @tr("密码");
-                accepted => {
-                    do-login();
+    
+            HorizontalBox {
+                alignment: start;
+                
+                register := Button {
+                    text: @tr("注册…");
+                    icon: StyleMetrics.dark-color-scheme
+                        ? @image-url("images/ext_link.svg")
+                        : @image-url("images/ext_link_light.svg");
                 }
             }
-        }
-
-        HorizontalBox {
-            alignment: center;
-
-            Button {
-                primary: true;
-                enabled: !logging;
-                text: @tr("登录");
-                width: parent.width - 40px;
-                clicked => {
-                    do-login()
+    
+            ClosureStudioLogoStacked {
+                single-row-size: 60px;
+            }
+    
+            HorizontalBox {
+                alignment: center;
+    
+                account-input := LineEdit {
+                    enabled: !use-auth && !logging;
+                    width: parent.width - 40px;
+                    height: 42px;
+                    horizontal-alignment: left;
+    
+                    placeholder-text: @tr("账号");
                 }
             }
-        }
-
-        if use-auth && !logging : HorizontalLayout {
-            alignment: center;
-
-            Rectangle {
-                Text {
-                    text: @tr("[退出当前登录]");
-                }
-
-                TouchArea {
-                    clicked => {
-                        set-use-auth("", false);
+    
+            HorizontalBox {
+                alignment: center;
+    
+                password-input := LineEdit {
+                    enabled: !use-auth && !logging;
+                    width: parent.width - 40px;
+                    height: 42px;
+                    horizontal-alignment: left;
+                    input-type: InputType.password;
+    
+                    placeholder-text: use-auth ? @tr("已记住登录状态") : @tr("密码");
+                    accepted => {
+                        do-login();
                     }
                 }
             }
+    
+            HorizontalBox {
+                alignment: center;
+    
+                Button {
+                    primary: true;
+                    enabled: !logging 
+                        && account-input.text != "" 
+                        && password-input.text != "";
+                    text: @tr("登录");
+                    width: parent.width - 40px;
+                    clicked => {
+                        do-login()
+                    }
+                }
+            }
+    
+            if use-auth && !logging : HorizontalLayout {
+                alignment: center;
+    
+                Rectangle {
+                    Text {
+                        text: @tr("[登录其他账号]");
+                    }
+    
+                    TouchArea {
+                        clicked => {
+                            set-use-auth("", false);
+                        }
+                    }
+                }
+            }
+    
+            HorizontalBox {
+                alignment: center;
+    
+                login-spinner := Spinner {
+                    visible: logging;
+                    indeterminate: true;
+                    width: self.visible ? 40px : 0px;
+                }
+    
+                Text {
+                    vertical-alignment: center;
+    
+                    text: login-status-text;
+                    wrap: word-wrap;
+                }
+            }
         }
 
-        HorizontalBox {
-            alignment: center;
-
-            login-spinner := Spinner {
-                visible: logging;
-                indeterminate: true;
-                width: self.visible ? 40px : 0px;
+        bottom-text := VerticalBox {
+            Text {
+                text: @tr("可露希尔云托管");
+                horizontal-alignment: center;
             }
 
             Text {
-                vertical-alignment: center;
-
-                text: login-status-text;
-                wrap: word-wrap;
-            }
-        }
-
-        Rectangle {
-            height: 40px;
-        }
-
-        Rectangle {
-            height: 24px;
-
-            VerticalBox {
-
-                Text {
-                    text: @tr("可露希尔云托管");
-                    horizontal-alignment: center;
-                }
-
-                Text {
-                    text: @tr("https://arknights.host");
-                    font-family: FontGlobals.alphanumeric-text-sans;
-                    horizontal-alignment: center;
-                }
+                text: @tr("https://arknights.host");
+                font-family: FontGlobals.alphanumeric-text-sans;
+                horizontal-alignment: center;
             }
         }
     }

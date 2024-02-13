@@ -38,11 +38,11 @@ export global SlotTierConsts {
     };
 
     public pure function get-tier-card-data(tier: UserTier) -> SlotTierCardData {
-        if (tier == UserTier.Basic) {
+        if tier == UserTier.Basic {
             tier-basic
-        } else if (tier == UserTier.SmsVerified) {
+        } else if tier == UserTier.SmsVerified {
             tier-one
-        } else if (tier == UserTier.QQVerified) {
+        } else if tier == UserTier.QQVerified {
             tier-max
         } else {
             tier-basic

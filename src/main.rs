@@ -13,20 +13,23 @@ use app::controller::rt_api_model::RtApiModel;
 use app::ui::*;
 use app::utils::data_dir::data_dir;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
-use app::{api_controller::Controller as ApiController, controller::ControllerHub};
+use app::{api_controller::Controller as ApiController, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
 use arkhost_api::clients::common::UserState;
 use arkhost_api::clients::{common::UserStateDataSource, id_server::AuthClient};
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
-use tokio_util::sync::CancellationToken;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::{self, sync::mpsc};
+use tokio_util::sync::CancellationToken;
 
 fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
     let client = AuthClient::client_builder_with_default_settings()
+        .use_rustls_tls()
+        .gzip(true)
+        .brotli(true)
         .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
@@ -45,6 +48,9 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
 
 fn create_asset_client() -> AssetClient {
     let client = AssetClient::client_builder_with_default_settings()
+        .use_rustls_tls()
+        .gzip(true)
+        .brotli(true)
         .timeout(Duration::from_secs(12))
         .build()
         .unwrap();
@@ -88,6 +94,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
 
     let stop = CancellationToken::new();
+    let _guard = stop.clone().drop_guard();
 
     let mut api_controller = ApiController::new(auth_client);
     let (tx_api_command, rx_api_command) = mpsc::channel(32);
@@ -119,33 +126,28 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     }
 
     let ui = AppWindow::new()?;
-    let hub = Arc::new(ControllerHub::new(
+    let adaptor = Arc::new(ControllerAdaptor::new(
         AppState::new(ui.as_weak()),
         Arc::new(RtApiModel::new()),
         tx_api_command.clone(),
         tx_auth_command.clone(),
         tx_asset_command.clone(),
     ));
-    hub.clone().attach(&ui);
+    adaptor.clone().attach(&ui);
     if let Some(state) = user_state_data_or_null {
-        let app_state = hub.app_state.lock().unwrap();
+        let app_state = adaptor.app_state.lock().unwrap();
         if state.is_expired() {
-            app_state.set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into()).exec();
+            app_state
+                .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into())
+                .exec();
             app_state.set_use_auth(String::new(), false).exec();
         } else {
             app_state.set_use_auth(state.account, true).exec();
-            let hub = hub.clone();
-            tokio::spawn(async move {
-                hub.session_controller.auth().await
-            });
+            let adaptor = adaptor.clone();
+            tokio::spawn(async move { adaptor.session_controller.auth().await });
         }
     }
-
-    let result = ui.run();
-
-    stop.cancel();
-
-    result
+    ui.run()
 }
 
 #[tokio::main()]

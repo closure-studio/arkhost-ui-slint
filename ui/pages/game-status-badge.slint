@@ -1,5 +1,6 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
+import { FontGlobals } from "../font-globals.slint";
 
 component GameStatusBadgeBase inherits Rectangle {
     in property <GameInfo> info;
@@ -37,7 +38,7 @@ component GameStatusBadgeBase inherits Rectangle {
         }
         captcha when info.game-state == GameState.Captcha: {
             status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
-            status-text: @tr("需要人机验证");
+            status-text: @tr("进行人机验证");
             status-icon: @image-url("../images/game_status_captcha.svg");
             status-icon-blinking: true;
         }
@@ -93,10 +94,9 @@ export component GameStatusBadgeWide inherits GameStatusBadgeBase {
 
         Image {
             source: root.status-icon;
-            colorize: StyleMetrics.default-text-color;
-            opacity: root.enable-icon-blinking && root.status-icon-blinking
-                ? 0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad))
-                : 1;
+            colorize: root.enable-icon-blinking && root.status-icon-blinking
+                ? StyleMetrics.default-text-color.with-alpha(0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad)))
+                : StyleMetrics.default-text-color;
             width: 26px;
             height: 26px;
             horizontal-stretch: 0;
@@ -105,6 +105,7 @@ export component GameStatusBadgeWide inherits GameStatusBadgeBase {
         Text {
             text: root.status-text;
             font-size: 14px;
+            font-weight: FontGlobals.emphasis-font-weight;
             horizontal-alignment: center;
             vertical-alignment: center;
 

@@ -1,0 +1,120 @@
+import { StyleMetrics } from "std-widgets.slint";
+import { MockData } from "../mock-data.slint";
+import { 
+    SlotInfo,
+    SlotState, 
+    SlotPlatform, 
+    SlotUpdateRequestState,
+    SlotInfoUtils,
+    SlotDetailsViewState
+} from "../slot-info.slint";
+import { FontGlobals } from "../font-globals.slint";
+
+export component SlotListItem inherits Rectangle {
+    in property <int> index: 1;
+    in property <SlotInfo> info: MockData.slot-info;
+    in property <brush> accent-color: StyleMetrics.dark-color-scheme
+        ? #34ccef
+        : #1978e3;
+
+    callback slot-selected(string);
+    private property <brush> plain-background: StyleMetrics.dark-color-scheme
+        ? #242424
+        : StyleMetrics.window-background;
+
+    border-radius: 10px;
+    clip: true;
+
+    HorizontalLayout {
+        alignment: start;
+        padding: 15px;
+
+        VerticalLayout {
+            private property <brush> current-accent-color;
+
+            alignment: start;
+
+            Text {
+                font-size: 25px;
+                font-family: FontGlobals.closure-studio-logo;
+                color: current-accent-color;
+                horizontal-alignment: left;
+                
+                text: index;
+            }
+
+            Text {
+                font-size: 13px;
+                font-family: FontGlobals.closure-studio-logo;
+                color: current-accent-color;
+                horizontal-alignment: left;
+
+                text: "#SLOT";
+            }
+
+            animate current-accent-color { duration: 0.25s; easing: ease; }
+
+            width: 60px;
+            states [
+                unselected when info.view-state != SlotDetailsViewState.Expanded: {
+                    current-accent-color: StyleMetrics.default-text-color.transparentize(30%);
+                }
+                selected when info.view-state == SlotDetailsViewState.Expanded: {
+                    current-accent-color: accent-color;
+                }
+            ]
+        }
+
+        Text {
+            font-size: 16px;
+            font-family: FontGlobals.alphanumeric-text-sans;
+            font-weight: FontGlobals.emphasis-font-weight;
+            vertical-alignment: center;
+
+            states [
+                empty when info.game-account == "": {
+                    text: @tr("未添加 \n-");
+                }
+                has-game when info.game-account != "": {
+                    text: info.game-account + "\n" + SlotInfoUtils.get-server-display-name(info.platform);
+                }
+            ]
+        }
+    }
+
+    touch-area := TouchArea {
+        clicked => { slot-selected(info.uuid); }
+    }
+
+    animate background { duration: 0.15s; easing: ease; }
+    states [
+        up when !touch-area.has-hover && !touch-area.pressed: {
+            background: plain-background;
+        }
+        hover when touch-area.has-hover && !touch-area.pressed: {
+            background: plain-background.mix(StyleMetrics.default-text-color, 90%);
+        }
+        down when touch-area.pressed: {
+            background: plain-background.mix(StyleMetrics.default-text-color, 70%);
+        }
+    ]
+}
+
+export component SlotList inherits VerticalLayout {
+    in property <[SlotInfo]> slot-info-list: [
+        MockData.slot-info,
+        MockData.slot-info,
+        MockData.slot-info,
+    ];
+    
+    callback slot-selected(string);
+
+    alignment: start;
+    spacing: 10px;
+
+    for slot-info[idx] in slot-info-list: SlotListItem {
+        index: idx + 1;
+        info: slot-info;
+        slot-selected(id) => { slot-selected(id); }
+    }
+}

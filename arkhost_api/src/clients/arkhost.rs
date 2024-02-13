@@ -158,8 +158,16 @@ impl EventSourceClient {
                 match ev {
                     es::SSE::Event(ev) => match ev.event_type.as_str() {
                         api::sse::EVENT_TYPE_GAME => {
-                            let games: Vec<GameInfo> = serde_json::de::from_str(&ev.data)?;
-                            Ok(Some(GameSseEvent::Game(games)))
+                            let games: NullableData<Vec<GameInfo>> =
+                                serde_json::de::from_str(&ev.data)?;
+                            match games {
+                                NullableData::Data(games) => Ok(Some(GameSseEvent::Game(games))),
+                                _ => Ok(Some(GameSseEvent::Game(Vec::default()))),
+                            }
+                        }
+                        api::sse::EVENT_TYPE_SSR => {
+                            let ssr_list: Vec<SsrRecord> = serde_json::de::from_str(&ev.data)?;
+                            Ok(Some(GameSseEvent::Ssr(ssr_list)))
                         }
                         api::sse::EVENT_TYPE_CLOSE => Ok(Some(GameSseEvent::Close)),
                         other => Ok(Some(GameSseEvent::Unrecognized(other.into()))),

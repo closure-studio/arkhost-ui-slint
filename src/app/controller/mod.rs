@@ -2,8 +2,8 @@ pub mod app_state_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
-pub mod sender;
 pub mod rt_api_model;
+pub mod sender;
 pub mod session_controller;
 pub mod slot_controller;
 pub mod user_controller;
@@ -12,15 +12,17 @@ extern crate alloc;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
-use self::sender::Sender;
 use self::rt_api_model::RtApiModel;
+use self::sender::Sender;
 use self::slot_controller::SlotController;
+use self::user_controller::UserController;
 use self::{app_state_controller::AppStateController, session_controller::SessionController};
 use super::app_state::mapping::{GameOptionsMapping, SlotUpdateDraftMapping};
 use super::app_state::AppState;
 use super::auth_controller::AuthContext;
 use super::ui::*;
 use super::utils::ext_link;
+use arkhost_api::models::api_quota::user_tier_availability_rank;
 use slint::{Model, SharedString};
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -55,7 +57,8 @@ where
     RespRecvError(#[from] oneshot::error::RecvError),
 }
 
-pub struct ControllerHub {
+pub struct ControllerAdaptor {
+    pub rt_api_model: Arc<RtApiModel>,
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
     pub image_controller: Arc<ImageController>,
@@ -63,9 +66,10 @@ pub struct ControllerHub {
     pub game_controller: Arc<GameController>,
     pub slot_controller: Arc<SlotController>,
     pub game_operation_controller: Arc<GameOperationController>,
+    pub user_controller: Arc<UserController>,
 }
 
-impl ControllerHub {
+impl ControllerAdaptor {
     pub fn new(
         app_state: AppState,
         rt_api_model: Arc<RtApiModel>,
@@ -108,20 +112,27 @@ impl ControllerHub {
             game_controller.clone(),
             slot_controller.clone(),
         ));
+        let user_controller = Arc::new(UserController::new(
+            rt_api_model.clone(),
+            app_state_controller.clone(),
+            sender.clone(),
+        ));
         Self {
-            app_state: app_state.clone(),
+            rt_api_model,
+            app_state,
             app_state_controller,
             image_controller,
             session_controller,
             game_controller,
             slot_controller,
             game_operation_controller,
+            user_controller,
         }
     }
 
     pub fn attach(self: Arc<Self>, app: &AppWindow) {
         app.on_register_requested(|| {
-            ext_link::open_ext_link("https://www.arknights.host");
+            ext_link::open_ext_link("https://closure.ltsc.vip");
         });
         app.on_open_ext_link(|str| {
             ext_link::open_ext_link(&str);
@@ -129,7 +140,6 @@ impl ControllerHub {
         {
             let app_weak = app.as_weak();
             let this = self.clone();
-
             app.on_login_requested(move |account, password| {
                 let app = app_weak.clone().unwrap();
 
@@ -159,7 +169,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_auth_requested(move || {
                 let this = this.clone();
                 tokio::spawn(async move {
@@ -170,7 +179,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_load_logs(move |id, load_spec| {
                 this.app_state_controller
                     .exec(|x| x.set_log_load_state(id.clone().into(), GameLogLoadState::Loading));
@@ -186,7 +194,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_start_game(move |id| {
                 this.app_state_controller.exec(|x| {
                     x.set_game_request_state(
@@ -204,7 +211,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_stop_game(move |id| {
                 this.app_state_controller.exec(|x| {
                     x.set_game_request_state(
@@ -222,7 +228,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_save_options(move |id, options| {
                 this.app_state_controller.exec(|x| {
                     x.set_game_save_state(id.clone().into(), GameOptionSaveState::Saving)
@@ -241,7 +246,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_view_changed(move |id, view| {
                 let this = this.to_owned();
                 this.clone().app_state_controller.exec(|x| {
@@ -277,7 +281,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_reconnect_sse(move || {
                 let this = this.to_owned();
                 tokio::spawn(async move {
@@ -288,7 +291,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_refresh_user_info(move || {
                 let this = this.clone();
                 tokio::spawn(async move {
@@ -299,7 +301,6 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_update_slot(move |id, update_draft| {
                 let this = this.clone();
                 let update_request = SlotUpdateDraftMapping::from_ui(&update_draft);
@@ -316,10 +317,10 @@ impl ControllerHub {
 
         {
             let this = self.clone();
-
             app.on_reset_slot_update_request_state(move |id| {
                 this.app_state_controller.exec(move |x| {
                     x.exec_with_slot_by_id(id.into(), move |slot_info_list, i, mut slot_info| {
+                        slot_info.override_update_draft_type = SlotUpdateDraftType::Unchanged;
                         slot_info.update_request_state = SlotUpdateRequestState::Idle;
                         slot_info.update_result = SharedString::default();
                         slot_info_list.set_row_data(i, slot_info);
@@ -329,9 +330,81 @@ impl ControllerHub {
         }
 
         {
+            let this = self.clone();
+            app.on_slot_selected(move |id| {
+                this.app_state_controller
+                    .exec(|x| x.select_slot(id.into(), true));
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_expand_verify_slot(move || {
+                let this = this.clone();
+
+                tokio::spawn(async move {
+                    for (id, slot_ref) in this.rt_api_model.slot_map_read().await.iter() {
+                        let availability_rank = slot_ref
+                            .slot
+                            .read()
+                            .await
+                            .data
+                            .user_tier_availability_rank();
+                        if (availability_rank & user_tier_availability_rank::TIER_BASIC) != 0 {
+                            this.app_state_controller.exec(|x| {
+                                x.exec_with_slot_by_id(
+                                    id.into(),
+                                    move |slot_info_list, i, mut slot_info| {
+                                        slot_info.override_update_draft_type =
+                                            SlotUpdateDraftType::Update;
+                                        slot_info_list.set_row_data(i, slot_info);
+                                    },
+                                )
+                            });
+                            this.app_state_controller
+                                .exec(|x| x.select_slot(id.clone(), false));
+                            break;
+                        }
+                    }
+                });
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_submit_sms_verify_code(move |code| {
+                let this = this.clone();
+
+                tokio::spawn(async move {
+                    this.user_controller
+                        .submit_sms_verify_code(code.into())
+                        .await;
+                    this.slot_controller.refresh_slots().await;
+                });
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_fetch_qq_verify_code(move || {
+                let this = this.clone();
+
+                tokio::spawn(async move {
+                    this.user_controller.get_qq_verify_code().await;
+                });
+            })
+        }
+
+        {
+            let app_weak = app.as_weak();
+            app.on_return_to_login_page(move || {
+                app_weak.unwrap().invoke_do_return_to_login_page();
+            });
+        }
+
+        {
             let app_weak = app.as_weak();
             let this = self.clone();
-
             let timer = slint::Timer::default();
             timer.start(
                 slint::TimerMode::Repeated,

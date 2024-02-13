@@ -226,10 +226,7 @@ impl RtUserModel {
 
     pub async fn find_game(&self, account: &str) -> anyhow::Result<GameRef> {
         match self.games.read().await.get(account) {
-            None => Err(anyhow!(format!(
-                "game with account '{}' not found",
-                account
-            ))),
+            None => Err(anyhow!(format!("game with account '{account}' not found"))),
             Some(game) => Ok(game.clone()),
         }
     }

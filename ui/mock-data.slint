@@ -1,5 +1,5 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
-import { SlotInfo, SlotState, SlotUpdateRequestState, SlotUpdateDraftType, SlotPlatform } from "slot-info.slint";
+import { SlotInfo, SlotState, SlotUpdateRequestState, SlotUpdateDraftType, SlotPlatform, SlotDetailsViewState } from "slot-info.slint";
 import { UserInfo, UserStatus, UserTier, UserProgress} from "user-info.slint";
 
 export global MockData {
@@ -49,6 +49,7 @@ export global MockData {
         game-account-split: ["LeaderOne", "@rhodes-island.org"],
         platform: SlotPlatform.Official,
         description: "可露希尔托管凭证 · 基础型",
+        view-state: SlotDetailsViewState.Independent,
         verify-rules: [
             {
                 has-result: true,

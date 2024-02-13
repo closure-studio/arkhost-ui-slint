@@ -9,47 +9,36 @@ component SmsVerifyArea inherits VerticalLayout {
     in property <bool> requesting;
 
     public function open-dialog() {
-        if (!UserInfoUtils.is-sms-verified(user-info) && !sms-dialog-open) {
+        if !UserInfoUtils.is-sms-verified(user-info) && !sms-dialog-open {
             sms-dialog-open = true;
         }
     }
 
     private property <bool> sms-dialog-open: false;
     
-    if !sms-dialog-open : GroupBox {
-        title: @tr("手机认证");
+    if UserInfoUtils.is-sms-verified(user-info) || !sms-dialog-open : GroupBox {
+        title: @tr("游戏账号归属认证");
         
-        HorizontalLayout {
-            spacing: 10px;
+        Button {
+            enabled: true; // 初始值，会被states修改
 
-            if UserInfoUtils.is-sms-verified(user-info) : LineEdit {
-                font-size: 14px;
-                read-only: true;
-                text: user-info.phone;
-                placeholder-text: "未认证";
-            }
+            clicked => { open-dialog(); }
+            width: 300px;
 
-            Button {
-                enabled: true; // 初始值，会被states修改
-
-                clicked => { open-dialog(); }
-                width: 200px;
-
-                states [
-                    busy when requesting: {
-                        enabled: false;
-                        text: @tr("请稍后");
-                    }
-                    sms-unverified when !UserInfoUtils.is-sms-verified(user-info) : {
-                        enabled: true;
-                        text: @tr("提交手机验证码");
-                    }
-                    sms-verified when UserInfoUtils.is-sms-verified(user-info) : {
-                        enabled: false;
-                        text: @tr("已完成");
-                    }
-                ]
-            }
+            states [
+                busy when requesting: {
+                    enabled: false;
+                    text: @tr("…");
+                }
+                sms-unverified when !UserInfoUtils.is-sms-verified(user-info) : {
+                    enabled: true;
+                    text: @tr("进行认证");
+                }
+                sms-verified when UserInfoUtils.is-sms-verified(user-info) : {
+                    enabled: false;
+                    text: @tr("已绑定到：") + user-info.phone;
+                }
+            ]
         }
     }
 
@@ -61,13 +50,40 @@ component SmsVerifyArea inherits VerticalLayout {
         padding-top: 20px;
         spacing: 15px;
 
-        sms-verify-code-input := LineEdit {
+        Text {
             font-size: 16px;
+            text: @tr("你正在进行【游戏账号归属认证】！")
+                + "\n" + @tr("🤔 你可能需要花一点时间完整阅读下面的说明：");
+            color: StyleMetrics.default-text-color;
+            wrap: word-wrap;
+        }   
+
+        Text {
+            font-size: 14px;
+            text: @tr("☎📩 请在第一个账号栏位添加【手机号】游戏账号，游戏登录成功后，可露希尔将向该号码发送验证短信，输入验证码完成游戏账号归属认证。\n（省流：☎📩=☎🎮）") 
+                + "\n"
+                + "\n" + @tr("🔒 完成归属认证后该手机号及其游戏托管将被绑定至可露希尔账号，不支持换绑、解绑操作。🔑请勿丢失你的可露希尔账号密码，以免无法再次添加托管该游戏账号。")
+                + "\n"
+                + "\n" + @tr("⛔ 如果在启动游戏后的24小时内未完成认证，游戏账号将中止托管。")
+                + "\n"
+                + "\n" + @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请先用你的手机号【在游戏内】注册【新游戏账号】用于归属认证，再继续添加常用账号至另一账号栏位。")
+                + "\n"
+                + "\n" + @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🛟确认未收到、在归属认证中遇到其他特殊情况，请联系可露希尔平台管理员。");
+            color: StyleMetrics.default-text-color.transparentize(20%);
+            wrap: word-wrap;
+        }
+
+        sms-verify-code-input := LineEdit {
+            font-size: 15px;
             enabled: !requesting;
             horizontal-alignment: center;
             input-type: number;
             placeholder-text: @tr("请输入发送到【归属认证手机号】的验证码");
-            accepted => { submit-sms-verify-code(); }
+            accepted => { 
+                if self.text != "" {
+                    submit-sms-verify-code();
+                }
+            }
         }
 
         HorizontalLayout {
@@ -76,7 +92,7 @@ component SmsVerifyArea inherits VerticalLayout {
 
             Button {
                 enabled: !requesting;
-                text: @tr("取消");
+                text: @tr("返回");
                 clicked => { 
                     sms-verify-code-input.text = "";
                     sms-dialog-open = false; 
@@ -84,7 +100,7 @@ component SmsVerifyArea inherits VerticalLayout {
             }
 
             Button {
-                enabled: !requesting;
+                enabled: !requesting && sms-verify-code-input.text != "";
                 text: @tr("提交");
                 primary: true;
                 clicked => { submit-sms-verify-code(); }
@@ -101,52 +117,41 @@ component QQVerifyArea inherits VerticalLayout {
     private property <bool> qq-verify-code-copied: false;
 
     public function open-dialog() {
-        if (!UserInfoUtils.is-qq-verified(user-info) && !qq-dialog-open) {
+        if !UserInfoUtils.is-qq-verified(user-info) && !qq-dialog-open {
             Callbacks.fetch-qq-verify-code();
             qq-verify-code-copied = false;
-            qq-dialog-open = true; 
+            qq-dialog-open = true;
         }
     }
 
-    if !qq-dialog-open : GroupBox {
+    if UserInfoUtils.is-qq-verified(user-info) || !qq-dialog-open : GroupBox {
         title: @tr("QQ认证");
 
-        HorizontalLayout {
-            spacing: 10px;
-
-            if UserInfoUtils.is-qq-verified(user-info) : LineEdit {
-                font-size: 14px;
-                read-only: true;
-                text: user-info.qq;
-                placeholder-text: "未认证";
+        open-dialog-btn := Button {
+            enabled: true; // 初始值，会被states修改
+            width: 300px;
+            clicked => {
+                open-dialog();
             }
 
-            open-dialog-btn := Button {
-                enabled: true; // 初始值，会被states修改
-                width: 200px;
-                clicked => {
-                    open-dialog();
+            states [
+                busy when requesting: {
+                    enabled: false;
+                    text: @tr("…");
                 }
-
-                states [
-                    busy when requesting: {
-                        enabled: false;
-                        text: @tr("请稍后");
-                    }
-                    sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
-                        enabled: false;
-                        text: @tr("请先完成归属手机号认证");
-                    }
-                    qq-unverified when !UserInfoUtils.is-qq-verified(user-info): {
-                        enabled: true;
-                        text: @tr("获取QQ验证代码");
-                    }
-                    verified when UserInfoUtils.is-qq-verified(user-info): {
-                        enabled: false;
-                        text: @tr("已完成");
-                    }
-                ]
-            }
+                sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
+                    enabled: false;
+                    text: @tr("请先完成归属手机号认证");
+                }
+                qq-unverified when !UserInfoUtils.is-qq-verified(user-info): {
+                    enabled: true;
+                    text: @tr("获取QQ验证代码");
+                }
+                verified when UserInfoUtils.is-qq-verified(user-info): {
+                    enabled: false;
+                    text: @tr("已绑定到：") + user-info.qq;
+                }
+            ]
         }
     }
 
@@ -212,7 +217,7 @@ component QQVerifyArea inherits VerticalLayout {
                     ? @image-url("../images/ext_link.svg")
                     : @image-url("../images/ext_link_light.svg");
 
-                clicked => { Callbacks.open-ext-link(@tr("https://www.arknights.host")); }
+                clicked => { Callbacks.open-ext-link(@tr("https://closure.ltsc.vip")); }
             }
 
             HorizontalLayout {
@@ -221,7 +226,7 @@ component QQVerifyArea inherits VerticalLayout {
 
                 Button {
                     enabled: !requesting;
-                    text: @tr("取消");
+                    text: @tr("返回");
                     clicked => { qq-dialog-open = false; }
                 }
 
@@ -287,8 +292,8 @@ export component UserCard inherits Rectangle {
                 spacing: 2px;
 
                 Text {
-                    font-size: 11px;
-                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 12px;
+                    font-family: FontGlobals.closure-studio-logo;
                     color: StyleMetrics.default-text-color.transparentize(30%);
                     text: "Doctor ID";
                     vertical-alignment: bottom;
@@ -340,6 +345,43 @@ export component UserCard inherits Rectangle {
         qq-verify-area := QQVerifyArea {
             user-info: user-info;
             requesting: requesting;
+        }
+
+        GroupBox {
+            title: @tr("其他");
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                Button {
+                    text: @tr("复制用户ID");
+                    width: 150px;
+        
+                    clicked => {
+                        uuid-dummy.select-all();
+                        uuid-dummy.copy();
+                        uuid-dummy.clear-selection();
+                    }
+                }
+
+                Button {
+                    text: @tr("回到登录界面");
+                    width: 150px;
+        
+                    clicked => {
+                        Callbacks.return-to-login-page();
+                    }
+                }
+
+                uuid-dummy := TextInput {
+                    accessible-role: none;
+                    accessible-checkable: false;
+                    visible: false;
+                    text: user-info.uuid;
+                    width: 0;
+                    height: 0;
+                }
+            }
         }
     }
 

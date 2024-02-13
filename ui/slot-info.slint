@@ -31,6 +31,12 @@ export enum SlotUpdateRequestState {
     Fail
 }
 
+export enum SlotDetailsViewState {
+    Independent,
+    Collapsed,
+    Expanded,
+}
+
 export struct SlotRequirement {
     has-result: bool,
     fulfilled: bool,
@@ -39,6 +45,8 @@ export struct SlotRequirement {
 }
 
 export struct SlotInfo {
+    view-state: SlotDetailsViewState,
+    override-update-draft-type: SlotUpdateDraftType,
     update-request-state: SlotUpdateRequestState,
     update-result: string,
 
@@ -55,11 +63,11 @@ export struct SlotInfo {
 
 export global SlotInfoUtils {
     pure public function get-server-display-name(server: SlotPlatform) -> string {
-        if (server == SlotPlatform.None) {
+        if server == SlotPlatform.None {
             return @tr("-");
-        } else if (server == SlotPlatform.Official) {
+        } else if server == SlotPlatform.Official {
             return @tr("官服 [G]");
-        } else if (server == SlotPlatform.Bilibili) {
+        } else if server == SlotPlatform.Bilibili {
             return @tr("BiliBili服 [B]");
         } else {
             return @tr("未知服务器");
@@ -67,11 +75,11 @@ export global SlotInfoUtils {
     }
 
     pure public function get-server-display-name-alternative(server: SlotPlatform) -> string {
-        if (server == SlotPlatform.None) {
+        if server == SlotPlatform.None {
             return @tr("-");
-        } else if (server == SlotPlatform.Official) {
+        } else if server == SlotPlatform.Official {
             return @tr("HYPERGRYPH");
-        } else if (server == SlotPlatform.Bilibili) {
+        } else if server == SlotPlatform.Bilibili {
             return @tr("BiliBili");
         } else {
             return @tr("Unknown");

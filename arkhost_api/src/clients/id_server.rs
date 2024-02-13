@@ -39,8 +39,6 @@ impl AuthClient {
         let headers = common::common_headers();
         client_builder
             .default_headers(headers)
-            .gzip(true)
-            .brotli(true)
     }
 
     pub async fn login(&self, email: String, password: String) -> ApiResult<()> {

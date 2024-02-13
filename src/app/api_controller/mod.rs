@@ -135,7 +135,7 @@ impl Controller {
         tokio::select! {
             _ = async {
                 while let Some(cmd) = recv.recv().await {
-                    self.process_command(cmd).await;
+                    self.exec_command(cmd).await;
                 }
             } => {},
             _ = stop.cancelled() => {}
@@ -304,7 +304,7 @@ impl Controller {
             .await
     }
 
-    async fn process_command(&self, cmd: Command) {
+    async fn exec_command(&self, cmd: Command) {
         match cmd.op {
             Operation::Login {
                 email,

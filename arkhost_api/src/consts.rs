@@ -35,6 +35,7 @@ pub mod arkhost {
 
         pub mod sse {
             pub const EVENT_TYPE_GAME: &str = "game";
+            pub const EVENT_TYPE_SSR: &str = "ssr";
             pub const EVENT_TYPE_CLOSE: &str = "close";
         }
     }

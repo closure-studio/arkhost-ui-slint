@@ -109,7 +109,9 @@ component GameCardTabSwitch inherits Rectangle {
                 vertical-alignment: top;
                 horizontal-alignment: center;
                 height: selected ? 15px : 0px;
+                opacity: selected ? 1 : 0;
                 animate height { duration: 0.25s; }
+                animate opacity { duration: 0.25s; }
             }
         }
     }

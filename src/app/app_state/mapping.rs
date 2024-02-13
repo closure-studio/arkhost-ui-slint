@@ -55,7 +55,7 @@ impl GameInfoMapping {
         .into();
         game_info.doctor_name = match self.game.info.status.nick_name.as_str() {
             "" => "未登录".to_string(),
-            nickname => format!("Dr. {}", nickname),
+            nickname => format!("Dr. {nickname}"),
         }
         .into();
         // 未实现玩家编号#1234，使用账号代替
@@ -282,6 +282,7 @@ impl SlotInfoMapping {
 
     pub fn create_slot_info(&self) -> SlotInfo {
         let mut slot_info = SlotInfo::default();
+        slot_info.view_state = SlotDetailsViewState::Collapsed;
         self.mutate(&mut slot_info);
         slot_info
     }
@@ -320,7 +321,7 @@ impl SlotInfoMapping {
 
     fn try_split_email(&self) -> VecModel<SharedString> {
         if let Some(game_account) = &self.slot_entry.data.game_account {
-            let mut iter = game_account[1..].rsplitn(2, '@');
+            let mut iter = game_account[1..].splitn(2, '@');
             if let (Some(s1), Some(s2)) = (iter.next(), iter.next()) {
                 return vec![s1.into(), ("@".to_owned() + s2).into()].into();
             }
@@ -395,6 +396,7 @@ impl SlotUpdateDraftMapping {
 
 #[derive(Debug, Clone)]
 pub struct UserInfoMapping {
+    pub uuid: String,
     pub nickname: String,
     pub status: api_passport::UserStatus,
     pub phone: String,
@@ -404,6 +406,7 @@ pub struct UserInfoMapping {
 
 impl UserInfoMapping {
     pub fn mutate(&self, user_info: &mut UserInfo) {
+        user_info.uuid = self.uuid.clone().into();
         user_info.nickname = self.nickname.clone().into();
         user_info.status = match self.status {
             api_passport::UserStatus::SmsUnverified => UserStatus::SmsUnverified,

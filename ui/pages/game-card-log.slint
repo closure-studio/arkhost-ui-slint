@@ -1,5 +1,6 @@
 import { GameOptions, GameInfo, GameLogLoadRequestType, GameLogLoadState } from "../game-info.slint";
 import { ListView , HorizontalBox, StyleMetrics , Button, ScrollView, VerticalBox, Spinner} from "std-widgets.slint";
+import { FontGlobals } from "../font-globals.slint";
 
 component GameCardLogEntry {
     in property <string> timestamp;
@@ -12,8 +13,9 @@ component GameCardLogEntry {
         Text {
             text: timestamp;
             height: 18px;
-            min-width: 96px;
+            min-width: 104px;
             font-size: 14px;
+            font-family: FontGlobals.alphanumeric-text-sans;
             color: StyleMetrics.default-text-color.transparentize(50%);
             horizontal-alignment: left;
         }
@@ -42,9 +44,9 @@ export component GameCardLog inherits VerticalLayout {
         load-button := Button {
             enabled: !log-loading;
             clicked => {
-                if (info.log-loaded == GameLogLoadState.NotLoaded) {
+                if info.log-loaded == GameLogLoadState.NotLoaded {
                     load-logs(info.id, GameLogLoadRequestType.Later);
-                } else if (info.log-loaded == GameLogLoadState.Loaded) {
+                } else if info.log-loaded == GameLogLoadState.Loaded {
                     load-logs(info.id, GameLogLoadRequestType.Former);
                 }
             }

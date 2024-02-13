@@ -2,10 +2,12 @@ use super::super::auth;
 use crate::app::ipc::AuthenticatorMessage;
 use crate::app::utils::data_dir;
 use crate::app::webview::auth::consts;
+use anyhow::anyhow;
 use argh::FromArgs;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use std::rc::Rc;
+use std::time::Duration;
 use std::thread;
 use thiserror::Error;
 use winit::window::WindowLevel;
@@ -24,10 +26,10 @@ pub enum ChildProcessAuthenticatorError {
 }
 
 #[derive(Debug, Clone, FromArgs)]
-/// 用于用户验证的WebView启动参数，如果使用WebView启动，则不打开主UI界面
+/// 用于用户验证的 WebView 启动参数，如果使用 WebView 启动，则不打开主UI界面
 pub struct LaunchArgs {
     #[argh(switch)]
-    /// 是否启动WebView
+    /// 是否启动 WebView
     pub launch_webview: Option<bool>,
 
     #[argh(option)]
@@ -35,7 +37,7 @@ pub struct LaunchArgs {
     pub account: Option<String>,
 
     #[argh(option)]
-    /// 父进程的IPC Server 名称
+    /// 父进程的 IPC Server 名称
     pub ipc: Option<String>,
 }
 
@@ -50,10 +52,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                 .send_event(AuthenticatorMessage::Result { result });
 
             if let Err(e) = res {
-                eprintln!(
-                    "[WebViewSubprocess] Error sending event to EventLoop: {}",
-                    e
-                )
+                eprintln!("[WebViewSubprocess] Error sending event to EventLoop: {e}")
             }
         }
     }
@@ -70,7 +69,26 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
         "[WebViewSubprocess] Sending inverse side senders to host {}",
         args.ipc.as_ref().unwrap()
     );
-    IpcSender::connect(args.ipc.unwrap())?.send((rx_host_sender, tx_host_sender_sender))?;
+
+    let server_name = args.ipc.unwrap();
+
+    let mut retries = 3;
+    loop {
+        match IpcSender::connect(server_name.clone()) {
+            Ok(sender) => break Ok(sender),
+            Err(e) => {
+                println!("[WebViewSubprocess] failed attempting to connect, retrying...\n{e}");
+            },
+        }
+
+        retries -= 1;
+        if retries > 0 {
+            thread::sleep(Duration::from_secs(1))
+        } else {
+            break Err(anyhow!("all attempts to connect failed"));
+        }
+    }?.send((rx_host_sender, tx_host_sender_sender))?;
+
     println!("[WebViewSubprocess] Receiving host TX receiver from host");
     let tx_host_sender: IpcSender<AuthenticatorMessage> = tx_host_sender_receiver.recv()?;
 
@@ -124,7 +142,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                     }
 
                     if let Err(e) = proxy.send_event(event) {
-                        println!("[WebViewSubprocess] Closing Authenticator on EventLoop send failed: {:?}", e);
+                        println!("[WebViewSubprocess] Closing Authenticator on EventLoop send failed: {e:?}");
                         break;
                     }
                 }
@@ -134,8 +152,7 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                             println!("[WebViewSubprocess] Closing Authenticator on host_tx_receiver Disconnected")
                         }
                         _ => println!(
-                            "[WebViewSubprocess] Closing Authenticator on host_tx_receiver recv failed: {:?}",
-                            e
+                            "[WebViewSubprocess] Closing Authenticator on host_tx_receiver recv failed: {e:?}"
                         ),
                     }
                     break;
@@ -149,8 +166,8 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
     });
     event_loop.run(move |event, evl| {
         evl.set_control_flow(ControlFlow::Wait);
-        if let Event::UserEvent(e) = &event {
-            println!("[WebViewSubprocess] AuthenticatorEvent {:?}", e);
+        if let Event::UserEvent(ev) = &event {
+            println!("[WebViewSubprocess] AuthenticatorEvent {ev:?}");
         }
 
         match event {
@@ -165,14 +182,14 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                 AuthenticatorMessage::PerformAction { action } => {
                     let preform_res = authenticator.auth_resolver.preform(action.clone());
                     if let Err(err) = preform_res {
-                        eprintln!("[WebViewSubprocess] Error preforming auth action: '{:?}'; Err: {}", action, err);
+                        eprintln!("[WebViewSubprocess] Error preforming auth action: '{action:?}'; Err: {err}");
                     }
                     _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
                 }
                 AuthenticatorMessage::Result { .. } => {
                     let send_res = tx_host_sender.send(ev);
                     if let Err(e) = send_res {
-                        eprintln!("[WebViewSubprocess] Unable to send auth result, Err: {}", e);
+                        eprintln!("[WebViewSubprocess] Unable to send auth result, Err: {e}");
                     }
                 }
                 AuthenticatorMessage::CloseRequested => {
@@ -183,15 +200,12 @@ pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
                 AuthenticatorMessage::ReloadRequested => {
                     let res = authenticator.reload();
                     if let Err(e) = res {
-                        eprintln!("[WebViewSubprocess] Unable to reload auth page, Err: {}", e);
+                        eprintln!("[WebViewSubprocess] Unable to reload auth page, Err: {e}");
                     }
                     _ = tx_host_sender.send(AuthenticatorMessage::Acknowledged);
                 }
                 #[allow(unreachable_patterns)]
-                _ => eprintln!(
-                    "[WebViewSubprocess] Error listening AuthenticatorEvent: handler not implemented for {:?}",
-                    ev
-                ),
+                _ => eprintln!("[WebViewSubprocess] Error listening AuthenticatorEvent: handler not implemented for {ev:?}"),
             },
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -221,7 +235,7 @@ pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
             ipc: Some(_),
         } => Some(launch(launch_args)),
         _ => Some(Err(ChildProcessAuthenticatorError::InvalidLaunchArgs {
-            launch_args_dbg_str: format!("{:?}", launch_args),
+            launch_args_dbg_str: format!("{launch_args:?}"),
         }
         .into())),
     }

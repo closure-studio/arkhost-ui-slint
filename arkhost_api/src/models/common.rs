@@ -22,9 +22,9 @@ where
 /// 嵌套响应数据包装对象，形如
 /// ```json
 /// {
-///     code: 1,
-///     data: { "foo": 42 }，
-///     message: "成功"
+///     "code": 1,
+///     "data": { "foo": 42 }，
+///     "message": "成功"
 /// }
 /// ```
 #[derive(Default, Deserialize, Clone, Debug)]

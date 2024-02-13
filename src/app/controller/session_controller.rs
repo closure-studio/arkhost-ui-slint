@@ -59,7 +59,7 @@ impl SessionController {
             }
             Err(e) => {
                 self.app_state_controller
-                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{:?}", e)));
+                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{e:?}")));
             }
         }
     }
@@ -85,7 +85,7 @@ impl SessionController {
                 self.app_state_controller.exec(|x| {
                     x.set_login_state(
                         LoginState::Errored,
-                        format!("自动登录失败，请重试或检查网络环境\n{:?}", e),
+                        format!("自动登录失败，请重试或检查网络环境\n{e:?}"),
                     )
                 });
             }

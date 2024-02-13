@@ -6,7 +6,7 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
-use slint::{Model, ModelRc, Timer, VecModel, Weak};
+use slint::{Model, ModelRc, SharedString, Timer, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
 use tokio::sync::Notify;
 
@@ -130,7 +130,7 @@ impl AppState {
         &self,
         id: String,
         state: SlotUpdateRequestState,
-        status_text: Option<String>
+        status_text: Option<String>,
     ) -> AppStateAsyncOp {
         self.exec_with_slot_by_id(id, move |slot_info_list, i, mut slot_info| {
             slot_info.update_request_state = state;
@@ -176,6 +176,7 @@ impl AppState {
         })
     }
 
+    // TODO: update_slot_info_lost中逻辑与该部分重复
     pub fn update_game_views(
         &self,
         mut game_list: Vec<(i32, String, GameInfoMapping)>,
@@ -233,6 +234,28 @@ impl AppState {
             match Self::find_game_by_id(&game_info_list, &id) {
                 Some((i, game_info)) => func(game_info_list, i, game_info),
                 None => { /* TODO: report error */ }
+            }
+        })
+    }
+
+    pub fn select_slot(&self, id: String, toggle: bool) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            let slot_info_list = ui.get_slot_info_list();
+
+            for (i, mut slot_info) in slot_info_list.iter().enumerate() {
+                slot_info.view_state = if slot_info.uuid == id {
+                    if !toggle || (slot_info.view_state != SlotDetailsViewState::Expanded) {
+                        ui.set_selected_slot(SharedString::from(&id));
+                        SlotDetailsViewState::Expanded
+                    } else {
+                        ui.set_selected_slot(Default::default());
+                        SlotDetailsViewState::Collapsed
+                    }
+                } else {
+                    SlotDetailsViewState::Collapsed
+                };
+
+                slot_info_list.set_row_data(i, slot_info);
             }
         })
     }

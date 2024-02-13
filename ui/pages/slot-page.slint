@@ -1,6 +1,6 @@
-import { ScrollView , VerticalBox} from "std-widgets.slint";
+import { ScrollView , VerticalBox, StyleMetrics } from "std-widgets.slint";
 import { MockData } from "../mock-data.slint";
-import { SlotInfo } from "../slot-info.slint";
+import { SlotInfo, SlotState, SlotDetailsViewState } from "../slot-info.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
 import { SlotCard } from "slot-card.slint";
 import { SlotTierCard } from "slot-tier-card.slint";
@@ -8,6 +8,8 @@ import { UserInfo, UserTier, UserProgress } from "../user-info.slint";
 import { SlotTierConsts } from "../slot-tier-consts.slint";
 import { UserCard } from "user-card.slint";
 import { Callbacks } from "../callbacks.slint";
+import { SlotList } from "slot-list.slint";
+import { FontGlobals } from "../font-globals.slint";
 
 export component SlotPage {
     in property <[SlotInfo]> slot-info-list: [
@@ -15,9 +17,11 @@ export component SlotPage {
         MockData.slot-info,
         MockData.slot-info,
     ];
+    in property <string> selected-slot;
     in property <UserInfo> user-info: MockData.user-info;
 
-    private property <bool> double-column-layout : self.width >= 1200px;
+    private property <bool> double-column-layout: self.width >= 1200px;
+    private property <bool> has-selected-slot: selected-slot != "";
 
     scroll-view := ScrollView {
         HorizontalLayout {
@@ -37,26 +41,43 @@ export component SlotPage {
                         background-color: #00649ebb;
                         accent-color: #ebf3ff;
                         has-action: false;
-                        text: @tr("该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
+                        text: @tr("👀 该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
                     }
 
                     if user-info.progress == UserProgress.Initial: BannerNotification {
+                        property <image> empty;
+
                         background-color: #00649ebb;
                         accent-color: #ebf3ff;
-                        text: @tr("你还没有添加第一个游戏账号，是否开启向导？");
+                        text: @tr("🔰 你还没有添加第一个游戏账号，点这里开始上路 👉");
     
                         has-action: true;
-                        action-text: @tr("[开启向导]");
-                        action-icon: @image-url("../images/slot_tutor_start.svg");
+                        action-text: @tr("[Go]");
+                        action-icon: empty;
+                        action => {
+                            user-card.open-sms-verify-dialog();
+                            Callbacks.expand-verify-slot();
+                        }
+                    }
+
+                    if user-info.progress == UserProgress.SmsVerified: BannerNotification {
+                        background-color: #00649ebb;
+                        accent-color: #ebf3ff;
+                        text: @tr("✅ 归属认证已经完成，你可以继续添加更多托管账号了。");
+
+                        has-action: false;
                     }
                     
                     slot-tier-card := SlotTierCard {
                         data: SlotTierConsts.get-tier-card-data(user-info.tier);
 
                         on-upgrade-tier(next-tier) => {
-                            if (next-tier == UserTier.SmsVerified) {
+                            if next-tier == UserTier.SmsVerified {
+                                if user-info.progress == UserProgress.Initial {
+                                    Callbacks.expand-verify-slot();
+                                }
                                 user-card.open-sms-verify-dialog();
-                            } else if (next-tier == UserTier.QQVerified) {
+                            } else if next-tier == UserTier.QQVerified {
                                 user-card.open-qq-verify-dialog();
                             }
                         }
@@ -64,6 +85,11 @@ export component SlotPage {
     
                     user-card := UserCard {
                         user-info: user-info;
+                    }
+
+                    slot-list := SlotList {
+                        slot-info-list: slot-info-list;
+                        slot-selected(id) => { Callbacks.slot-selected(id); }
                     }
     
                     animate width { duration: 0.25s; easing: ease; }
@@ -75,18 +101,54 @@ export component SlotPage {
                         : 640px;
                 }
     
-                slot-info-area := VerticalLayout {
-                    alignment: start;
-                    padding-top: 10px;
-                    padding-bottom: 10px;
-                    spacing: 10px;
-    
-                    for slot-info in slot-info-list: SlotCard {
-                        info: slot-info;
-                        slot-saved(uuid, update-draft) => { Callbacks.update-slot(uuid, update-draft); }
-                        reset-slot-update-request-state(uuid) => { Callbacks.reset-slot-update-request-state(uuid); }
+                slot-info-area := Rectangle {
+                    // placeholder
+                    Rectangle {
+                        opacity: !has-selected-slot
+                            ? 1
+                            : 0;
+                        background: StyleMetrics.dark-color-scheme
+                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        border-radius: 10px;
+
+                        Text {
+                            font-size: 18px;
+                            font-family: FontGlobals.alphanumeric-text-sans;
+                            color: StyleMetrics.default-text-color.transparentize(60%);
+                            text: @tr("/// 请在列表中选择一个账号栏位 ///");
+                        }
+
+                        y: 10px;
+                        height: user-info-area.min-height - 10px;
+
+                        animate opacity { duration: 0.15s; easing: ease; }
                     }
 
+                    for slot-info in slot-info-list: SlotCard {
+                        info: slot-info;
+                        slot-saved(uuid, update-draft) => { 
+                            Callbacks.update-slot(uuid, update-draft); 
+                        }
+                        reset-slot-update-request-state(uuid) => { Callbacks.reset-slot-update-request-state(uuid); }
+
+                        x: 0px;
+
+                        animate y { duration: 0.25s; easing: ease; }
+                        animate opacity { duration: 0.25s; easing: ease; }
+
+                        states [
+                            hide when slot-info.view-state != SlotDetailsViewState.Expanded: {
+                                opacity: 0;
+                                y: - self.height - 1px;
+                            }
+                            show when slot-info.view-state == SlotDetailsViewState.Expanded: {
+                                opacity: 1;
+                                y: 10px;
+                            }
+                        ]
+                    }
+    
                     states [
                         single-column when !double-column-layout: {
                             x: 0px;
@@ -105,7 +167,10 @@ export component SlotPage {
                             }
                         }
                     ]
+                    
                     width: min(root.width, 640px);
+                    height: max(700px, user-info-area.min-height + 10px);
+                    min-height: self.height;
                 }
 
                 states [

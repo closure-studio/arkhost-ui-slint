@@ -8,6 +8,7 @@ import { AboutPage } from "pages/about-page.slint";
 import { Callbacks } from "callbacks.slint";
 import { ClosureStudioLogoSingleRow } from "components/closure-studio-logo.slint";
 import { SlotPage } from "pages/slot-page.slint";
+import { FontGlobals } from "font-globals.slint";
 
 export component AppWindow inherits Window {
     title: @tr("Closure Studio");
@@ -18,16 +19,13 @@ export component AppWindow inherits Window {
     in property <SseConnectState> sse-connect-state;
     in property <[SlotInfo]> slot-info-list;
     in property <UserInfo> user-info;
+    in property <string> selected-slot;
     in-out property <LoginState> login-state;
     in-out property <string> login-status-text;
 
     callback login-requested <=> login-window.login-requested;
     callback auth-requested <=> login-window.auth-requested;
     callback register-requested <=> login-window.register-requested;
-
-    public function set-use-auth(account: string, use-auth-val: bool) {
-        login-window.set-use-auth(account, use-auth-val);
-    }
 
     callback start-game <=> Callbacks.start-game;
     callback stop-game <=> Callbacks.stop-game;
@@ -42,13 +40,26 @@ export component AppWindow inherits Window {
     callback submit-sms-verify-code <=> Callbacks.submit-sms-verify-code;
     callback fetch-qq-verify-code <=> Callbacks.fetch-qq-verify-code;
 
+    callback slot-selected <=> Callbacks.slot-selected;
+    callback expand-verify-slot <=> Callbacks.expand-verify-slot;
     callback update-slot <=> Callbacks.update-slot;
     callback reset-slot-update-request-state <=> Callbacks.reset-slot-update-request-state;
     
     callback open-ext-link <=> Callbacks.open-ext-link;
+    callback return-to-login-page <=> Callbacks.return-to-login-page;
+
+    public function set-use-auth(account: string, use-auth-val: bool) {
+        login-window.set-use-auth(account, use-auth-val);
+    }
+
+    public function do-return-to-login-page() {
+        login-state = LoginState.Unlogged;
+        login-status-text = "";
+    }
 
     preferred-width: 1280px;
     preferred-height: 800px;
+    default-font-weight: 350;
 
     background: StyleMetrics.dark-color-scheme
         ? StyleMetrics.window-background
@@ -63,6 +74,7 @@ export component AppWindow inherits Window {
     
                 VerticalLayout {
                     game-info-page := GameInfoPage {
+                        user: user-info;
                         game-info-list: game-info-list;
                         fetch-games-state: fetch-games-state;
                         sse-connect-state: sse-connect-state;
@@ -78,33 +90,12 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     slot-page := SlotPage {
                         slot-info-list: slot-info-list;
+                        selected-slot: selected-slot;
                         user-info: user-info;
                     }
                 }
             }
 
-            Tab {
-                title: @tr("设置");
-    
-                HorizontalLayout {
-                    alignment: space-around;
-
-                    VerticalBox {
-                        max-width: 300px;
-                        alignment: start;
-
-                        Button {
-                            text: @tr("退出登录");
-
-                            clicked => {
-                                login-state = LoginState.Unlogged;
-                                login-status-text = "";
-                            }
-                        }
-                    }
-                }
-            }
-    
             Tab {
                 title: @tr("关于");
     

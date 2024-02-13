@@ -55,26 +55,24 @@ impl UserStateFileStorage {
         match File::create(&path) {
             Ok(mut file) => match file.write_all(self.jwt.clone().unwrap().as_bytes()) {
                 Ok(_) => println!(
-                    "[UserStateFileStorage] user state file have been written to {:?}",
-                    path
+                    "[UserStateFileStorage] user state file have been written to {}",
+                    path.display()
                 ),
                 Err(e) => eprintln!(
-                    "[UserStateFileStorage] unable to write user state file at {:?}; Err: {e}",
-                    path
+                    "[UserStateFileStorage] unable to write user state file at {}; Err: {e}",
+                    path.display()
                 ),
             },
             Err(e) => eprintln!(
-                "[UserStateFileStorage] unable to create user state file at {:?}; Err: {e}",
-                path
+                "[UserStateFileStorage] unable to create user state file at {}; Err: {e}",
+                path.display()
             ),
         };
     }
 
     pub fn store_path(&self) -> PathBuf {
         match &self.store_setting {
-            UserStateFileStoreSetting::DataDirWithCurrentDirFallback => {
-                super::data_dir::data_dir()
-            }
+            UserStateFileStoreSetting::DataDirWithCurrentDirFallback => super::data_dir::data_dir(),
             UserStateFileStoreSetting::Path(path) => PathBuf::from(path),
         }
     }

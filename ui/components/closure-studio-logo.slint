@@ -1,4 +1,4 @@
-import { HorizontalBox } from "std-widgets.slint";
+import { StyleMetrics, HorizontalBox } from "std-widgets.slint";
 import { FontGlobals } from "../font-globals.slint";
 
 export component ClosureStudioLogoSingleRow inherits HorizontalBox {
@@ -81,18 +81,51 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
             alignment: space-around;
 
             Rectangle {
-                height: 30px;
-                width: 60px;
+                height: 22px;
+                width: 140px;
                 border-radius: 8px;
 
-                Text {
-                    font-size: 18px;
-                    font-family: FontGlobals.alphanumeric-text-sans;
-                    color: whitesmoke;
-                    text: "BETA";
+                HorizontalLayout {
+                    padding-left: 5px;
+                    padding-right: 5px;
+                    alignment: space-around;
+
+                    Text {
+                        font-size: 15px;
+                        font-family: FontGlobals.closure-studio-logo;
+                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        text: "D32 ";
+                        vertical-alignment: center;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        
+                        Rectangle {
+                            Image {
+                                source: @image-url("../images/D32_Steel.png");
+                                
+                                width: 36px;
+                                height: 36px;
+                            }
+
+                            width: 32px;
+                            height: 18px;
+                        }
+                    }
+
+                    Text {
+                        font-size: 15px;
+                        font-family: FontGlobals.closure-studio-logo;
+                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        text: " EDITION";
+                        vertical-alignment: center;
+                    }
                 }
 
-                background: gray;
+                background: StyleMetrics.dark-color-scheme
+                    ? #303030
+                    : StyleMetrics.window-background;
             }
         }
     }

@@ -71,7 +71,7 @@ impl GameOperationController {
                     Err(e) => println!("[Controller] failed attempting to start game {account}: {e}"),
                 }
             }
-            anyhow::bail!("all attempts failed")
+            anyhow::bail!("提交失败：人机验证失败")
         })(account.clone()).await;
 
         if result.is_err() {
