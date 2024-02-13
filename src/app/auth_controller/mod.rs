@@ -14,9 +14,9 @@ pub struct AuthContext {
 }
 
 pub enum Command {
-    AuthArkHostBackground { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
-    AuthArkHostCaptcha { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
-    AuthGeeTest { resp: oneshot::Sender<anyhow::Result<AuthResult>>, gt: String, challenge: String },
+    ArkHostBackground { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
+    ArkHostCaptcha { resp: oneshot::Sender<anyhow::Result<AuthResult>>, action: String },
+    GeeTest { resp: oneshot::Sender<anyhow::Result<AuthResult>>, gt: String, challenge: String },
 }
 
 #[async_trait]

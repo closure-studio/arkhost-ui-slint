@@ -21,4 +21,5 @@ pub mod ipc;
 /// 用于显示网页弹窗或WebView来进行用户验证/游戏验证
 pub mod webview;
 /// Slint生成的代码导出至此
+#[allow(clippy::all)]
 pub mod ui;

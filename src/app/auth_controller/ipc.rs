@@ -25,7 +25,7 @@ pub struct IpcAuthController {
 impl IpcAuthController {
     async fn exec_cmd(&mut self, cmd: Command) {
         match cmd {
-            Command::AuthArkHostBackground { resp, action } => {
+            Command::ArkHostBackground { resp, action } => {
                 _ = resp.send(
                     self.auth(
                         AuthAction::ArkHostRestrictedActionBackground {
@@ -37,7 +37,7 @@ impl IpcAuthController {
                     .await,
                 )
             }
-            Command::AuthArkHostCaptcha { resp, action } => {
+            Command::ArkHostCaptcha { resp, action } => {
                 _ = resp.send(
                     self.auth(
                         AuthAction::ArkHostRestrictedActionCaptcha {
@@ -49,7 +49,7 @@ impl IpcAuthController {
                     .await,
                 )
             }
-            Command::AuthGeeTest {
+            Command::GeeTest {
                 resp,
                 gt,
                 challenge,

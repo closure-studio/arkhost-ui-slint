@@ -15,8 +15,8 @@ use crate::app::ui::UserIdApiRequestState;
 
 use super::AuthResult;
 use super::{
-    app_state_controller::AppStateController, sender::Sender,
-    rt_api_model::RtApiModel, ApiOperation,
+    app_state_controller::AppStateController, rt_api_model::RtApiModel, sender::Sender,
+    ApiOperation,
 };
 
 pub struct SlotController {
@@ -111,14 +111,14 @@ impl SlotController {
         let (resp2, rx2) = oneshot::channel();
         let mut auth_attempts = [
             (
-                AuthCommand::AuthArkHostBackground {
+                AuthCommand::ArkHostBackground {
                     resp: resp1,
                     action: "slot".into(),
                 },
                 rx1,
             ),
             (
-                AuthCommand::AuthArkHostCaptcha {
+                AuthCommand::ArkHostCaptcha {
                     resp: resp2,
                     action: "slot".into(),
                 },
@@ -126,34 +126,37 @@ impl SlotController {
             ),
         ]
         .into_iter();
-    
-        let update_result = (|id: String, update_request: UpdateSlotAccountRequest| async move {
+
+        let invoke_auth = |id: String, update_request: UpdateSlotAccountRequest| async move {
             let (tx_command, rx_command) = mpsc::channel(2);
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
-            self.sender.tx_auth_controller.send(AuthContext {
-                rx_command,
-                stop
-            }).await?;
-            while let Some((auth_command, mut rx_auth_controller)) = auth_attempts.next() {
+            self.sender
+                .tx_auth_controller
+                .send(AuthContext { rx_command, stop })
+                .await?;
+            for (auth_command, mut rx_auth_controller) in auth_attempts.by_ref() {
                 match self
-                .try_update_slot(
-                    id.clone(),
-                    auth_command,
-                    update_request.clone(),
-                    &tx_command,
-                    &mut rx_auth_controller,
-                )
-                .await {
+                    .try_update_slot(
+                        id.clone(),
+                        auth_command,
+                        update_request.clone(),
+                        &tx_command,
+                        &mut rx_auth_controller,
+                    )
+                    .await
+                {
                     Ok(res) => {
                         return anyhow::Ok(res);
-                    },
+                    }
                     Err(e) => println!("[Controller] failed attempting to update slot {id}: {e:?}"),
                 }
             }
-            
+
             anyhow::bail!("all attempts failed");
-        })(id.clone(), update_request.clone()).await;
+        };
+
+        let update_result = invoke_auth(id.clone(), update_request.clone()).await;
 
         match update_result {
             Ok(result) => {
@@ -209,7 +212,7 @@ impl SlotController {
                 });
             }
         }
-        
+
         self.refresh_slots().await;
     }
 
@@ -245,9 +248,7 @@ impl SlotController {
             )
             .await?;
         match &result.internal_code {
-            Some(arkhost_api::consts::error_code::CAPTCHA_ERROR) => {
-                Err(anyhow!("captcha failed"))
-            }
+            Some(arkhost_api::consts::error_code::CAPTCHA_ERROR) => Err(anyhow!("captcha failed")),
             _ => Ok(result),
         }
     }

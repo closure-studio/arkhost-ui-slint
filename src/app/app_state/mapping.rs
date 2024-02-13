@@ -281,8 +281,7 @@ impl SlotInfoMapping {
     }
 
     pub fn create_slot_info(&self) -> SlotInfo {
-        let mut slot_info = SlotInfo::default();
-        slot_info.view_state = SlotDetailsViewState::Collapsed;
+        let mut slot_info: SlotInfo = Default::default();
         self.mutate(&mut slot_info);
         slot_info
     }

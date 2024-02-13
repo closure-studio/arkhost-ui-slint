@@ -36,14 +36,14 @@ impl GameOperationController {
         let (resp2, rx2) = oneshot::channel();
         let auth_methods = [
             (
-                AuthCommand::AuthArkHostBackground {
+                AuthCommand::ArkHostBackground {
                     resp: resp1,
                     action: "login".into(),
                 },
                 rx1,
             ),
             (
-                AuthCommand::AuthArkHostCaptcha {
+                AuthCommand::ArkHostCaptcha {
                     resp: resp2,
                     action: "login".into(),
                 },
@@ -51,15 +51,15 @@ impl GameOperationController {
             ),
         ];
 
-        let result = (|account: String| async move {
+        let invoke_auth = |account: String| async move {
             let (tx_command, rx_command) = mpsc::channel(1);
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
-            self.sender.tx_auth_controller.send(AuthContext {
-                rx_command,
-                stop
-            }).await?;
-            
+            self.sender
+                .tx_auth_controller
+                .send(AuthContext { rx_command, stop })
+                .await?;
+
             for (auth_command, mut rx) in auth_methods {
                 match self
                     .try_start_game(account.clone(), auth_command, &tx_command, &mut rx)
@@ -68,11 +68,15 @@ impl GameOperationController {
                     Ok(_) => {
                         return anyhow::Ok(());
                     }
-                    Err(e) => println!("[Controller] failed attempting to start game {account}: {e}"),
+                    Err(e) => {
+                        println!("[Controller] failed attempting to start game {account}: {e}")
+                    }
                 }
             }
             anyhow::bail!("提交失败：人机验证失败")
-        })(account.clone()).await;
+        };
+
+        let result = invoke_auth(account.clone()).await;
 
         if result.is_err() {
             eprintln!("[Controller] all attempts to start game {account} failed");
@@ -130,28 +134,26 @@ impl GameOperationController {
             (challenge_info.clone(), CaptchaState::Running),
         );
 
-        let auth_result = (|gt| async move {
+        let invoke_auth = |gt| async move {
             let (tx_command, rx_command) = mpsc::channel(1);
             let (resp, rx) = oneshot::channel();
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
             self.sender
                 .tx_auth_controller
-                .send(AuthContext {
-                    rx_command,
-                    stop,
-                })
+                .send(AuthContext { rx_command, stop })
                 .await?;
             tx_command
-                .send(AuthCommand::AuthGeeTest {
+                .send(AuthCommand::GeeTest {
                     resp,
                     gt,
                     challenge,
                 })
                 .await?;
             rx.await?
-        })(gt.clone())
-        .await;
+        };
+
+        let auth_result = invoke_auth(gt.clone()).await;
 
         let captcha_info = match auth_result.and_then(|result| match result {
             AuthResult::GeeTestAuth { token, .. } => {

@@ -184,14 +184,14 @@ impl<T: UserState + ?Sized> UserStateDataSource for T {
             if let (Some(_), Some(payload), Some(_), None) =
                 (iter.next(), iter.next(), iter.next(), iter.next())
             {
-                match base64::engine::general_purpose::STANDARD_NO_PAD
+                if let Ok(state) = base64::engine::general_purpose::STANDARD_NO_PAD
                     .decode(payload)
                     .map_err(anyhow::Error::from)
                     .and_then(|x| {
                         serde_json::de::from_slice::<UserStateData>(&x).map_err(anyhow::Error::from)
-                    }) {
-                    Ok(state) => return Some(state),
-                    Err(_) => {}
+                    })
+                {
+                    return Some(state);
                 }
             }
         }
