@@ -18,7 +18,6 @@ pub mod arkhost {
     pub const API_BASE_URL: &str = "https://api.ltsc.vip/";
     pub mod api {
         pub const GAMES: &str = "game";
-        pub const GAMES_SSE: &str = "sse/games";
 
         pub fn game(account: &str) -> String {
             format!("game/{account}")
@@ -34,6 +33,8 @@ pub mod arkhost {
         }
 
         pub mod sse {
+            pub const GAMES: &str = "sse/games";
+
             pub const EVENT_TYPE_GAME: &str = "game";
             pub const EVENT_TYPE_SSR: &str = "ssr";
             pub const EVENT_TYPE_CLOSE: &str = "close";

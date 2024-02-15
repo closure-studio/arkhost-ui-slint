@@ -1,10 +1,10 @@
 use crate::app::{
-    api_controller::RetrieveLogSpec,
+    api_worker::RetrieveLogSpec,
     app_state::{
         mapping::GameInfoMapping,
         model::{CharIllust, ImageDataRaw, ImageDataRef},
     },
-    asset_controller::AssetRef,
+    asset_worker::AssetRef,
     controller::RefreshLogsCondition,
     game_data::{CharPack, CharPackSummaryTable, StageTable},
     rt_api_model,
@@ -159,6 +159,9 @@ impl GameController {
                             },
                             GameSseEvent::Unrecognized(ev_type) => {
                                 println!("[Controller] Unrecognized SSE event: {ev_type}");
+                            },
+                            GameSseEvent::RecoverableError(e) => {
+                                println!("[Controller] SSE Client is recovering on error: {e}")
                             }
                         },
                         Ok(None) => {

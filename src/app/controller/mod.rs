@@ -19,7 +19,7 @@ use self::user_controller::UserController;
 use self::{app_state_controller::AppStateController, session_controller::SessionController};
 use super::app_state::mapping::{GameOptionsMapping, SlotUpdateDraftMapping};
 use super::app_state::AppState;
-use super::auth_controller::AuthContext;
+use super::auth_worker::AuthContext;
 use super::ui::*;
 use super::utils::ext_link;
 use arkhost_api::models::api_quota::user_tier_availability_rank;
@@ -29,10 +29,10 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
-type ApiOperation = super::api_controller::Operation;
-type ApiCommand = super::api_controller::Command;
-type AuthCommand = super::auth_controller::Command;
-type AssetCommand = super::asset_controller::Command;
+type ApiOperation = super::api_worker::Operation;
+type ApiCommand = super::api_worker::Command;
+type AuthCommand = super::auth_worker::Command;
+type AssetCommand = super::asset_worker::Command;
 
 type ApiResult<T> = arkhost_api::clients::common::ApiResult<T>;
 type AuthResult = super::webview::auth::AuthResult;
@@ -73,9 +73,9 @@ impl ControllerAdaptor {
     pub fn new(
         app_state: AppState,
         rt_api_model: Arc<RtApiModel>,
-        tx_api_controller: mpsc::Sender<ApiCommand>,
-        tx_auth_controller: mpsc::Sender<AuthContext>,
-        tx_asset_controller: mpsc::Sender<AssetCommand>,
+        tx_api_worker: mpsc::Sender<ApiCommand>,
+        tx_auth_worker: mpsc::Sender<AuthContext>,
+        tx_asset_worker: mpsc::Sender<AssetCommand>,
     ) -> Self {
         let app_state = Arc::new(Mutex::new(app_state));
         let app_state_controller = Arc::new(AppStateController {
@@ -83,9 +83,9 @@ impl ControllerAdaptor {
         });
         let sender = Arc::new(Sender {
             rt_api_model: rt_api_model.clone(),
-            tx_api_controller,
-            tx_auth_controller,
-            tx_asset_controller,
+            tx_api_worker,
+            tx_auth_worker,
+            tx_asset_worker,
         });
         let image_controller = Arc::new(ImageController::new(sender.clone()));
         let game_operation_controller = Arc::new(GameOperationController::new(
@@ -142,18 +142,6 @@ impl ControllerAdaptor {
             let this = self.clone();
             app.on_login_requested(move |account, password| {
                 let app = app_weak.clone().unwrap();
-
-                if account.is_empty() {
-                    app.set_login_status_text("账号不能为空 ".into());
-                    app.set_login_state(LoginState::Errored);
-                    return;
-                }
-
-                if password.is_empty() {
-                    app.set_login_status_text("密码不能为空 ".into());
-                    app.set_login_state(LoginState::Errored);
-                    return;
-                }
 
                 app.set_login_status_text("正在登录…… ".into());
                 app.set_login_state(LoginState::LoggingIn);

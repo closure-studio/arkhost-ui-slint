@@ -41,12 +41,12 @@ pub enum Command {
     },
 }
 
-pub struct AssetController {
+pub struct AssetWorker {
     pub asset_client: Arc<AssetClient>,
     pub cache: Arc<RwLock<HashMap<String, AssetRef>>>,
 }
 
-impl AssetController {
+impl AssetWorker {
     pub fn new(asset_client: AssetClient) -> Self {
         Self {
             asset_client: Arc::new(asset_client),

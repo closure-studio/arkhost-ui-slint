@@ -20,6 +20,6 @@ pub enum Command {
 }
 
 #[async_trait]
-pub trait AuthController {
+pub trait AuthWorker {
     async fn run(&mut self, tx: mpsc::Receiver<AuthContext>, stop: CancellationToken);
 }

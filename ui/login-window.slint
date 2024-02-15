@@ -98,8 +98,7 @@ export component LoginWindow {
                 Button {
                     primary: true;
                     enabled: !logging 
-                        && account-input.text != "" 
-                        && password-input.text != "";
+                        && ((account-input.text != "" && password-input.text != "") || use-auth);
                     text: @tr("登录");
                     width: parent.width - 40px;
                     clicked => {

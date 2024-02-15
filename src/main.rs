@@ -4,20 +4,21 @@
 mod app;
 
 use app::app_state::AppState;
-use app::asset_controller::AssetController;
+use app::asset_worker::AssetWorker;
 #[cfg(feature = "desktop-app")]
-use app::auth_controller::ipc::IpcAuthController;
+use app::auth_worker::ipc::IpcAuthWorker;
 
-use app::auth_controller::AuthController;
+use app::auth_worker::AuthWorker;
 use app::controller::rt_api_model::RtApiModel;
 use app::ui::*;
+use app::utils::cache_manager::CACacheManager;
 use app::utils::data_dir::data_dir;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
-use app::{api_controller::Controller as ApiController, controller::ControllerAdaptor};
+use app::{api_worker::Worker as ApiWorker, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
 use arkhost_api::clients::common::UserState;
 use arkhost_api::clients::{common::UserStateDataSource, id_server::AuthClient};
-use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
+use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
 use std::sync::{Arc, RwLock};
@@ -26,7 +27,7 @@ use tokio::{self, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 
 fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
-    let client = AuthClient::client_builder_with_default_settings()
+    let client = AuthClient::default_client_builder()
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
@@ -47,7 +48,7 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
 }
 
 fn create_asset_client() -> AssetClient {
-    let client = AssetClient::client_builder_with_default_settings()
+    let client = AssetClient::default_client_builder()
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
@@ -65,9 +66,8 @@ fn create_asset_client() -> AssetClient {
             },
             options: HttpCacheOptions {
                 cache_mode_fn: Some(Arc::new(|req| {
-                    // TODO: temporary fix
-                    if req.uri.path().ends_with(".json") || req.uri.path().contains("/avatar/") {
-                        CacheMode::NoStore
+                    if req.uri.path().ends_with(".webp") {
+                        CacheMode::ForceCache
                     } else {
                         CacheMode::Default
                     }
@@ -96,34 +96,36 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     let stop = CancellationToken::new();
     let _guard = stop.clone().drop_guard();
 
-    let mut api_controller = ApiController::new(auth_client);
+    let mut api_worker = ApiWorker::new(auth_client);
     let (tx_api_command, rx_api_command) = mpsc::channel(32);
-    {
+    tokio::spawn({
         let stop = stop.clone();
-        tokio::spawn(async move {
-            api_controller.run(rx_api_command, stop).await;
-        });
-    }
+        async move {
+            api_worker.run(rx_api_command, stop).await;
+        }
+    });
+    
 
     #[cfg(feature = "desktop-app")]
-    let mut auth_controller = IpcAuthController::new();
+    let mut auth_worker = IpcAuthWorker::new();
     let (tx_auth_command, rx_auth_command) = mpsc::channel(16);
-    {
+    let stop = stop.clone();
+    tokio::spawn({
         let stop = stop.clone();
-        tokio::spawn(async move {
-            auth_controller.run(rx_auth_command, stop).await;
-        });
-    }
+        async move {
+            auth_worker.run(rx_auth_command, stop).await;
+        }
+    });
 
     let asset_client = create_asset_client();
-    let mut asset_controller = AssetController::new(asset_client);
+    let mut asset_worker = AssetWorker::new(asset_client);
     let (tx_asset_command, rx_asset_command) = mpsc::channel(32);
-    {
+    tokio::spawn({
         let stop = stop.clone();
-        tokio::spawn(async move {
-            asset_controller.run(rx_asset_command, stop).await;
-        });
-    }
+        async move {
+            asset_worker.run(rx_asset_command, stop).await;
+        }
+    });
 
     let ui = AppWindow::new()?;
     let adaptor = Arc::new(ControllerAdaptor::new(
@@ -155,12 +157,11 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "desktop-app")]
     if let Some(result) = app::webview::auth::subprocess_webview::launch_if_requested() {
         result?;
-        return Ok(());
+    } else {
+        let app_window_result = run_app().await;
+        app_window_result?;
+        println!("[main] APP exited on close requested.");
     }
-
-    let app_window_result = run_app().await;
-
-    app_window_result?;
-    println!("[main] APP exited on close requested.");
+    
     Ok(())
 }

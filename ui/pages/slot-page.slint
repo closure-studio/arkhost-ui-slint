@@ -44,7 +44,7 @@ export component SlotPage {
                         text: @tr("👀 该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
                     }
 
-                    if user-info.progress == UserProgress.Initial: BannerNotification {
+                    if user-info.progress == UserProgress.Initial && !user-card.sms-dialog-open: BannerNotification {
                         property <image> empty;
 
                         background-color: #00649ebb;

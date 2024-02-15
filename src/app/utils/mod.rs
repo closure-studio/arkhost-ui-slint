@@ -3,3 +3,4 @@ pub mod ext_link;
 pub mod subprocess;
 pub mod data_dir;
 pub mod user_state;
+pub mod cache_manager;

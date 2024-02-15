@@ -1,4 +1,4 @@
-use crate::app::auth_controller::AuthContext;
+use crate::app::auth_worker::AuthContext;
 
 use super::rt_api_model::RtApiModel;
 use super::{
@@ -11,14 +11,14 @@ use tokio::sync::oneshot;
 
 pub struct Sender {
     pub rt_api_model: Arc<RtApiModel>,
-    pub tx_api_controller: mpsc::Sender<ApiCommand>,
-    pub tx_auth_controller: mpsc::Sender<AuthContext>,
-    pub tx_asset_controller: mpsc::Sender<AssetCommand>,
+    pub tx_api_worker: mpsc::Sender<ApiCommand>,
+    pub tx_auth_worker: mpsc::Sender<AuthContext>,
+    pub tx_asset_worker: mpsc::Sender<AssetCommand>,
 }
 
 impl Sender {
     pub async fn send_api_command(&self, op: ApiOperation) -> ApiResult<()> {
-        self.tx_api_controller
+        self.tx_api_worker
             .send(ApiCommand {
                 user: self.rt_api_model.user.clone(),
                 op,
@@ -43,7 +43,7 @@ impl Sender {
     }
 
     pub async fn send_asset_command(&self, command: AssetCommand) -> AssetResult<()> {
-        self.tx_asset_controller
+        self.tx_asset_worker
             .send(command)
             .await
             .map_err(ApiError::CommandSendError::<AssetCommand>)?;

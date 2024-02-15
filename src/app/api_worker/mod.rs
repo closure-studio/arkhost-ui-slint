@@ -1,4 +1,5 @@
 use anyhow::Context;
+use arkhost_api::clients::arkhost::EventSourceClient;
 use arkhost_api::clients::{self, common::ApiResult};
 use arkhost_api::consts;
 use arkhost_api::models::{api_arkhost, api_passport, api_quota};
@@ -105,14 +106,14 @@ pub struct Command {
     pub op: Operation,
 }
 
-pub struct Controller {
+pub struct Worker {
     pub auth_client: Arc<clients::id_server::AuthClient>,
     pub arkhost_client: Arc<clients::arkhost::Client>,
     pub registry_client: Arc<clients::quota::Client>,
     pub eventsource_client: Arc<clients::arkhost::EventSourceClient>,
 }
 
-impl Controller {
+impl Worker {
     pub fn new(auth_client: clients::id_server::AuthClient) -> Self {
         Self {
             auth_client: Arc::new(auth_client.clone()),
@@ -190,7 +191,7 @@ impl Controller {
         let game_details = self.arkhost_client.get_game(&account).await?;
         let game_ref = user_model.find_game(&account).await?;
         game_ref.game.write().await.details = Some(game_details);
-        user_model.find_game(&account).await
+        Ok(game_ref)
     }
 
     pub async fn retrieve_log(
@@ -245,9 +246,9 @@ impl Controller {
         }
         game.log_cursor_front = game.logs.first().map_or(0, |x| x.id);
         game.log_cursor_back = game.logs.last().map_or(0, |x| x.id);
-
         drop(game);
-        user_model.find_game(&account).await
+
+        Ok(game_ref)
     }
 
     pub async fn start_game(&self, account: String, captcha_token: String) -> CommandResult<()> {
@@ -375,7 +376,10 @@ impl Controller {
                 );
             }
             Operation::ConnectGameEventSource { resp } => {
-                _ = resp.send(self.eventsource_client.connect_games_sse())
+                _ = resp.send(
+                    self.eventsource_client
+                        .connect_games_sse(|url| EventSourceClient::build_default_client(url)),
+                )
             }
         }
     }

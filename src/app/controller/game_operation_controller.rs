@@ -1,4 +1,4 @@
-use crate::app::auth_controller::AuthContext;
+use crate::app::auth_worker::AuthContext;
 use crate::app::ui::*;
 use crate::app::webview::auth::AuthResult;
 use arkhost_api::models::api_arkhost;
@@ -56,7 +56,7 @@ impl GameOperationController {
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
             self.sender
-                .tx_auth_controller
+                .tx_auth_worker
                 .send(AuthContext { rx_command, stop })
                 .await?;
 
@@ -140,7 +140,7 @@ impl GameOperationController {
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
             self.sender
-                .tx_auth_controller
+                .tx_auth_worker
                 .send(AuthContext { rx_command, stop })
                 .await?;
             tx_command

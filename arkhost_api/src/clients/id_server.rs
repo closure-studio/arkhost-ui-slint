@@ -34,9 +34,9 @@ impl AuthClient {
         }
     }
 
-    pub fn client_builder_with_default_settings() -> reqwest::ClientBuilder {
-        let client_builder = common::client_builder_with_common_options();
-        let headers = common::common_headers();
+    pub fn default_client_builder() -> reqwest::ClientBuilder {
+        let client_builder = common::client_builder();
+        let headers = common::headers();
         client_builder
             .default_headers(headers)
     }

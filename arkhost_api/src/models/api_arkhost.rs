@@ -52,6 +52,7 @@ pub enum GameSseEvent {
     Ssr(Vec<SsrRecord>),
     Close,
     Unrecognized(String),
+    RecoverableError(anyhow::Error),
 }
 
 #[serde_as]

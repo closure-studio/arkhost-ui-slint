@@ -95,7 +95,7 @@ component GameCardTabSwitch inherits Rectangle {
                         rotation-angle: 360deg;
                         in { animate rotation-angle { duration: 0.5s; } }
                     }
-                    reset-rotate when enable-special-fx: {
+                    reset-rotate when enable-special-fx && !touch-area.pressed: {
                         rotation-angle: 0deg;
                         in { animate rotation-angle { duration: 1s; delay: 1s; } }
                     }
@@ -109,9 +109,20 @@ component GameCardTabSwitch inherits Rectangle {
                 vertical-alignment: top;
                 horizontal-alignment: center;
                 height: selected ? 15px : 0px;
-                opacity: selected ? 1 : 0;
                 animate height { duration: 0.25s; }
-                animate opacity { duration: 0.25s; }
+
+                states [
+                    show when selected: {
+                        height: 15px;
+                        opacity: 1;
+                        in { animate opacity { delay: 0.15s; duration: 0.1s; } }
+                    }
+                    hide when !selected: {
+                        height: 0px;
+                        opacity: 0;
+                        in { animate opacity { duration: 0.1s; } }
+                    }
+                ]
             }
         }
     }

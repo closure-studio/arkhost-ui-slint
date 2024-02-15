@@ -1,7 +1,9 @@
+use std::env;
+use std::ffi::OsStr;
 use std::sync::Arc;
 
 use super::AuthContext;
-use super::AuthController;
+use super::AuthWorker;
 use super::Command;
 use crate::app::ipc::AuthenticatorServerSideChannel;
 use crate::app::ipc::{AuthenticatorConnection, AuthenticatorMessage};
@@ -18,11 +20,11 @@ struct AuthProcess {
     connection: AuthenticatorConnection,
 }
 
-pub struct IpcAuthController {
+pub struct IpcAuthWorker {
     auth_process: Option<Arc<Mutex<AuthProcess>>>,
 }
 
-impl IpcAuthController {
+impl IpcAuthWorker {
     async fn exec_cmd(&mut self, cmd: Command) {
         match cmd {
             Command::ArkHostBackground { resp, action } => {
@@ -71,7 +73,7 @@ impl IpcAuthController {
 }
 
 #[async_trait]
-impl AuthController for IpcAuthController {
+impl AuthWorker for IpcAuthWorker {
     async fn run(&mut self, mut tx: mpsc::Receiver<AuthContext>, stop: CancellationToken) {
         tokio::select! {
             _ = async {
@@ -97,7 +99,7 @@ impl AuthController for IpcAuthController {
     }
 }
 
-impl IpcAuthController {
+impl IpcAuthWorker {
     pub fn new() -> Self {
         Self { auth_process: None }
     }
@@ -153,7 +155,7 @@ impl IpcAuthController {
                 let mut auth_process = auth_process.lock().await;
                 match auth_process.process.poll() {
                     Some(exit_status) => {
-                        println!("[IpcAuthController] Auth process exited with status {exit_status:?}, respawning...");
+                        println!("[IpcAuthWorker] Auth process exited with status {exit_status:?}, respawning...");
                         false
                     }
                     None => true,
@@ -169,14 +171,18 @@ impl IpcAuthController {
             String,
         ) = IpcOneShotServer::new().unwrap();
 
-        let mut process = crate::app::utils::subprocess::dup_current_exe(&[
-            "",
-            "--launch-webview",
-            "--account",
-            "UNUSED",
-            "--ipc",
-            &ipc_server_name,
-        ])?;
+        let current_exe = env::current_exe().unwrap_or_default();
+        let mut process = crate::app::utils::subprocess::spawn_executable(
+            current_exe.as_os_str(),
+            &[
+                current_exe.as_os_str(),
+                OsStr::new("--launch-webview"),
+                OsStr::new("--account"),
+                OsStr::new("UNUSED"),
+                OsStr::new("--ipc"),
+                OsStr::new(&ipc_server_name),
+            ],
+        )?;
 
         match AuthenticatorConnection::accept(ipc_server) {
             Ok(connection) => Ok(Arc::new(Mutex::new(AuthProcess {

@@ -200,7 +200,7 @@ impl<T: UserState + ?Sized> UserStateDataSource for T {
     }
 }
 
-pub fn common_headers() -> reqwest::header::HeaderMap {
+pub fn headers() -> reqwest::header::HeaderMap {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "X-Platform",
@@ -214,7 +214,7 @@ pub fn common_headers() -> reqwest::header::HeaderMap {
     headers
 }
 
-pub fn client_builder_with_common_options() -> reqwest::ClientBuilder {
+pub fn client_builder() -> reqwest::ClientBuilder {
     reqwest::ClientBuilder::new()
         .min_tls_version(reqwest::tls::Version::TLS_1_2)
         .max_tls_version(reqwest::tls::Version::TLS_1_3)

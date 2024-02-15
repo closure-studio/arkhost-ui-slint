@@ -1,6 +1,6 @@
 use crate::app::{
     app_state::model::{ImageDataRaw, ImageDataRef},
-    asset_controller::AssetRef,
+    asset_worker::AssetRef,
     rt_api_model,
 };
 

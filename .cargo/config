@@ -1,0 +1,5 @@
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[env]
+SKIA_BINARIES_URL = "https://github.com/wg138940/skia-binaries/releases/download/{tag}/skia-binaries-{key}.tar.gz"

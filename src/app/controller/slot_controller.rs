@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
-use crate::app::auth_controller::AuthContext;
+use crate::app::auth_worker::AuthContext;
 use crate::app::controller::AuthCommand;
 use crate::app::ui::UserIdApiRequestState;
 
@@ -132,17 +132,17 @@ impl SlotController {
             let stop = CancellationToken::new();
             let _guard = stop.clone().drop_guard();
             self.sender
-                .tx_auth_controller
+                .tx_auth_worker
                 .send(AuthContext { rx_command, stop })
                 .await?;
-            for (auth_command, mut rx_auth_controller) in auth_attempts.by_ref() {
+            for (auth_command, mut rx_auth_worker) in auth_attempts.by_ref() {
                 match self
                     .try_update_slot(
                         id.clone(),
                         auth_command,
                         update_request.clone(),
                         &tx_command,
-                        &mut rx_auth_controller,
+                        &mut rx_auth_worker,
                     )
                     .await
                 {

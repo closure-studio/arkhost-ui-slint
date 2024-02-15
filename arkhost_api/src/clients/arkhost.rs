@@ -6,10 +6,9 @@ use super::{
 };
 use crate::models::{api_arkhost::*, common::ResponseWrapperNested};
 use crate::{consts::arkhost::api, models::common::NullableData};
-use es::Client as EsClient;
 use eventsource_client as es;
 
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 use reqwest::Url;
 pub struct Client {
     base_url: Url,
@@ -145,43 +144,36 @@ impl EventSourceClient {
         }
     }
 
-    pub fn connect_games_sse(&self) -> anyhow::Result<SseStream<anyhow::Result<GameSseEvent>>> {
-        let mut url = self.base_url.join(api::GAMES_SSE)?;
+    pub fn connect_games_sse<C: es::Client>(
+        &self,
+        build_client: impl FnOnce(&str) -> anyhow::Result<C>,
+    ) -> anyhow::Result<SseStream<anyhow::Result<GameSseEvent>>> {
+        let mut url = self.base_url.join(api::sse::GAMES)?;
         url.query_pairs_mut()
             .append_pair("token", &self.auth_client.jwt()?);
 
-        let client = Self::default_client(url.as_str())?;
-        let stream = client
-            .stream()
-            .map_err(anyhow::Error::from)
-            .try_filter_map(|ev| async {
-                match ev {
-                    es::SSE::Event(ev) => match ev.event_type.as_str() {
-                        api::sse::EVENT_TYPE_GAME => {
-                            let games: NullableData<Vec<GameInfo>> =
-                                serde_json::de::from_str(&ev.data)?;
-                            match games {
-                                NullableData::Data(games) => Ok(Some(GameSseEvent::Game(games))),
-                                _ => Ok(Some(GameSseEvent::Game(Vec::default()))),
-                            }
-                        }
-                        api::sse::EVENT_TYPE_SSR => {
-                            let ssr_list: Vec<SsrRecord> = serde_json::de::from_str(&ev.data)?;
-                            Ok(Some(GameSseEvent::Ssr(ssr_list)))
-                        }
-                        api::sse::EVENT_TYPE_CLOSE => Ok(Some(GameSseEvent::Close)),
-                        other => Ok(Some(GameSseEvent::Unrecognized(other.into()))),
-                    },
-                    es::SSE::Comment(_) => Ok(None), // Error on unexpected comment?
+        let client = build_client(url.as_str())?;
+        let stream = client.stream().filter_map(|res| async {
+            match res {
+                Ok(ev) => match ev {
+                    es::SSE::Event(ev) => Some(Self::try_parse_ev(ev)),
+                    es::SSE::Comment(_) => None, // Error on unexpected comment?
+                },
+                Err(e) => {
+                    // 先前出现读到EOF时 eventsource_client 仍可继续重试，
+                    // 但仍抛出eventsource_client::Error 错误导致下游中止连接
+                    // 故忽略错误并全部交由 eventsource_client::Client 重试
+                    Some(Ok(GameSseEvent::RecoverableError(anyhow::Error::from(e))))
                 }
-            });
+            }
+        });
 
         Ok(stream.boxed())
     }
 
-    pub fn default_client(url: &str) -> anyhow::Result<impl es::Client> {
+    pub fn build_default_client(url: &str) -> anyhow::Result<impl es::Client> {
         let mut builder = es::ClientBuilder::for_url(url)?;
-        for (k, v) in common::common_headers() {
+        for (k, v) in common::headers() {
             if let Some(header_name) = k {
                 builder = builder.header(header_name.as_str(), v.to_str()?)?;
             }
@@ -198,5 +190,23 @@ impl EventSourceClient {
             .build();
 
         Ok(client)
+    }
+
+    fn try_parse_ev(ev: es::Event) -> anyhow::Result<GameSseEvent> {
+        match ev.event_type.as_str() {
+            api::sse::EVENT_TYPE_GAME => {
+                let games: NullableData<Vec<GameInfo>> = serde_json::de::from_str(&ev.data)?;
+                Ok(match games {
+                    NullableData::Data(games) => GameSseEvent::Game(games),
+                    _ => GameSseEvent::Game(Vec::default()),
+                })
+            }
+            api::sse::EVENT_TYPE_SSR => {
+                let ssr_list: Vec<SsrRecord> = serde_json::de::from_str(&ev.data)?;
+                Ok(GameSseEvent::Ssr(ssr_list))
+            }
+            api::sse::EVENT_TYPE_CLOSE => Ok(GameSseEvent::Close),
+            other => Ok(GameSseEvent::Unrecognized(other.into())),
+        }
     }
 }

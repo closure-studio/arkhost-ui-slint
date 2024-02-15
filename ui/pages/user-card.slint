@@ -7,14 +7,13 @@ import { FontGlobals } from "../font-globals.slint";
 component SmsVerifyArea inherits VerticalLayout {
     in property <UserInfo> user-info;
     in property <bool> requesting;
+    out property <bool> sms-dialog-open: false;
 
     public function open-dialog() {
         if !UserInfoUtils.is-sms-verified(user-info) && !sms-dialog-open {
             sms-dialog-open = true;
         }
     }
-
-    private property <bool> sms-dialog-open: false;
     
     if UserInfoUtils.is-sms-verified(user-info) || !sms-dialog-open : GroupBox {
         title: @tr("游戏账号归属认证");
@@ -112,8 +111,8 @@ component SmsVerifyArea inherits VerticalLayout {
 component QQVerifyArea inherits VerticalLayout {
     in property <UserInfo> user-info;
     in property <bool> requesting;
+    out property <bool> qq-dialog-open: false;
 
-    private property <bool> qq-dialog-open: false;
     private property <bool> qq-verify-code-copied: false;
 
     public function open-dialog() {
@@ -243,6 +242,8 @@ component QQVerifyArea inherits VerticalLayout {
 
 export component UserCard inherits Rectangle {
     in property <UserInfo> user-info: MockData.user-info;
+    out property <bool> sms-dialog-open: sms-verify-area.sms-dialog-open;
+    out property <bool> qq-dialog-open: qq-verify-area.qq-dialog-open;
     private property <bool> requesting: user-info.id-api-request-state == UserIdApiRequestState.Requesting;
 
     public function open-qq-verify-dialog() {
@@ -350,27 +351,32 @@ export component UserCard inherits Rectangle {
         GroupBox {
             title: @tr("其他");
 
-            HorizontalLayout {
-                spacing: 10px;
+            Rectangle {
+                HorizontalLayout {
+                    spacing: 10px;
 
-                Button {
-                    text: @tr("复制用户ID");
-                    width: 150px;
-        
-                    clicked => {
-                        uuid-dummy.select-all();
-                        uuid-dummy.copy();
-                        uuid-dummy.clear-selection();
+                    Button {
+                        text: @tr("复制用户ID");
+            
+                        clicked => {
+                            uuid-dummy.select-all();
+                            uuid-dummy.copy();
+                            uuid-dummy.clear-selection();
+                        }
                     }
-                }
 
-                Button {
-                    text: @tr("回到登录界面");
-                    width: 150px;
-        
-                    clicked => {
-                        Callbacks.return-to-login-page();
+                    Button {
+                        text: @tr("回到登录界面");
+            
+                        clicked => {
+                            Callbacks.return-to-login-page();
+                        }
                     }
+
+                    width: 300px;
+                    height: 30px;
+                    x: 0;
+                    y: 0;
                 }
 
                 uuid-dummy := TextInput {
