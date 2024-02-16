@@ -17,7 +17,7 @@ pub mod utils;
 
 #[cfg(feature = "desktop-app")]
 /// 用于在桌面端中处理UI进程和验证网页弹窗进程的通讯
-pub mod ipc;
+pub mod ipc_auth_comm;
 /// 用于显示网页弹窗或WebView来进行用户验证/游戏验证
 pub mod webview;
 /// Slint codegen

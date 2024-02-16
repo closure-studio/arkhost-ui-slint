@@ -6,9 +6,13 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum AuthenticatorConnectionError {
+pub enum AuthenticatorCommError {
+    #[error("failed to launch authenticator WebView")]
+    LaunchWebViewFailed,
+    #[error("error send authenticator message")]
+    SendError(anyhow::Error),
     #[error("error receiving authenticator message")]
-    RecvError(#[from] anyhow::Error),
+    RecvError(anyhow::Error),
     #[error("expected response of type {expected}, got: {got}")]
     InvalidResponse { expected: String, got: String },
     #[error("authenticator was unexpectedly closed")]
@@ -24,6 +28,7 @@ pub enum AuthenticatorMessage {
     CloseRequested,
     ReloadRequested,
     Closed,
+    LaunchWebViewFailed,
 }
 
 pub struct AuthenticatorConnection {
@@ -65,13 +70,19 @@ impl AuthenticatorConnection {
         })
     }
 
-    pub async fn send_command(&mut self, command: AuthenticatorMessage) -> anyhow::Result<()> {
-        self.tx_client_sender.send(command)?;
+    pub async fn send_command(
+        &mut self,
+        command: AuthenticatorMessage,
+    ) -> Result<(), AuthenticatorCommError> {
+        self.tx_client_sender.send(command).map_err(|e| AuthenticatorCommError::SendError(e.into()))?;
         let event = self.rx_client_receiver.next().await;
         match event {
-            Some(Err(e)) => Err(AuthenticatorConnectionError::RecvError(e.into()).into()),
+            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into()).into()),
             Some(Ok(AuthenticatorMessage::Acknowledged)) => Ok(()),
-            _ => Err(AuthenticatorConnectionError::InvalidResponse {
+            Some(Ok(AuthenticatorMessage::LaunchWebViewFailed)) => {
+                Err(AuthenticatorCommError::LaunchWebViewFailed)
+            }
+            _ => Err(AuthenticatorCommError::InvalidResponse {
                 expected: "Acknowledged".into(),
                 got: format!("{event:?}"),
             }
@@ -82,17 +93,17 @@ impl AuthenticatorConnection {
     pub async fn send_auth_action(
         &mut self,
         action: AuthenticatorMessage,
-    ) -> anyhow::Result<auth::AuthResult> {
+    ) -> Result<auth::AuthResult, AuthenticatorCommError> {
         self.send_command(action).await?;
 
         let event = self.rx_client_receiver.next().await;
         match event {
-            Some(Err(e)) => Err(AuthenticatorConnectionError::RecvError(e.into()).into()),
+            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into()).into()),
             Some(Ok(AuthenticatorMessage::Result { result })) => Ok(result),
             Some(Ok(AuthenticatorMessage::Closed)) => {
-                Err(AuthenticatorConnectionError::AuthenticatorClosed.into())
+                Err(AuthenticatorCommError::AuthenticatorClosed.into())
             }
-            _ => Err(AuthenticatorConnectionError::InvalidResponse {
+            _ => Err(AuthenticatorCommError::InvalidResponse {
                 expected: "Result".into(),
                 got: format!("{event:?}"),
             }

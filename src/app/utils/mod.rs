@@ -4,3 +4,5 @@ pub mod subprocess;
 pub mod data_dir;
 pub mod user_state;
 pub mod cache_manager;
+#[cfg(target_os = "windows")]
+pub mod webview2;

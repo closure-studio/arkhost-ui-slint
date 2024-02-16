@@ -3,12 +3,13 @@ use std::ffi::OsStr;
 use std::sync::Arc;
 
 use super::AuthContext;
+use super::AuthError;
 use super::AuthWorker;
 use super::Command;
-use crate::app::ipc::AuthenticatorServerSideChannel;
-use crate::app::ipc::{AuthenticatorConnection, AuthenticatorMessage};
+use crate::app::ipc_auth_comm::AuthenticatorCommError;
+use crate::app::ipc_auth_comm::AuthenticatorServerSideChannel;
+use crate::app::ipc_auth_comm::{AuthenticatorConnection, AuthenticatorMessage};
 use crate::app::webview::auth::{AuthAction, AuthResult};
-use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_channel::ipc::IpcOneShotServer;
 use subprocess::Popen;
@@ -24,7 +25,76 @@ pub struct IpcAuthWorker {
     auth_process: Option<Arc<Mutex<AuthProcess>>>,
 }
 
+#[async_trait]
+impl AuthWorker for IpcAuthWorker {
+    async fn run(&mut self, mut tx: mpsc::Receiver<AuthContext>, stop: CancellationToken) {
+        tokio::select! {
+            _ = async {
+                while let Some(context) = tx.recv().await {
+                    tokio::select! {
+                        _ = async {
+                            let mut rx_command = context.rx_command;
+                            while let Some(cmd) = rx_command.recv().await {
+                                self.exec_cmd(cmd).await;
+                            }
+                        } => {},
+                        _ = context.stop.cancelled() => {}
+                    }
+                    _ = self.set_visible(false).await;
+                }
+            } => {},
+            _ = stop.cancelled() => {}
+        }
+
+        if let Some(auth_process) = &self.auth_process {
+            auth_process.lock().await.connection.close();
+        }
+    }
+}
+
 impl IpcAuthWorker {
+    pub fn new() -> Self {
+        Self { auth_process: None }
+    }
+
+    pub async fn set_visible(&mut self, visible: bool) -> anyhow::Result<()> {
+        let auth_process = self.ensure_auth_process().await?;
+        let mut auth_process = auth_process.lock().await;
+        Ok(auth_process
+            .connection
+            .send_command(AuthenticatorMessage::SetVisible {
+                x: 0.,
+                y: 0.,
+                visible,
+            })
+            .await?)
+    }
+
+    pub async fn auth(
+        &mut self,
+        action: AuthAction,
+        in_background: bool,
+    ) -> anyhow::Result<AuthResult> {
+        let auth_process = self.ensure_auth_process().await?;
+        let mut auth_process = auth_process.lock().await;
+        auth_process
+            .connection
+            .send_command(AuthenticatorMessage::SetVisible {
+                x: 250.,
+                y: 250.,
+                visible: !in_background,
+            })
+            .await?;
+        let auth_result = auth_process
+            .connection
+            .send_auth_action(AuthenticatorMessage::PerformAction { action })
+            .await?;
+        match auth_result {
+            AuthResult::Failed { .. } => Err(AuthError::AuthFailed(auth_result).into()),
+            _ => Ok(auth_result),
+        }
+    }
+
     async fn exec_cmd(&mut self, cmd: Command) {
         match cmd {
             Command::ArkHostBackground { resp, action } => {
@@ -68,77 +138,27 @@ impl IpcAuthWorker {
                     .await,
                 )
             }
+            Command::LaunchAuthenticator { resp } => {
+                _ = resp.send(self.try_launch_authenticator().await);
+            }
         }
     }
-}
 
-#[async_trait]
-impl AuthWorker for IpcAuthWorker {
-    async fn run(&mut self, mut tx: mpsc::Receiver<AuthContext>, stop: CancellationToken) {
-        tokio::select! {
-            _ = async {
-                while let Some(context) = tx.recv().await {
-                    tokio::select! {
-                        _ = async {
-                            let mut rx_command = context.rx_command;
-                            while let Some(cmd) = rx_command.recv().await {
-                                self.exec_cmd(cmd).await;
-                            }
-                        } => {},
-                        _ = context.stop.cancelled() => {}
-                    }
-                    _ = self.set_visible(false).await;
-                }
-            } => {},
-            _ = stop.cancelled() => {}
-        }
-
-        if let Some(auth_process) = &self.auth_process {
-            auth_process.lock().await.connection.close();
-        }
-    }
-}
-
-impl IpcAuthWorker {
-    pub fn new() -> Self {
-        Self { auth_process: None }
-    }
-
-    pub async fn set_visible(&mut self, visible: bool) -> anyhow::Result<()> {
-        let auth_process = self.ensure_auth_process().await?;
+    async fn try_launch_authenticator(&mut self) -> Result<(), AuthError> {
+        let auth_process = self.ensure_auth_process().await.map_err(|e| AuthError::LaunchFailed(e))?;
         let mut auth_process = auth_process.lock().await;
-        auth_process
+        let result = auth_process
             .connection
             .send_command(AuthenticatorMessage::SetVisible {
                 x: 0.,
                 y: 0.,
-                visible,
+                visible: false,
             })
-            .await
-    }
-
-    pub async fn auth(
-        &mut self,
-        action: AuthAction,
-        in_background: bool,
-    ) -> anyhow::Result<AuthResult> {
-        let auth_process = self.ensure_auth_process().await?;
-        let mut auth_process = auth_process.lock().await;
-        auth_process
-            .connection
-            .send_command(AuthenticatorMessage::SetVisible {
-                x: 250.,
-                y: 250.,
-                visible: !in_background,
-            })
-            .await?;
-        let auth_result = auth_process
-            .connection
-            .send_auth_action(AuthenticatorMessage::PerformAction { action })
-            .await?;
-        match auth_result {
-            AuthResult::Failed { .. } => Err(anyhow!("auth failed: {auth_result:?}")),
-            _ => Ok(auth_result),
+            .await;
+        match result {
+            Ok(()) => Ok(()),
+            Err(AuthenticatorCommError::LaunchWebViewFailed) => Err(AuthError::LaunchWebViewFailed),
+            Err(e) => Err(AuthError::LaunchFailed(e.into())),
         }
     }
 

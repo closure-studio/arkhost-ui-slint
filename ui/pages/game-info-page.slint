@@ -5,6 +5,7 @@ import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
 import { ScrollView , VerticalBox, Spinner} from "std-widgets.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
+import { StateGlobals, WebViewType } from "../state-globals.slint";
 
 export enum FetchGamesState {
     NotFetched,
@@ -87,15 +88,37 @@ export component GameInfoPage {
                 if user.status == UserStatus.Banned : BannerNotification {
                     background-color: #8d7800ee;
                     accent-color: #fffceb;
-                    text: @tr("🛑 你的可露希尔账号已经被停用");
+                    text: @tr("🛑 你的可露希尔账号已经被管理员停用");
+                }
+
+                if !StateGlobals.has-default-webview-installation && StateGlobals.has-webview-launch-failure: BannerNotification {
+                    private property <bool> is-ms-edge-webview2: 
+                        StateGlobals.default-webview-installation-type == WebViewType.MicrosoftEdgeWebView2;
+
+                    background-color: #8d7800ee;
+                    accent-color: #fffceb;
+                    has-action: true;
+                    action-text: @tr("[下载页面]");
+                    action-icon: @image-url("../images/ext_link.svg");
+                    action => { 
+                        if is-ms-edge-webview2 {
+                            Callbacks.open-ext-link("https://developer.microsoft.com/microsoft-edge/webview2/consumer/");
+                        }
+                    }
+
+                    states [
+                        ms-edge-webview2 when is-ms-edge-webview2: {
+                            text: @tr("🚧 内置浏览器启动失败，无法进行进行滑块验证等操作。请尝试安装 Microsoft Edge WebView2 后重启客户端 👉");
+                        }
+                    ]
                 }
 
                 if user.progress == UserProgress.SmsVerifySlotAdded: BannerNotification {
                     background-color: #00649ebb;
                     accent-color: #ebf3ff;
-                    text: @tr("⏰ 你的首个账号在启动后将处于24小时试用期，启动后请注意查收验证码，及时前往认证");
+                    text: @tr("⏰ 你的首个账号在启动后将处于24小时试用期，启动后请留意验证码短信，在试用期内及时前往认证");
                     has-action: true;
-                    action-text: @tr("[转到账号管理]");
+                    action-text: @tr("[已收到验证码]");
                     action-icon: @image-url("../images/ext_link.svg");
                     action => { goto-slot-page(); }
                 }
@@ -109,11 +132,11 @@ export component GameInfoPage {
     
                     states [
                         disconnected when sse-connect-state == SseConnectState.Disconnected: {
-                            text: @tr("📡 与服务器的连接已断开，请重新连接");
+                            text: @tr("📡 与服务器的连接意外断开，请重新连接 👉");
                         }
                         disconnected-occupied-elaswhere when 
                             sse-connect-state == SseConnectState.DisconnectedOccupiedElsewhere: {
-                            text: @tr("🚧 你已经在其他位置打开可露希尔终端，请重新连接");
+                            text: @tr("🚧 你已经在其他位置登入可露希尔管理终端，请重新上线 👉");
                         }
                     ]
                 }
@@ -121,7 +144,7 @@ export component GameInfoPage {
                 if fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: BannerNotification {
                     background-color: #00649ebb;
                     accent-color: #ebf3ff;
-                    text: @tr("🤷‍♂️ 你还没有添加任何游戏账号，请前往【账号管理】添加");
+                    text: @tr("🤷‍♂️ 你还没有添加任何游戏账号，请前往【账号管理】添加 👉");
                     has-action: true;
                     action-text: @tr("[转到账号管理]");
                     action-icon: @image-url("../images/ext_link.svg");

@@ -8,7 +8,7 @@ use app::asset_worker::AssetWorker;
 #[cfg(feature = "desktop-app")]
 use app::auth_worker::ipc::IpcAuthWorker;
 
-use app::auth_worker::AuthWorker;
+use app::auth_worker::{self, AuthContext, AuthError, AuthWorker};
 use app::controller::rt_api_model::RtApiModel;
 use app::ui::*;
 use app::utils::cache_manager::CACacheManager;
@@ -18,11 +18,13 @@ use app::{api_worker::Worker as ApiWorker, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
 use arkhost_api::clients::common::UserState;
 use arkhost_api::clients::{common::UserStateDataSource, id_server::AuthClient};
+use futures_util::TryFutureExt;
 use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tokio::sync::oneshot;
 use tokio::{self, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 
@@ -104,7 +106,6 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             api_worker.run(rx_api_command, stop).await;
         }
     });
-    
 
     #[cfg(feature = "desktop-app")]
     let mut auth_worker = IpcAuthWorker::new();
@@ -136,6 +137,56 @@ async fn run_app() -> Result<(), slint::PlatformError> {
         tx_asset_command.clone(),
     ));
     adaptor.clone().attach(&ui);
+
+    #[cfg(target_os = "windows")]
+    let default_webview_installation_found = {
+        let ver = app::utils::webview2::test_installation_ver();
+        println!("[WebView2] installation found: {ver:?}");
+        ver.is_some()
+    };
+    #[cfg(not(target_os = "windows"))]
+    // TODO: detect webview installation on other OS
+    let default_webview_installation_found = true;
+
+    adaptor.app_state_controller.exec(move |x| {
+        x.state_globals(move |s| {
+            #[cfg(target_os = "windows")]
+            s.set_default_webview_installation_type(app::ui::WebViewType::MicrosoftEdgeWebView2);
+            s.set_has_default_webview_installation(default_webview_installation_found);
+        })
+    });
+    if !default_webview_installation_found {
+        let (tx_command, rx_command) = mpsc::channel(1);
+        let stop = CancellationToken::new();
+        let _guard = stop.clone().drop_guard();
+        let result = tx_auth_command
+            .send(AuthContext { rx_command, stop })
+            .map_err(anyhow::Error::from)
+            .and_then(|_| {
+                let (resp, rx_launch_result) = oneshot::channel();
+                tx_command
+                    .send(auth_worker::Command::LaunchAuthenticator { resp })
+                    .map_err(anyhow::Error::from)
+                    .and_then(|_| rx_launch_result.map_err(anyhow::Error::from))
+            })
+            .await;
+        let webview_launch_success = match result {
+            Ok(Ok(())) => true,
+            Ok(Err(AuthError::LaunchWebViewFailed)) => false,
+            Ok(Err(e)) => {
+                println!("Unknown launch error checking webview availability: {e}");
+                false
+            }
+            Err(e) => {
+                println!("Unknown error checking webview availability: {e}");
+                false
+            }
+        };
+        adaptor.app_state_controller.exec(move |x| {
+            x.state_globals(move |s| s.set_has_webview_launch_failure(!webview_launch_success))
+        });
+    }
+    
     if let Some(state) = user_state_data_or_null {
         let app_state = adaptor.app_state.lock().unwrap();
         if state.is_expired() {
@@ -162,6 +213,6 @@ async fn main() -> anyhow::Result<()> {
         app_window_result?;
         println!("[main] APP exited on close requested.");
     }
-    
+
     Ok(())
 }
