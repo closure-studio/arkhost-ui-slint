@@ -39,6 +39,10 @@ pub mod arkhost {
             pub const EVENT_TYPE_SSR: &str = "ssr";
             pub const EVENT_TYPE_CLOSE: &str = "close";
         }
+
+        pub mod system {
+            pub const CONFIG: &str = "system/config";
+        }
     }
 }
 

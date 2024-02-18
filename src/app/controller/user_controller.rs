@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot;
 
+use crate::app::utils::notification;
+
 use super::{
     app_state_controller::AppStateController, rt_api_model::RtApiModel, sender::Sender,
     ApiOperation,
@@ -35,6 +37,19 @@ impl UserController {
             .await;
         if let Err(e) = res {
             println!("[Controller] Error submitting SMS verify code: {e}");
+            notification::toast(
+                "提交验证码失败",
+                None,
+                &format!("{e}"),
+                None,
+            );
+        } else {
+            notification::toast(
+                "提交验证码成功！",
+                Some("你已解锁不限时托管和更多托管槽位"),
+                "",
+                None,
+            );
         }
     }
 
@@ -56,6 +71,12 @@ impl UserController {
             }
             Err(e) => {
                 println!("[Controller] Error fetching QQ verify code: {e}");
+                notification::toast(
+                    "获取QQ验证码失败",
+                    None,
+                    &format!("{e}"),
+                    None,
+                );
             }
         }
     }

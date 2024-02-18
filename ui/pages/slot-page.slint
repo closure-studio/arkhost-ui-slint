@@ -38,8 +38,10 @@ export component SlotPage {
                     spacing: 10px;
 
                     BannerNotification {
-                        background-color: #00649ebb;
-                        accent-color: #ebf3ff;
+                        background-color: StyleMetrics.dark-color-scheme
+                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        accent-color: StyleMetrics.default-text-color;
                         has-action: false;
                         text: @tr("👀 该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
                     }
@@ -47,7 +49,7 @@ export component SlotPage {
                     if user-info.progress == UserProgress.Initial && !user-card.sms-dialog-open: BannerNotification {
                         property <image> empty;
 
-                        background-color: #00649ebb;
+                        background-color: #0661d0;
                         accent-color: #ebf3ff;
                         text: @tr("🔰 你还没有添加第一个游戏账号，点这里开始上路 👉");
     
@@ -61,7 +63,7 @@ export component SlotPage {
                     }
 
                     if user-info.progress == UserProgress.SmsVerified: BannerNotification {
-                        background-color: #00649ebb;
+                        background-color: #0661d0;
                         accent-color: #ebf3ff;
                         text: @tr("✅ 归属认证已经完成，你可以继续添加更多托管账号了。");
 
@@ -170,7 +172,7 @@ export component SlotPage {
                     
                     width: min(root.width, 640px);
                     height: max(700px, user-info-area.min-height + 10px);
-                    min-height: self.height;
+                    min-height: 1000px;
                 }
 
                 states [

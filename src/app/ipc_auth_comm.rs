@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::webview::auth;
 use futures_util::StreamExt;
 use ipc_channel::asynch::IpcStream;
@@ -22,6 +24,7 @@ pub enum AuthenticatorCommError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuthenticatorMessage {
     Acknowledged,
+    Ping,
     SetVisible { x: f32, y: f32, visible: bool },
     PerformAction { action: auth::AuthAction },
     Result { result: auth::AuthResult },
@@ -74,19 +77,23 @@ impl AuthenticatorConnection {
         &mut self,
         command: AuthenticatorMessage,
     ) -> Result<(), AuthenticatorCommError> {
-        self.tx_client_sender.send(command).map_err(|e| AuthenticatorCommError::SendError(e.into()))?;
+        self.tx_client_sender
+            .send(command)
+            .map_err(|e| AuthenticatorCommError::SendError(e.into()))?;
         let event = self.rx_client_receiver.next().await;
         match event {
-            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into()).into()),
+            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into())),
             Some(Ok(AuthenticatorMessage::Acknowledged)) => Ok(()),
             Some(Ok(AuthenticatorMessage::LaunchWebViewFailed)) => {
                 Err(AuthenticatorCommError::LaunchWebViewFailed)
             }
+            Some(Ok(AuthenticatorMessage::Closed)) => {
+                Err(AuthenticatorCommError::AuthenticatorClosed)
+            }
             _ => Err(AuthenticatorCommError::InvalidResponse {
                 expected: "Acknowledged".into(),
                 got: format!("{event:?}"),
-            }
-            .into()),
+            }),
         }
     }
 
@@ -98,16 +105,24 @@ impl AuthenticatorConnection {
 
         let event = self.rx_client_receiver.next().await;
         match event {
-            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into()).into()),
+            Some(Err(e)) => Err(AuthenticatorCommError::RecvError(e.into())),
             Some(Ok(AuthenticatorMessage::Result { result })) => Ok(result),
             Some(Ok(AuthenticatorMessage::Closed)) => {
-                Err(AuthenticatorCommError::AuthenticatorClosed.into())
+                Err(AuthenticatorCommError::AuthenticatorClosed)
             }
             _ => Err(AuthenticatorCommError::InvalidResponse {
                 expected: "Result".into(),
                 got: format!("{event:?}"),
-            }
-            .into()),
+            }),
+        }
+    }
+
+    pub async fn ping(&mut self, timeout: Duration) -> bool {
+        tokio::select! {
+            is_ok = async {
+                self.send_command(AuthenticatorMessage::Ping).await.is_ok()
+            } => is_ok,
+            _ = tokio::time::sleep(timeout) => false
         }
     }
 

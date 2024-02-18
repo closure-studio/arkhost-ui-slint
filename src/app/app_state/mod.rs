@@ -321,7 +321,7 @@ impl AppState {
         })
     }
 
-    pub fn state_globals(&self, func: impl FnOnce(StateGlobals<'_>) -> () + Send + 'static) -> AppStateAsyncOp {
+    pub fn state_globals(&self, func: impl FnOnce(StateGlobals<'_>) + Send + 'static) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
             func(ui.global::<StateGlobals>());
         })

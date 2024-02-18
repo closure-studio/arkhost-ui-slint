@@ -272,7 +272,7 @@ impl ControllerAdaptor {
             app.on_reconnect_sse(move || {
                 let this = this.to_owned();
                 tokio::spawn(async move {
-                    this.session_controller.start_sse_event_loop().await;
+                    this.session_controller.spawn_sse_event_loop().await;
                 });
             });
         }

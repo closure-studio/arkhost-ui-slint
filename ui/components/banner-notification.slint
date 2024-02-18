@@ -8,6 +8,7 @@ export component BannerNotification inherits Rectangle {
     in property <bool> has-action: false;
     in property <string> action-text;
     in property <image> action-icon: @image-url("../images/banner_notification_apply.svg");
+    in property <TextWrap> wrap;
     callback action();
 
     background: background-color;
@@ -26,6 +27,7 @@ export component BannerNotification inherits Rectangle {
             font-weight: FontGlobals.emphasis-font-weight * 0.6;
             color: accent-color;
             vertical-alignment: center;
+            wrap: wrap;
         }
         
         if has-action: Rectangle {

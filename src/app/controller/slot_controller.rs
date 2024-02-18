@@ -12,6 +12,7 @@ use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
 use crate::app::auth_worker::AuthContext;
 use crate::app::controller::AuthCommand;
 use crate::app::ui::UserIdApiRequestState;
+use crate::app::utils::notification;
 
 use super::AuthResult;
 use super::{
@@ -91,6 +92,12 @@ impl SlotController {
                 }
                 Err(e) => {
                     println!("[Controller] Error retrieving Registry API user {e}");
+                    notification::toast(
+                        "获取用户信息失败",
+                        None,
+                        &format!("{e}"),
+                        None,
+                    );
                 }
             }
         }
@@ -153,7 +160,7 @@ impl SlotController {
                 }
             }
 
-            anyhow::bail!("all attempts failed");
+            anyhow::bail!("人机验证失败");
         };
 
         let update_result = invoke_auth(id.clone(), update_request.clone()).await;
@@ -178,6 +185,12 @@ impl SlotController {
                 let available = available.unwrap_or(result.success);
 
                 let status_text = if available {
+                    notification::toast(
+                        "更新托管成功！",
+                        None,
+                        "",
+                        None,
+                    );
                     "".to_owned()
                 } else {
                     let e = ResponseError::<SlotRuleValidationResult> {

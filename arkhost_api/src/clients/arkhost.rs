@@ -126,6 +126,21 @@ impl Client {
 
         Ok(try_response_data(status_code, json)?)
     }
+
+    pub async fn get_site_config(&self) -> ApiResult<SiteConfig> {
+        let resp = self
+            .auth_client
+            .client
+            .get(self.base_url.join(api::system::CONFIG)?)
+            .bearer_auth(self.auth_client.jwt()?)
+            .send()
+            .await?;
+
+        let status_code = resp.status();
+        let json: ResponseWrapperNested<SiteConfig> = try_response_json(resp).await?;
+
+        Ok(try_response_data(status_code, json)?)
+    }
 }
 
 #[derive(Debug, Clone)]

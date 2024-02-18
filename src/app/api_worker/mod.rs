@@ -98,6 +98,9 @@ pub enum Operation {
         #[derivative(Debug = "ignore")]
         resp: Responder<clients::arkhost::SseStream<anyhow::Result<api_arkhost::GameSseEvent>>>,
     },
+    GetSiteConfig {
+        resp: Responder<api_arkhost::SiteConfig>,
+    },
 }
 
 #[derive(Debug)]
@@ -305,6 +308,10 @@ impl Worker {
             .await
     }
 
+    pub async fn get_site_config(&self) -> CommandResult<api_arkhost::SiteConfig> {
+        self.arkhost_client.get_site_config().await
+    }
+
     async fn exec_command(&self, cmd: Command) {
         match cmd.op {
             Operation::Login {
@@ -378,8 +385,11 @@ impl Worker {
             Operation::ConnectGameEventSource { resp } => {
                 _ = resp.send(
                     self.eventsource_client
-                        .connect_games_sse(|url| EventSourceClient::build_default_client(url)),
+                        .connect_games_sse(EventSourceClient::build_default_client),
                 )
+            }
+            Operation::GetSiteConfig { resp } => {
+                _ = resp.send(self.get_site_config().await);
             }
         }
     }

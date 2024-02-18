@@ -55,7 +55,7 @@ impl CacheManager for CACacheManager {
     ) -> Result<HttpResponse> {
         let data = Store {
             response: response.clone(),
-            policy: policy,
+            policy,
         };
         let bytes = bincode::serialize(&data)?;
         _ = self.delete(&cache_key).await;
@@ -70,11 +70,9 @@ impl CacheManager for CACacheManager {
                     println!("[CACacheManager] failed to remove cache content: {e}");
                     break;
                 }
-            } else {
-                if let Err(e) = cacache::remove(&self.path, cache_key).await {
-                    println!("[CACacheManager] failed to remove cache entry '{cache_key}': {e}");
-                    break;
-                }
+            } else if let Err(e) = cacache::remove(&self.path, cache_key).await {
+                println!("[CACacheManager] failed to remove cache entry '{cache_key}': {e}");
+                break;
             }
         }
 

@@ -12,11 +12,13 @@ use super::webview::auth::AuthResult;
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("authentication failed: {0:?}")]
-    AuthFailed(AuthResult),
+    Auth(AuthResult),
     #[error("authenticator WebView launch failed")]
-    LaunchWebViewFailed,
+    LaunchWebView,
     #[error("authenticator launch failed {0}")]
-    LaunchFailed(anyhow::Error)
+    Launch(anyhow::Error),
+    #[error("authenticator process unexpectedly exited with exit status '{0}'")]
+    ProcessExited(String)
 }
 
 pub struct AuthContext {

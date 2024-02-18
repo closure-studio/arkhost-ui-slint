@@ -1,6 +1,8 @@
 use crate::app::auth_worker::AuthContext;
 use crate::app::ui::*;
+use crate::app::utils::notification;
 use crate::app::webview::auth::AuthResult;
+use arkhost_api::clients::common::ResponseError;
 use arkhost_api::models::api_arkhost;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -69,17 +71,40 @@ impl GameOperationController {
                         return anyhow::Ok(());
                     }
                     Err(e) => {
-                        println!("[Controller] failed attempting to start game {account}: {e}")
+                        if e.downcast_ref::<ResponseError<()>>().is_some_and(|x| {
+                            x.internal_status_code.is_some_and(|x| {
+                                x == arkhost_api::consts::error_code::CAPTCHA_ERROR
+                            })
+                        }) {
+                            println!("[Controller] captcha failed starting game {account}");
+                        } else {
+                            println!("[Controller] Unexpected error starting game {account}: {e}");
+                            notification::toast(
+                                &format!("{account} 启动托管时出现意外错误"),
+                                None,
+                                &format!("{e}"),
+                                None,
+                            );
+                            anyhow::bail!("提交失败：意外错误 {}", e);
+                        }
                     }
                 }
             }
-            anyhow::bail!("提交失败：人机验证失败")
+            notification::toast(
+                &format!("{account} 启动托管失败"),
+                Some("人机验证失败"),
+                "请尝试重新启动托管并再次进行人机验证",
+                None,
+            );
+            anyhow::bail!("提交失败：人机验证失败");
         };
 
         let result = invoke_auth(account.clone()).await;
 
         if result.is_err() {
             eprintln!("[Controller] all attempts to start game {account} failed");
+        } else {
+            notification::toast(&format!("{account} 已启动托管"), None, "", None);
         }
         self.app_state_controller
             .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
@@ -98,8 +123,18 @@ impl GameOperationController {
             )
             .await
         {
-            Ok(_) => {}
-            Err(e) => eprintln!("[Controller] Error stopping game {e}"),
+            Ok(_) => {
+                notification::toast(&format!("{account} 已停止托管"), None, "", None);
+            }
+            Err(e) => {
+                eprintln!("[Controller] Error stopping game {e}");
+                notification::toast(
+                    &format!("{account} 停止托管时出现错误"),
+                    None,
+                    &format!("{e}"),
+                    None,
+                );
+            }
         }
 
         self.app_state_controller
@@ -167,6 +202,12 @@ impl GameOperationController {
                 eprintln!(
                     "[Controller] Error performing game captcha (invoking authenticator) {e}"
                 );
+                notification::toast(
+                    &format!("{account} 进行登录滑块验证失败"),
+                    None,
+                    &format!("{e}\n请尝试在验证超时后重新启动托管"),
+                    None,
+                );
                 self.captcha_states
                     .lock()
                     .await
@@ -189,6 +230,12 @@ impl GameOperationController {
             .await
         {
             eprintln!("[Controller] Error performing game captcha (updating game config) {e}");
+            notification::toast(
+                &format!("{account} 提交登录滑块验证结果失败"),
+                None,
+                &format!("{e}\n请尝试在验证超时后重新启动托管"),
+                None,
+            );
             self.captcha_states
                 .lock()
                 .await

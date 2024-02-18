@@ -1,4 +1,5 @@
 use super::super::auth;
+use crate::app;
 use crate::app::ipc_auth_comm::AuthenticatorMessage;
 use crate::app::utils::data_dir;
 use crate::app::webview::auth::consts;
@@ -57,21 +58,6 @@ impl auth::AuthListener for Listener {
     }
 }
 
-pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
-    let server_name = args.ipc.unwrap();
-    let (tx_host, rx_host) = connect_to_host_process(server_name)?;
-    match {
-        let tx_host = tx_host.clone();
-        launch_webview(tx_host, rx_host, args.account.unwrap())
-    } {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            _ = tx_host.send(AuthenticatorMessage::LaunchWebViewFailed);
-            Err(e)
-        }
-    }
-}
-
 pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
     let launch_args: LaunchArgs = argh::from_env();
 
@@ -89,6 +75,24 @@ pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
             launch_args_dbg_str: format!("{launch_args:?}"),
         }
         .into())),
+    }
+}
+
+pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
+    #[cfg(target_os = "windows")]
+    app::utils::app_user_model::set_to_authenticator_id();
+
+    let server_name = args.ipc.unwrap();
+    let (tx_host, rx_host) = connect_to_host_process(server_name)?;
+    match {
+        let tx_host = tx_host.clone();
+        launch_webview(tx_host, rx_host, args.account.unwrap())
+    } {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            _ = tx_host.send(AuthenticatorMessage::LaunchWebViewFailed);
+            Err(e)
+        }
     }
 }
 
@@ -144,9 +148,7 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
 
     println!("[WebViewSubprocess] Launching authenticator WebView");
     let authenticator = auth::Authenticator::new(
-        auth::AuthParams::ArkHostAuth {
-            user: account,
-        },
+        auth::AuthParams::ArkHostAuth { user: account },
         Rc::new(Box::new(Listener {
             event_loop_proxy: event_loop.create_proxy(),
         })),
@@ -210,6 +212,9 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
 
         match event {
             Event::UserEvent(ev) => match ev {
+                AuthenticatorMessage::Ping => {
+                    _ = tx_host.send(AuthenticatorMessage::Acknowledged);
+                }
                 AuthenticatorMessage::SetVisible { x, y, visible } => {
                     window.set_visible(visible);
                     if visible {

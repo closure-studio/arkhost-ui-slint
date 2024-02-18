@@ -22,7 +22,6 @@ pub trait AuthListener {
 #[serde(rename_all = "camelCase")]
 pub enum AuthParams {
     ArkHostAuth { user: String },
-    GeeTestAuth {},
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,7 +182,7 @@ impl Authenticator {
         let mut builder = builder;
 
         match self.auth_params {
-            AuthParams::GeeTestAuth {} | AuthParams::ArkHostAuth { .. } => {
+            AuthParams::ArkHostAuth { .. } => {
                 builder = builder
                     .with_url_and_headers(consts::ARKHOST_VERIFY_URL, Self::request_headers())?;
             }

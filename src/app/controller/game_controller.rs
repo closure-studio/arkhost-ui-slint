@@ -8,7 +8,7 @@ use crate::app::{
     controller::RefreshLogsCondition,
     game_data::{CharPack, CharPackSummaryTable, StageTable},
     rt_api_model,
-    ui::*,
+    ui::*, utils::notification,
 };
 use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, GameStatus};
@@ -278,8 +278,23 @@ impl GameController {
             )
             .await
         {
-            Ok(_) => {}
-            Err(e) => eprintln!("[Controller] Error stopping game {e}"),
+            Ok(_) => {
+                notification::toast(
+                    &format!("{account} 更新游戏设置成功！"),
+                    None,
+                    "",
+                    None,
+                );
+            }
+            Err(e) => {
+                eprintln!("[Controller] Error update game settings {e}");
+                notification::toast(
+                    &format!("{account} 更新游戏设置失败"),
+                    None,
+                    &format!("{e}"),
+                    None,
+                );
+            },
         }
 
         self.app_state_controller
@@ -312,6 +327,12 @@ impl GameController {
             }
             Err(e) => {
                 eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
+                notification::toast(
+                    &format!("{id} 获取日志失败"),
+                    None,
+                    &format!("{e}"),
+                    None,
+                );
                 self.app_state_controller
                     .exec(|x| x.update_game_view(id, None, true));
             }

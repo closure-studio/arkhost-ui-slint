@@ -1,5 +1,7 @@
-// TODO: 添加用户界面报错后隐藏命令行输出
-// #![windows_subsystem = "windows"]
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions),),
+    windows_subsystem = "windows"
+)]
 
 mod app;
 
@@ -33,7 +35,7 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
-        .timeout(Duration::from_secs(12))
+        .connect_timeout(Duration::from_secs(8))
         .build()
         .unwrap();
 
@@ -54,7 +56,7 @@ fn create_asset_client() -> AssetClient {
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
-        .timeout(Duration::from_secs(12))
+        .connect_timeout(Duration::from_secs(8))
         .build()
         .unwrap();
 
@@ -87,6 +89,11 @@ fn create_asset_client() -> AssetClient {
 
 // TODO: 改进初始化APP相关代码质量
 async fn run_app() -> Result<(), slint::PlatformError> {
+    #[cfg(target_os = "windows")]
+    {
+        app::utils::app_user_model::set_to_default_id();
+    }
+
     #[cfg(feature = "desktop-app")]
     let mut user_state =
         UserStateFileStorage::new(UserStateFileStoreSetting::DataDirWithCurrentDirFallback);
@@ -172,7 +179,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             .await;
         let webview_launch_success = match result {
             Ok(Ok(())) => true,
-            Ok(Err(AuthError::LaunchWebViewFailed)) => false,
+            Ok(Err(AuthError::LaunchWebView)) | Ok(Err(AuthError::ProcessExited(_))) => false,
             Ok(Err(e)) => {
                 println!("Unknown launch error checking webview availability: {e}");
                 false
@@ -186,7 +193,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
             x.state_globals(move |s| s.set_has_webview_launch_failure(!webview_launch_success))
         });
     }
-    
+
     if let Some(state) = user_state_data_or_null {
         let app_state = adaptor.app_state.lock().unwrap();
         if state.is_expired() {
@@ -203,7 +210,7 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     ui.run()
 }
 
-#[tokio::main()]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "desktop-app")]
     if let Some(result) = app::webview::auth::subprocess_webview::launch_if_requested() {

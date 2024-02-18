@@ -3,7 +3,7 @@ import { UserInfo, UserStatus, UserProgress } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
-import { ScrollView , VerticalBox, Spinner} from "std-widgets.slint";
+import { StyleMetrics, ScrollView , VerticalBox, Spinner } from "std-widgets.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
 import { StateGlobals, WebViewType } from "../state-globals.slint";
 
@@ -86,19 +86,41 @@ export component GameInfoPage {
                 width: min(root.width, 1440px);
 
                 if user.status == UserStatus.Banned : BannerNotification {
-                    background-color: #8d7800ee;
+                    background-color: #dd8800;
                     accent-color: #fffceb;
                     text: @tr("🛑 你的可露希尔账号已经被管理员停用");
+                }
+
+                if StateGlobals.site-announcement != "" 
+                    || StateGlobals.is-site-under-maintenance : HorizontalLayout {
+                    spacing: 10px;
+                    if StateGlobals.site-announcement != "" : BannerNotification {
+                        background-color: StyleMetrics.dark-color-scheme
+                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        accent-color: StyleMetrics.default-text-color;
+                        has-action: false;
+                        text: @tr("📢 ") + StateGlobals.site-announcement;
+                        wrap: word-wrap;
+                    }
+
+                    if StateGlobals.is-site-under-maintenance : BannerNotification {
+                        background-color: StyleMetrics.dark-color-scheme
+                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        accent-color: StyleMetrics.default-text-color;
+                        has-action: false;
+                        text: @tr("🚧 可露希尔平台正在维护中");
+                    }
                 }
 
                 if !StateGlobals.has-default-webview-installation && StateGlobals.has-webview-launch-failure: BannerNotification {
                     private property <bool> is-ms-edge-webview2: 
                         StateGlobals.default-webview-installation-type == WebViewType.MicrosoftEdgeWebView2;
 
-                    background-color: #8d7800ee;
+                    background-color: #dd8800;
                     accent-color: #fffceb;
                     has-action: true;
-                    action-text: @tr("[下载页面]");
                     action-icon: @image-url("../images/ext_link.svg");
                     action => { 
                         if is-ms-edge-webview2 {
@@ -109,22 +131,13 @@ export component GameInfoPage {
                     states [
                         ms-edge-webview2 when is-ms-edge-webview2: {
                             text: @tr("🚧 内置浏览器启动失败，无法进行进行滑块验证等操作。请尝试安装 Microsoft Edge WebView2 后重启客户端 👉");
+                            action-text: @tr("[下载页面]");
                         }
                     ]
                 }
-
-                if user.progress == UserProgress.SmsVerifySlotAdded: BannerNotification {
-                    background-color: #00649ebb;
-                    accent-color: #ebf3ff;
-                    text: @tr("⏰ 你的首个账号在启动后将处于24小时试用期，启动后请留意验证码短信，在试用期内及时前往认证");
-                    has-action: true;
-                    action-text: @tr("[已收到验证码]");
-                    action-icon: @image-url("../images/ext_link.svg");
-                    action => { goto-slot-page(); }
-                }
     
                 if sse-connect-state != SseConnectState.Connected: BannerNotification {
-                    background-color: #8d7800ee;
+                    background-color: #dd8800;
                     accent-color: #fffceb;
                     has-action: true;
                     action-text: @tr("[重新连接]");
@@ -140,9 +153,19 @@ export component GameInfoPage {
                         }
                     ]
                 }
+                
+                if user.progress == UserProgress.SmsVerifySlotAdded: BannerNotification {
+                    background-color: #0661d0;
+                    accent-color: #ebf3ff;
+                    text: @tr("⏰ 你的首个账号在启动后将处于24小时试用期，启动后请留意验证码短信，在试用期内及时前往认证");
+                    has-action: true;
+                    action-text: @tr("[已收到验证码]");
+                    action-icon: @image-url("../images/ext_link.svg");
+                    action => { goto-slot-page(); }
+                }
     
                 if fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: BannerNotification {
-                    background-color: #00649ebb;
+                    background-color: #0661d0;
                     accent-color: #ebf3ff;
                     text: @tr("🤷‍♂️ 你还没有添加任何游戏账号，请前往【账号管理】添加 👉");
                     has-action: true;

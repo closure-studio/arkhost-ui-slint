@@ -5,7 +5,8 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    app_state_controller::AppStateController, game_controller::GameController, sender::Sender, rt_api_model::RtApiModel, slot_controller::SlotController, ApiOperation
+    app_state_controller::AppStateController, game_controller::GameController,
+    rt_api_model::RtApiModel, sender::Sender, slot_controller::SlotController, ApiOperation,
 };
 
 pub struct SessionController {
@@ -23,7 +24,7 @@ impl SessionController {
         app_state_controller: Arc<AppStateController>,
         sender: Arc<Sender>,
         game_controller: Arc<GameController>,
-        slot_controller: Arc<SlotController>
+        slot_controller: Arc<SlotController>,
     ) -> Self {
         Self {
             rt_api_model,
@@ -92,7 +93,7 @@ impl SessionController {
         }
     }
 
-    pub async fn start_sse_event_loop(&self) {
+    pub async fn spawn_sse_event_loop(&self) {
         let stop_connection_token = CancellationToken::new();
         if self
             .stop_connections
@@ -115,10 +116,34 @@ impl SessionController {
         });
     }
 
+    pub async fn fetch_site_config(&self) {
+        let (resp, mut rx) = oneshot::channel();
+        match self
+            .sender
+            .send_api_request(ApiOperation::GetSiteConfig { resp }, &mut rx)
+            .await
+        {
+            Ok(cfg) => self.app_state_controller.exec(move |x| {
+                x.state_globals(move |s| {
+                    if let Some(announcement) = cfg.announcement {
+                        s.set_site_announcement(announcement.into());
+                    }
+                    s.set_is_site_under_maintenance(cfg.is_under_maintenance);
+                })
+            }),
+            Err(e) => {
+                println!("[Controller] Error fetching site config: {e}");
+            }
+        }
+    }
+
     async fn on_login(&self) {
         self.rt_api_model.user.clear().await;
         self.game_controller.try_ensure_resources().await;
-        self.slot_controller.refresh_slots().await;
-        self.start_sse_event_loop().await;
+        tokio::join!(
+            self.fetch_site_config(),
+            self.slot_controller.refresh_slots(),
+            self.spawn_sse_event_loop()
+        );
     }
 }

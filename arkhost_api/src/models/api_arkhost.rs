@@ -233,3 +233,10 @@ pub struct GetLogResponse {
     pub logs: Vec<LogEntry>,
     pub has_more: bool,
 }
+
+#[derive(Default, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteConfig {
+    pub is_under_maintenance: bool,
+    pub announcement: Option<String>
+}
