@@ -7,84 +7,110 @@ export component GameCardOptions inherits ScrollView {
     private property <bool> saving;
     callback save-options(string, GameOptions);
     
-    VerticalBox {
-        alignment: start;
-        spacing: 10px;
+    HorizontalLayout {
+        alignment: center;
 
-        Text {
-            text: @tr("游戏设置");
-            font-size: 20px;
-            height: 24px;
-        }
-        
-        enable-building-arrange := Switch {
-            enabled: !saving;
-            text: @tr("启用基建换班");
-            checked: info.options.enable-building-arrange;
-        }
-
-        enable-auto-battle := Switch {
-            enabled: !saving;
-            text: @tr("启用自动战斗");
-            checked: info.options.enable-auto-battle;
-        }
-
-        recruit-ignore-robot := Switch {
-            enabled: !saving;
-            text: @tr("公招忽略小车");
-            checked: info.options.recruit-ignore-robot;
-        }
-
-        Text {
-            text: @tr("保留理智") + " (" + @tr("当前: ") + info.options.ap-reserve + ")";
-        }
-
-        ap-reserve := SpinBox {
-            enabled: !saving;
-            maximum: 135;
-            value: info.options.ap-reserve;
-            edited => { options.ap-reserve = self.value }
-        }
-
-        Text {
-            text: @tr("保留公招券") + " (" + @tr("当前: ") + options.recruit-reserve + ")";
-        }
-
-        recruit-reserve := SpinBox {
-            enabled: !saving;
-            value: info.options.recruit-reserve;
-            edited => { options.recruit-reserve = self.value }
-        }
-
-        HorizontalLayout {
+        VerticalBox {
+            alignment: space-between;
             spacing: 10px;
+    
+            VerticalBox {
+                alignment: start;
+                spacing: 10px;
 
-            Button {
-                enabled: !saving;
-                text: @tr("保存");
-                clicked => { 
-                    options.enable-building-arrange = enable-building-arrange.checked;
-                    options.enable-auto-battle = enable-auto-battle.checked;
-                    options.recruit-ignore-robot = recruit-ignore-robot.checked;
-                    save-options(info.id, options);
+                Text {
+                    text: @tr("托管设置");
+                    font-size: 20px;
+                    height: 24px;
+                }
+                
+                enable-building-arrange := Switch {
+                    enabled: !saving;
+                    text: @tr("启用基建换班");
+                    checked: info.options.enable-building-arrange;
+                }
+        
+                enable-auto-battle := Switch {
+                    enabled: !saving;
+                    text: @tr("启用自动战斗");
+                    checked: info.options.enable-auto-battle;
+                }
+        
+                recruit-ignore-robot := Switch {
+                    enabled: !saving;
+                    text: @tr("公招忽略小车");
+                    checked: info.options.recruit-ignore-robot;
+                }
+        
+                Text {
+                    text: @tr("保留理智");
+                }
+        
+                HorizontalLayout {
+                    ap-reserve := SpinBox {
+                        enabled: !saving;
+                        maximum: 135;
+                        value: info.options.ap-reserve;
+                        edited => { options.ap-reserve = self.value }
+                        max-width: 400px;
+                    }
+                }
+        
+                Text {
+                    text: @tr("保留公招券");
+                }
+        
+                HorizontalLayout {
+                    recruit-reserve := SpinBox {
+                        enabled: !saving;
+                        value: info.options.recruit-reserve;
+                        edited => { options.recruit-reserve = self.value }
+                        max-width: 400px;
+                    }
                 }
             }
-            Button {
-                enabled: !saving;
-                text: @tr("取消");
-                clicked => { 
-                    enable-building-arrange.checked = options.enable-building-arrange;
-                    enable-auto-battle.checked = options.enable-auto-battle;
-                    recruit-ignore-robot.checked = options.recruit-ignore-robot;
-                    ap-reserve.value = info.options.ap-reserve;
-                    recruit-reserve.value = info.options.recruit-reserve;
+
+                    
+    
+            HorizontalLayout {
+                alignment: start;
+                spacing: 10px;
+
+                Button {
+                    enabled: !saving;
+                    primary: true;
+                    text: @tr("保存");
+                    clicked => { 
+                        options.enable-building-arrange = enable-building-arrange.checked;
+                        options.enable-auto-battle = enable-auto-battle.checked;
+                        options.recruit-ignore-robot = recruit-ignore-robot.checked;
+                        save-options(info.id, options);
+                    }
+
+                    width: 100px;
+                }
+
+                Button {
+                    enabled: !saving;
+                    text: @tr("撤消");
+                    clicked => { 
+                        enable-building-arrange.checked = options.enable-building-arrange;
+                        enable-auto-battle.checked = options.enable-auto-battle;
+                        recruit-ignore-robot.checked = options.recruit-ignore-robot;
+                        ap-reserve.value = info.options.ap-reserve;
+                        recruit-reserve.value = info.options.recruit-reserve;
+                    }
+
+                    width: 100px;
+                }
+
+                if saving : Spinner {
+                    indeterminate: true;
+                    width: parent.height;
                 }
             }
-            Spinner {
-                visible: saving;
-                indeterminate: true;
-                width: parent.height;
-            }
+
+            width: clamp(root.width - 20px, 300px, 1000px);
         }
     }
 

@@ -5,6 +5,7 @@
 
 mod app;
 
+use anyhow::bail;
 use app::app_state::AppState;
 use app::asset_worker::AssetWorker;
 #[cfg(feature = "desktop-app")]
@@ -12,9 +13,11 @@ use app::auth_worker::ipc::IpcAuthWorker;
 
 use app::auth_worker::{self, AuthContext, AuthError, AuthWorker};
 use app::controller::rt_api_model::RtApiModel;
+use app::program_options::LaunchArgs;
 use app::ui::*;
 use app::utils::cache_manager::CACacheManager;
 use app::utils::data_dir::data_dir;
+use app::utils::subprocess::spawn_executable;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
 use app::{api_worker::Worker as ApiWorker, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
@@ -24,6 +27,8 @@ use futures_util::TryFutureExt;
 use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
+use std::env;
+use std::ffi::OsStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::oneshot;
@@ -210,15 +215,42 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     ui.run()
 }
 
-#[tokio::main(flavor = "multi_thread")]
+async fn launch_app_window_if_requested(
+    launch_args: &LaunchArgs,
+) -> Option<Result<(), slint::PlatformError>> {
+    if let Some(true) = launch_args.launch_app_window {
+        Some(run_app().await)
+    } else {
+        None
+    }
+}
+
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let launch_args: LaunchArgs = argh::from_env();
+    if let (Some(true), Some(true)) = (&launch_args.launch_app_window, &launch_args.launch_webview)
+    {
+        bail!("invalid parameters");
+    }
+
     #[cfg(feature = "desktop-app")]
-    if let Some(result) = app::webview::auth::subprocess_webview::launch_if_requested() {
+    if let Some(result) = app::webview::auth::subprocess_webview::launch_if_requested(&launch_args)
+    {
+        result?;
+    } else if let Some(result) = launch_app_window_if_requested(&launch_args).await {
         result?;
     } else {
-        let app_window_result = run_app().await;
-        app_window_result?;
-        println!("[main] APP exited on close requested.");
+        println!("[main] Spawning AppWindow process");
+        let current_exe = env::current_exe().unwrap_or_default();
+        let mut app_window = spawn_executable(
+            current_exe.as_os_str(),
+            &[current_exe.as_os_str(), OsStr::new("--launch-app-window")],
+            None,
+            true,
+        )?;
+
+        let exit_status = app_window.wait()?;
+        println!("[main] AppWindow process exited with status '{exit_status:?}'");
     }
 
     Ok(())

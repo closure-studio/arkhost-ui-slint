@@ -92,12 +92,7 @@ impl SlotController {
                 }
                 Err(e) => {
                     println!("[Controller] Error retrieving Registry API user {e}");
-                    notification::toast(
-                        "获取用户信息失败",
-                        None,
-                        &format!("{e}"),
-                        None,
-                    );
+                    notification::toast("获取用户信息失败", None, &format!("{e}"), None);
                 }
             }
         }
@@ -185,12 +180,6 @@ impl SlotController {
                 let available = available.unwrap_or(result.success);
 
                 let status_text = if available {
-                    notification::toast(
-                        "更新托管成功！",
-                        None,
-                        "",
-                        None,
-                    );
                     "".to_owned()
                 } else {
                     let e = ResponseError::<SlotRuleValidationResult> {

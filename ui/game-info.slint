@@ -43,6 +43,7 @@ export struct GameOptions {
 
 export enum GameInfoViewType {
     DoctorInfo,
+    Battle,
     Details,
     Settings,
     Logs,
@@ -64,6 +65,16 @@ export struct IllustInfo {
     scale-y: float,
     size-x: float,
     size-y: float
+}
+
+export struct BattleMap {
+    map-id: string,
+    code-name: string,
+    display-name: string,
+}
+
+export struct BattleUpdateFields {
+    maps: [BattleMap]
 }
 
 export struct GameDetails {  
@@ -96,5 +107,7 @@ export struct GameInfo {
     request-state: GameOperationRequestState,
     save-state: GameOptionSaveState,
     active-view: GameInfoViewType,
-    details: GameDetails
+    details: GameDetails,
+    map-search-results: [BattleMap],
+    selected-maps: [BattleMap]
 }

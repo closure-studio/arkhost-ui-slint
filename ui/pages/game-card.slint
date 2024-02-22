@@ -1,5 +1,5 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
-import { GameInfo, GameState, GameInfoViewType, GameLogLoadState, GameLogLoadRequestType } from "../game-info.slint";
+import { GameInfo, GameState, GameInfoViewType, GameLogLoadState, GameLogLoadRequestType, BattleMap } from "../game-info.slint";
 import { GameCardDoctorInfo } from "game-card-doctor-info.slint";
 import { GameCardOptions } from "game-card-options.slint";
 import { GameCardLog } from "game-card-log.slint";
@@ -7,6 +7,7 @@ import { GameCardOperationShortcutPanel, GameCardOperationShortcutPanelVertical 
 import { GameStatusBadge } from "game-status-badge.slint";
 import { MockData } from "../mock-data.slint";
 import { CharIllust } from "../components/char-illust.slint";
+import { GameCardBattle } from "game-card-battle.slint";
 
 component GameCardTab inherits Rectangle {
     in property <length> design-height;
@@ -143,6 +144,10 @@ export component GameCard inherits Rectangle {
     callback save-options <=> options.save-options;
     callback load-logs <=> logs.load-logs;
     callback view-changed(string, GameInfoViewType);
+    callback search-maps <=> battle.search-maps;
+    callback set-map-selected <=> battle.set-map-selected;
+    callback reset-selected-maps <=> battle.reset-selected-maps;
+    callback save-maps <=> battle.save-maps;
     
     border-radius: 10px;
     background: StyleMetrics.dark-color-scheme
@@ -212,27 +217,38 @@ export component GameCard inherits Rectangle {
                     active-tab: 0;
                     current-active-tab: current-active-tab;
                     doc-info := GameCardDoctorInfo {
+                        info: info; 
+
                         start-game(id) => { start-game(id); }
                         stop-game(id) => { stop-game(id); }
                         restart-game(id) => { restart-game(id); }
-                        info: info; 
                     }
                     design-height: 320px;
                     adaptive-height: get-adaptive-height(self.design-height);
                 }
+
+                battle-tab := GameCardTab {
+                    active-tab: 1;
+                    current-active-tab: current-active-tab;
+                    battle := GameCardBattle {
+                        info: info;
+                    }
+                    design-height: 450px;
+                    adaptive-height: get-adaptive-height(self.design-height);
+                }
                 
                 settings-tab := GameCardTab {
-                    active-tab: 1;
+                    active-tab: 2;
                     current-active-tab: current-active-tab;
                     options := GameCardOptions {
                         info: info;
                     }
-                    design-height: 500px;
+                    design-height: 450px;
                     adaptive-height: get-adaptive-height(self.design-height);
                 }
 
                 log-tab := GameCardTab {
-                    active-tab: 2;
+                    active-tab: 3;
                     current-active-tab: current-active-tab;
                     logs := GameCardLog {
                         info: info;
@@ -249,12 +265,17 @@ export component GameCard inherits Rectangle {
                         height: get-adaptive-height(current-tab-design-height);
                         in { animate height { duration: 0.25s; easing: ease; } }
                     }
-                    settings when current-active-tab == 1: {
+                    battle when current-active-tab == 1: {
+                        current-tab-design-height: battle-tab.design-height;
+                        height: get-adaptive-height(current-tab-design-height);
+                        in { animate height { duration: 0.25s; easing: ease; } }
+                    }
+                    settings when current-active-tab == 2: {
                         current-tab-design-height: settings-tab.design-height;
                         height: get-adaptive-height(current-tab-design-height);
                         in { animate height { duration: 0.25s; easing: ease; } }
                     }
-                    log when current-active-tab == 2: {
+                    log when current-active-tab == 3: {
                         current-tab-design-height: log-tab.design-height;
                         height: get-adaptive-height(current-tab-design-height);
                         in { animate height { duration: 0.25s; easing: ease; } }
@@ -284,30 +305,41 @@ export component GameCard inherits Rectangle {
                         current-active-tab: current-active-tab;
                         icon: @image-url("../images/game_card_tab_user.svg");
                         clicked => { 
-                            current-active-tab = 0; 
+                            current-active-tab = self.active-tab; 
                             view-changed(info.id, GameInfoViewType.DoctorInfo);
+                        }
+                    }
+
+                    GameCardTabSwitch {
+                        name: @tr("作战");
+                        active-tab: 1;
+                        current-active-tab: current-active-tab;
+                        icon: @image-url("../images/icon_battle.png");
+                        clicked => { 
+                            current-active-tab = self.active-tab; 
+                            view-changed(info.id, GameInfoViewType.Battle);
                         }
                     }
         
                     GameCardTabSwitch {
                         name: @tr("设置");
-                        active-tab: 1;
+                        active-tab: 2;
                         current-active-tab: current-active-tab;
                         icon: @image-url("../images/game_card_tab_options.svg");
                         clicked => { 
-                            current-active-tab = 1; 
+                            current-active-tab = self.active-tab; 
                             view-changed(info.id, GameInfoViewType.Settings);
                         }
                     }
         
                     GameCardTabSwitch {
                         name: @tr("日志");
-                        active-tab: 2;
+                        active-tab: 3;
                         current-active-tab: current-active-tab;
                         icon: @image-url("../images/game_card_tab_log.svg");
                         enable-special-fx: true;
                         clicked => { 
-                            current-active-tab = 2;                 
+                            current-active-tab = self.active-tab;                 
                             view-changed(info.id, GameInfoViewType.Logs);
                         }
                     }

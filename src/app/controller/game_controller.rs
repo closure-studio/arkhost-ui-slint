@@ -1,20 +1,24 @@
 use crate::app::{
     api_worker::RetrieveLogSpec,
     app_state::{
-        mapping::GameInfoMapping,
+        mapping::{BattleMapMapping, GameInfoMapping},
         model::{CharIllust, ImageDataRaw, ImageDataRef},
     },
     asset_worker::AssetRef,
     controller::RefreshLogsCondition,
-    game_data::{CharPack, CharPackSummaryTable, StageTable},
+    game_data::{CharPack, CharPackSummaryTable, Stage, StageDropType, StageTable, StageType},
     rt_api_model,
-    ui::*, utils::notification,
+    ui::*,
+    utils::{
+        levenshtein_distance::{self, ResultEntry},
+        notification,
+    },
 };
 use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, GameStatus};
 use futures_util::{future::join_all, TryStreamExt};
 use serde::Deserialize;
-use slint::Model;
+use slint::{Model, ModelRc, VecModel};
 use tokio::{
     join,
     sync::{oneshot, RwLock},
@@ -22,6 +26,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use std::{
+    cmp,
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -46,6 +51,7 @@ pub struct GameController {
     game_resource_map: RwLock<HashMap<String, Arc<GameResourceEntry>>>,
     #[allow(unused)] // TODO: 关卡相关
     stage_data: RwLock<Option<StageTable>>,
+    stage_search_tree: RwLock<levenshtein_distance::Trie<Arc<String>>>,
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
     refreshing: AtomicBool,
 
@@ -69,6 +75,7 @@ impl GameController {
         Self {
             game_resource_map: RwLock::new(HashMap::new()),
             stage_data: RwLock::new(None),
+            stage_search_tree: Default::default(),
             char_pack_summaries: RwLock::new(None),
             refreshing: AtomicBool::new(false),
 
@@ -101,7 +108,7 @@ impl GameController {
         {
             Ok(_) => {
                 self.slot_controller.submit_slot_model_to_ui().await;
-                self.try_fetch_all_game_details().await;
+                self.process_game_details().await;
                 self.process_game_list_changes(refresh_log_cond).await;
                 self.app_state_controller
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
@@ -139,7 +146,7 @@ impl GameController {
 
                                 self.rt_api_model.user.handle_retrieve_games_result(games).await;
                                 self.slot_controller.submit_slot_model_to_ui().await;
-                                self.try_fetch_all_game_details().await;
+                                self.process_game_details().await;
                                 self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
                                 if is_initial {
@@ -187,10 +194,24 @@ impl GameController {
         Ok(())
     }
 
-    pub async fn try_fetch_all_game_details(&self) {
+    pub async fn process_game_details(&self) {
+        let stage_data = self.stage_data.read().await;
         let mut games_to_fetch_details: Vec<String> = Vec::new();
         for game_ref in self.rt_api_model.game_map_read().await.values() {
-            let game = game_ref.game.read().await;
+            let mut game = game_ref.game.write().await;
+            if let Some(stage) = stage_data.as_ref().and_then(|t| {
+                game.info
+                    .game_config
+                    .map_id
+                    .as_ref()
+                    .and_then(|m| t.stages.get(m))
+            }) {
+                let mut stage_name = stage.display();
+                stage_name.insert(0, ' ');
+                stage_name.insert_str(0, &stage.code);
+                game.stage_name = Some(stage_name);
+            }
+
             if game.info.status.code == api_arkhost::GameStatus::Running {
                 games_to_fetch_details.push(game.info.status.account.clone());
             }
@@ -252,14 +273,23 @@ impl GameController {
         game_list.sort_by_key(|(order, _, _)| *order);
         let game_ids: Vec<String> = game_list.iter().map(|(_, id, _)| id.clone()).collect();
         self.app_state_controller
-            .exec(|x| x.update_game_views(game_list, false));
+            .exec_wait(|x| x.update_game_views(game_list, false))
+            .await;
+        for id in game_ids.clone() {
+            let game_ref = game_map.get(&id);
+            if let Some(game_ref) = game_ref {
+                let game_entry = game_ref.game.read().await;
+                self.set_selected_maps(id.clone(), &game_entry.info, false)
+                    .await;
+            }
+        }
 
         join_all(load_images_task).await;
         let mut refresh_log_tasks = vec![];
         for id in game_ids {
             refresh_log_tasks
                 .push(self.refresh_logs_if_needed(id.clone(), refresh_log_cond.clone()));
-            self.try_apply_game_images(id.clone()).await;
+            self.try_apply_game_images(id).await;
         }
         join_all(refresh_log_tasks).await;
     }
@@ -278,23 +308,16 @@ impl GameController {
             )
             .await
         {
-            Ok(_) => {
-                notification::toast(
-                    &format!("{account} 更新游戏设置成功！"),
-                    None,
-                    "",
-                    None,
-                );
-            }
+            Ok(_) => {}
             Err(e) => {
                 eprintln!("[Controller] Error update game settings {e}");
                 notification::toast(
-                    &format!("{account} 更新游戏设置失败"),
+                    &format!("{account} 更新托管设置失败"),
                     None,
                     &format!("{e}"),
                     None,
                 );
-            },
+            }
         }
 
         self.app_state_controller
@@ -327,16 +350,199 @@ impl GameController {
             }
             Err(e) => {
                 eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
-                notification::toast(
-                    &format!("{id} 获取日志失败"),
-                    None,
-                    &format!("{e}"),
-                    None,
-                );
+                notification::toast(&format!("{id} 获取日志失败"), None, &format!("{e}"), None);
                 self.app_state_controller
                     .exec(|x| x.update_game_view(id, None, true));
             }
         }
+    }
+
+    // TODO: 模糊搜索优化 & 关键词搜索
+    pub async fn on_search_map(&self, id: String, term: String, fuzzy: bool) {
+        let search_tree = self.stage_search_tree.read().await;
+        let battle_map_mappings = match self.stage_data.read().await.as_ref() {
+            Some(stage_data) if !term.is_empty() => {
+                let chars: Vec<char> = term.chars().collect();
+                let results: Vec<ResultEntry<Arc<String>>> = search_tree
+                    .search(
+                        if fuzzy {
+                            consts::SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE_FUZZY
+                        } else {
+                            consts::SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE
+                        },
+                        &chars,
+                    )
+                    .into_iter()
+                    .collect();
+                let mut stages: Vec<(i32, &String, &Stage)> = results
+                    .iter()
+                    .filter_map(|ResultEntry(dist, map_id)| {
+                        stage_data
+                            .stages
+                            .get(map_id.as_ref())
+                            .map(|s| (*dist, map_id.as_ref(), s))
+                    })
+                    .collect();
+                stages.sort_by(
+                    |(lhs_dist, lhs_map_id, lhs_stage), (rhs_dist, rhs_map_id, rhs_stage)| {
+                        match (
+                            lhs_stage.name.as_ref().and_then(|x| x.find(&term)),
+                            rhs_stage.name.as_ref().and_then(|x| x.find(&term)),
+                        ) {
+                            (Some(_), None) => return cmp::Ordering::Less,
+                            (None, Some(_)) => return cmp::Ordering::Greater,
+                            (Some(lhs), Some(rhs)) if lhs != rhs => return lhs.cmp(&rhs),
+                            _ => {}
+                        };
+
+                        match (lhs_stage.code.find(&term), rhs_stage.code.find(&term)) {
+                            (Some(_), None) => return cmp::Ordering::Less,
+                            (None, Some(_)) => return cmp::Ordering::Greater,
+                            (Some(lhs), Some(rhs)) if lhs != rhs => return lhs.cmp(&rhs),
+                            _ => {}
+                        };
+
+                        match lhs_dist.cmp(rhs_dist) {
+                            cmp::Ordering::Equal => {}
+                            ord => return ord,
+                        }
+
+                        match lhs_stage.cmp(rhs_stage) {
+                            cmp::Ordering::Equal => lhs_map_id.cmp(rhs_map_id),
+                            ord => ord,
+                        }
+                    },
+                );
+                stages.truncate(consts::SEARCH_MAP_RESULT_LIMIT);
+                stages
+                    .into_iter()
+                    .map(|(_, map_id, stage)| {
+                        BattleMapMapping {
+                            map_id: map_id.clone(),
+                            code_name: stage.code.clone(),
+                            display_name: stage.display(),
+                        }
+                        .create_battle_map()
+                    })
+                    .collect()
+            }
+            _ => vec![],
+        };
+
+        self.app_state_controller.exec(move |x| {
+            x.exec_with_game_by_id(id, |game_info_list, i, mut game_info| {
+                game_info.map_search_results = ModelRc::new(VecModel::from(battle_map_mappings));
+                game_info_list.set_row_data(i, game_info);
+            })
+        });
+    }
+
+    pub async fn on_select_map(&self, id: String, map_id: String, selected: bool) {
+        let battle_map = if selected {
+            self.stage_data
+                .read()
+                .await
+                .as_ref()
+                .and_then(|x| x.stages.get(&map_id))
+                .map(|x| {
+                    BattleMapMapping {
+                        map_id: map_id.clone(),
+                        code_name: x.code.clone(),
+                        display_name: x.display(),
+                    }
+                    .create_battle_map()
+                })
+        } else {
+            None
+        };
+
+        self.app_state_controller.exec(move |x| {
+            x.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
+                if game_info
+                    .selected_maps
+                    .as_any()
+                    .downcast_ref::<VecModel<BattleMap>>()
+                    .is_none()
+                {
+                    game_info.selected_maps = ModelRc::new(VecModel::from(vec![]));
+                }
+
+                let selected_maps_rc = &game_info.selected_maps;
+                if let Some(selected_maps) = selected_maps_rc
+                    .as_any()
+                    .downcast_ref::<VecModel<BattleMap>>()
+                {
+                    if let Some((map_index, _)) = selected_maps
+                        .iter()
+                        .enumerate()
+                        .find(|(_, x)| x.map_id == map_id)
+                    {
+                        selected_maps.remove(map_index);
+                    }
+
+                    if let Some(battle_map) = battle_map {
+                        selected_maps.push(battle_map);
+                    }
+                }
+
+                game_info_list.set_row_data(i, game_info);
+            })
+        })
+    }
+
+    pub async fn reset_selected_maps(&self, id: String) {
+        let game_map = self.rt_api_model.game_map_read().await;
+        let game_ref = game_map.get(&id);
+        if let Some(game_ref) = game_ref {
+            let game_entry = game_ref.game.read().await;
+            self.set_selected_maps(id, &game_entry.info, true).await;
+        }
+    }
+
+    pub async fn set_selected_maps(
+        &self,
+        id: String,
+        game_info: &api_arkhost::GameInfo,
+        override_existing: bool,
+    ) {
+        let mut battle_maps_to_set = vec![];
+        let stage_data = self.stage_data.read().await;
+        if let Some(battle_maps) = &game_info.game_config.battle_maps {
+            for map_id in battle_maps {
+                let battle_map = stage_data
+                    .as_ref()
+                    .and_then(|x| x.stages.get(map_id))
+                    .map_or_else(
+                        || {
+                            BattleMapMapping {
+                                map_id: map_id.clone(),
+                                code_name: "".into(),
+                                display_name: map_id.clone(),
+                            }
+                            .create_battle_map()
+                        },
+                        |x| {
+                            BattleMapMapping {
+                                map_id: map_id.clone(),
+                                code_name: x.code.clone(),
+                                display_name: x.display(),
+                            }
+                            .create_battle_map()
+                        },
+                    );
+
+                battle_maps_to_set.push(battle_map);
+            }
+        }
+
+        self.app_state_controller.exec(|x| {
+            x.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
+                if override_existing || game_info.selected_maps.row_count() == 0 {
+                    game_info.selected_maps = ModelRc::new(VecModel::from(battle_maps_to_set));
+                    game_info_list.set_row_data(i, game_info);
+                }
+            })
+        });
     }
 
     pub async fn try_ensure_game_images(&self, game: &rt_api_model::GameEntry, id: String) {
@@ -424,6 +630,7 @@ impl GameController {
                     let path = arkhost_api::consts::asset::api::gamedata("excel/stage_table.json");
                     let stage_data = self.load_json_table::<StageTable>(path, None).await;
                     if let Some(stage_data) = stage_data {
+                        self.build_stage_search_tree(&stage_data).await;
                         _ = self.stage_data.write().await.insert(stage_data);
                     }
                 }
@@ -506,4 +713,53 @@ impl GameController {
             self.retrieve_logs(id, GameLogLoadRequestType::Later).await;
         }
     }
+
+    async fn build_stage_search_tree(&self, stage_data: &StageTable) {
+        let mut stage_search_tree = self.stage_search_tree.write().await;
+        stage_search_tree.clear();
+
+        let mut entries: u32 = 0;
+        for (id, stage) in
+            stage_data.stages.iter().filter(|(_, stage)| {
+                stage.can_battle_replay
+                    && !matches!(
+                        stage.stage_type,
+                        StageType::Training
+                            | StageType::Guide
+                            | StageType::SpecialStory
+                            | StageType::Campaign
+                            | StageType::HandbookBattle
+                            | StageType::ClimbTower
+                    )
+                    && stage.stage_drop_info.display_rewards.iter().any(|x| {
+                        matches!(x.drop_type, StageDropType::Normal | StageDropType::Special)
+                    })
+                    && stage.ap_cost > 0
+                    && !stage.is_predefined
+                    && !stage.is_hard_predefined
+                    && !stage.is_skill_selectable_predefined
+                    && !stage.is_story_only
+            })
+        {
+            let id: Arc<String> = Arc::new(id.clone());
+            if !stage.code.is_empty() {
+                let code_name: Vec<char> = stage.code.chars().collect();
+                stage_search_tree.insert(&code_name, id.clone());
+                entries += 1;
+            }
+            if let Some(name) = &stage.name {
+                let name: Vec<char> = name.chars().collect();
+                stage_search_tree.insert(&name, id);
+                entries += 1;
+            }
+        }
+
+        println!("[Controller] Inserted {entries} entries into stage search tree");
+    }
+}
+
+mod consts {
+    pub const SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE: i32 = 1;
+    pub const SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE_FUZZY: i32 = 5;
+    pub const SEARCH_MAP_RESULT_LIMIT: usize = 50;
 }

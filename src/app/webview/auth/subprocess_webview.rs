@@ -1,10 +1,10 @@
 use super::super::auth;
 use crate::app;
 use crate::app::ipc_auth_comm::AuthenticatorMessage;
+use crate::app::program_options::LaunchArgs;
 use crate::app::utils::data_dir;
 use crate::app::webview::auth::consts;
 use anyhow::anyhow;
-use argh::FromArgs;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use std::rc::Rc;
@@ -26,22 +26,6 @@ pub enum ChildProcessAuthenticatorError {
     InvalidLaunchArgs { launch_args_dbg_str: String },
 }
 
-#[derive(Debug, Clone, FromArgs)]
-/// 用于用户验证的 WebView 启动参数，如果使用 WebView 启动，则不打开主UI界面
-pub struct LaunchArgs {
-    #[argh(switch)]
-    /// 是否启动 WebView
-    pub launch_webview: Option<bool>,
-
-    #[argh(option)]
-    /// 要验证的账号
-    pub account: Option<String>,
-
-    #[argh(option)]
-    /// 父进程的 IPC Server 名称
-    pub ipc: Option<String>,
-}
-
 struct Listener {
     event_loop_proxy: EventLoopProxy<AuthenticatorMessage>,
 }
@@ -58,9 +42,7 @@ impl auth::AuthListener for Listener {
     }
 }
 
-pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
-    let launch_args: LaunchArgs = argh::from_env();
-
+pub fn launch_if_requested(launch_args: &LaunchArgs) -> Option<anyhow::Result<()>> {
     match launch_args {
         LaunchArgs {
             launch_webview: None,
@@ -70,6 +52,7 @@ pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
             launch_webview: Some(true),
             account: Some(_),
             ipc: Some(_),
+            ..
         } => Some(launch(launch_args)),
         _ => Some(Err(ChildProcessAuthenticatorError::InvalidLaunchArgs {
             launch_args_dbg_str: format!("{launch_args:?}"),
@@ -78,15 +61,15 @@ pub fn launch_if_requested() -> Option<anyhow::Result<()>> {
     }
 }
 
-pub fn launch(args: LaunchArgs) -> anyhow::Result<()> {
+pub fn launch(args: &LaunchArgs) -> anyhow::Result<()> {
     #[cfg(target_os = "windows")]
     app::utils::app_user_model::set_to_authenticator_id();
 
-    let server_name = args.ipc.unwrap();
+    let server_name = args.ipc.as_ref().unwrap().into();
     let (tx_host, rx_host) = connect_to_host_process(server_name)?;
     match {
         let tx_host = tx_host.clone();
-        launch_webview(tx_host, rx_host, args.account.unwrap())
+        launch_webview(tx_host, rx_host, args.account.as_ref().unwrap().into())
     } {
         Ok(_) => Ok(()),
         Err(e) => {

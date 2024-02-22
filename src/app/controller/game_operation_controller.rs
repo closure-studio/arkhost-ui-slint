@@ -103,8 +103,6 @@ impl GameOperationController {
 
         if result.is_err() {
             eprintln!("[Controller] all attempts to start game {account} failed");
-        } else {
-            notification::toast(&format!("{account} 已启动托管"), None, "", None);
         }
         self.app_state_controller
             .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
@@ -112,7 +110,7 @@ impl GameOperationController {
 
     pub async fn stop_game(&self, account: String) {
         let (resp, mut rx) = oneshot::channel();
-        match self
+        if let Err(e) = self
             .sender
             .send_api_request(
                 ApiOperation::StopGame {
@@ -123,18 +121,13 @@ impl GameOperationController {
             )
             .await
         {
-            Ok(_) => {
-                notification::toast(&format!("{account} 已停止托管"), None, "", None);
-            }
-            Err(e) => {
-                eprintln!("[Controller] Error stopping game {e}");
-                notification::toast(
-                    &format!("{account} 停止托管时出现错误"),
-                    None,
-                    &format!("{e}"),
-                    None,
-                );
-            }
+            eprintln!("[Controller] Error stopping game {e}");
+            notification::toast(
+                &format!("{account} 停止托管时出现意外错误"),
+                None,
+                &format!("{e}"),
+                None,
+            );
         }
 
         self.app_state_controller

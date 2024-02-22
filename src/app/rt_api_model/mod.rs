@@ -52,6 +52,7 @@ pub struct GameEntry {
     pub logs: Vec<api_arkhost::LogEntry>,
     pub log_cursor_back: u64,
     pub log_cursor_front: u64,
+    pub stage_name: Option<String>
 }
 
 impl GameEntry {
@@ -62,6 +63,7 @@ impl GameEntry {
             logs: Vec::new(),
             log_cursor_back: 0,
             log_cursor_front: 0,
+            stage_name: None
         }
     }
 }

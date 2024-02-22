@@ -1,0 +1,251 @@
+import { StyleMetrics, GridBox, Switch, ScrollView, VerticalBox, LineEdit, HorizontalBox, SpinBox, Button, Spinner, StandardListView, ListView, GroupBox } from "std-widgets.slint";
+import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields } from "../game-info.slint";
+import { FontGlobals } from "../font-globals.slint";
+import { MockData } from "../mock-data.slint";
+
+enum MapOperationType {
+    Add,
+    Remove
+}
+
+component MapListRow inherits VerticalLayout {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-right: 12px;
+
+    Rectangle {
+        border-radius: 6px;
+        background: StyleMetrics.dark-color-scheme
+            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+        clip: true;
+
+        @children
+    }
+}
+
+component MapList inherits ListView {
+    in property <GameInfo> info;
+    in property <[BattleMap]> battle-maps;
+    in property <MapOperationType> op-type;
+    callback set-map-selected(string, BattleMap, bool);
+
+    for battle-map in battle-maps: MapListRow {
+        HorizontalLayout {
+            padding-left: 5px;
+            padding-right: 5px;
+            alignment: space-between;
+
+            columns := HorizontalLayout {
+                padding: 8px;
+                spacing: 5px;
+                alignment: start;
+
+                Text {
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 18px;
+                    text: battle-map.code-name;
+                    vertical-alignment: center;
+
+                    min-width: 85px;
+                }
+
+                Text {
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    font-size: 14px;
+                    text: battle-map.display-name;
+                    vertical-alignment: center;
+
+                    max-width: 240px;
+                    overflow: elide;
+                }
+            }
+            
+            Rectangle {
+                VerticalLayout {
+                    alignment: center;
+
+                    Image {
+                        private property <float> alpha;
+                        source: op-type == MapOperationType.Add
+                            ? @image-url("../images/game_card_battle_add.svg")
+                            : @image-url("../images/game_card_battle_remove.svg");
+                        colorize: StyleMetrics.default-text-color.with-alpha(alpha);
+
+                        animate alpha { duration: 0.25s; }
+                        animate width { easing: ease; duration: 0.25s; }
+                        animate height { easing: ease; duration: 0.25s; }
+
+                        states [
+                            up when !add-touch-area.has-hover && !add-touch-area.pressed: {
+                                alpha: 0.5;
+                                width: 24px;
+                                height: 24px;
+                            }
+                            hover when add-touch-area.has-hover && !add-touch-area.pressed: {
+                                alpha: 1;
+                                width: 30px;
+                                height: 30px;
+                            }
+                            down when add-touch-area.pressed: {
+                                alpha: 1;
+                                width: 30px;
+                                height: 30px;
+                            }
+                        ]
+                    }
+
+                    width: 30px;
+                }
+
+                add-touch-area := TouchArea {
+                    clicked => {
+                        set-map-selected(info.id, battle-map, op-type == MapOperationType.Add)
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component GameCardBattle inherits VerticalLayout {
+    in property <GameInfo> info: MockData.game-info;
+    private property <bool> saving;
+
+    callback search-maps(string, string, bool);
+    callback set-map-selected(string, BattleMap, bool);
+    callback reset-selected-maps(string);
+    callback save-maps(string, BattleUpdateFields);
+
+    function on-term-changed() {
+        if search-box.text != "" {
+            search-maps(info.id, search-box.text, fuzzy.checked);
+        }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+
+        VerticalBox {
+            HorizontalLayout {
+                spacing: 10px;
+                fuzzy := Switch {
+                    text: @tr("模糊搜索");
+                    checked: true;
+
+                    toggled => {
+                        on-term-changed();
+                    }
+                }
+
+                search-box := LineEdit {
+                    font-size: 15px;
+                    placeholder-text: @tr("搜索关卡代号或名称");
+                    horizontal-alignment: center;
+                    height: 32px;
+    
+                    edited => {
+                        on-term-changed()
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: stretch;
+                spacing: 5px;
+
+                GroupBox {
+                    title: @tr("搜索结果");
+
+                    MapList {
+                        info: info;
+                        battle-maps: info.map-search-results;
+                        op-type: Add;
+                        
+                        set-map-selected(id, battle-map, selected) => { set-map-selected(id, battle-map, selected); }
+                    }
+                }
+
+                GroupBox {
+                    title: @tr("作战列表");
+                    MapList {
+                        info: info;
+                        battle-maps: info.selected-maps;
+                        op-type: Remove;
+                        
+                        set-map-selected(id, battle-map, selected) => { set-map-selected(id, battle-map, selected); }
+                    }
+                }
+            }
+
+            if tip-area.has-hover: MapListRow {
+                HorizontalLayout {
+                    padding: 10px;
+
+                    Text {
+                        font-size: 14px;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                        horizontal-alignment: left;
+                        text: @tr("作战时，系统将从列表首个关卡开始，跳过当日不开放的关卡，直到找到第一个当日开放的关卡。关卡不开放例如活动关已结束、资源收集关未开启等。 ");
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                spacing: 10px;
+
+                Button {
+                    enabled: !saving;
+                    text: @tr("保存");
+                    width: 100px;
+                    primary: true;
+                    clicked => { save-maps(info.id, { maps: info.selected-maps }); }
+                }
+
+                Button {
+                    enabled: !saving;
+                    text: @tr("撤消");
+                    width: 100px;
+                    clicked => { reset-selected-maps(info.id); }
+                }
+
+                Rectangle {
+                    HorizontalLayout {
+                        padding: 5px;
+
+                        Text {
+                            font-size: 14px;
+                            vertical-alignment: center;
+                            wrap: word-wrap;
+                            horizontal-alignment: left;
+                            text: @tr("ℹ️ 使用说明");
+                        }
+                    }
+
+                    tip-area := TouchArea {
+                        
+                    }
+                }
+
+                if saving : Spinner {
+                    indeterminate: true;
+                    width: 25px;
+                    height: 25px;
+                }
+            }
+
+            width: clamp(root.width - 20px, 300px, 1000px);
+        }
+    }
+
+    states [
+        idle when info.save-state == GameOptionSaveState.Idle: {
+            saving: false;
+        }
+        saving when info.save-state == GameOptionSaveState.Saving: {
+            saving: true;
+        }
+    ]
+}

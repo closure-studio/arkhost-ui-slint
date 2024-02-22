@@ -43,8 +43,14 @@ impl GameInfoMapping {
 
     pub fn mutate(&self, game_info: &mut GameInfo, refresh_logs: bool) {
         game_info.ap = self.game.info.status.ap.to_string().into();
-        game_info.battle_map = match self.game.info.game_config.map_id {
-            Some(ref map) if !map.is_empty() => map,
+        game_info.battle_map = match self.game.stage_name.as_ref().or(self
+            .game
+            .info
+            .game_config
+            .map_id
+            .as_ref())
+        {
+            Some(map) if !map.is_empty() => map,
             _ => "[作战未开始]",
         }
         .into();
@@ -434,6 +440,27 @@ impl UserInfoMapping {
 
         user_info.phone = self.phone.clone().into();
         user_info.qq = self.qq.clone().into();
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BattleMapMapping {
+    pub map_id: String,
+    pub code_name: String,
+    pub display_name: String,
+}
+
+impl BattleMapMapping {
+    pub fn create_battle_map(&self) -> BattleMap {
+        let mut battle_map = BattleMap::default();
+        self.mutate(&mut battle_map);
+        battle_map
+    }
+
+    pub fn mutate(&self, battle_map: &mut BattleMap) {
+        battle_map.map_id = self.map_id.clone().into();
+        battle_map.code_name = self.code_name.clone().into();
+        battle_map.display_name = self.display_name.clone().into();
     }
 }
 

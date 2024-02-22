@@ -36,6 +36,10 @@ export component AppWindow inherits Window {
     callback load-logs <=> Callbacks.load-logs;
     callback view-changed <=> Callbacks.view-changed;
     callback reconnect-sse <=> Callbacks.reconnect-sse;
+    callback search-maps <=> Callbacks.search-maps;
+    callback set-map-selected <=> Callbacks.set-map-selected;
+    callback reset-selected-maps <=> Callbacks.reset-selected-maps;
+    callback save-maps <=> Callbacks.save-maps;
 
     callback refresh-user-info <=> Callbacks.refresh-user-info;
     callback refresh-slot-info <=> Callbacks.refresh-slot-info;

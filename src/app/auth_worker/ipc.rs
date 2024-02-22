@@ -233,6 +233,8 @@ impl IpcAuthWorker {
                 OsStr::new("--ipc"),
                 OsStr::new(&ipc_server_name),
             ],
+            None,
+            true,
         )?;
 
         match AuthenticatorConnection::accept(ipc_server) {

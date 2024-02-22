@@ -1,4 +1,4 @@
-import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
+import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions, BattleMap, BattleUpdateFields } from "game-info.slint";
 import { SlotUpdateDraft, SlotUpdateRequestState } from "slot-info.slint";
 
 export global Callbacks {
@@ -9,6 +9,10 @@ export global Callbacks {
     callback load-logs(string, GameLogLoadRequestType);
     callback view-changed(string, GameInfoViewType);
     callback reconnect-sse();
+    callback search-maps(string, string, bool);
+    callback set-map-selected(string, BattleMap, bool);
+    callback reset-selected-maps(string);
+    callback save-maps(string, BattleUpdateFields);
 
     callback refresh-user-info();
     callback refresh-slot-info();

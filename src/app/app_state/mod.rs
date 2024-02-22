@@ -233,7 +233,7 @@ impl AppState {
             let game_info_list = ui.get_game_info_list();
             match Self::find_game_by_id(&game_info_list, &id) {
                 Some((i, game_info)) => func(game_info_list, i, game_info),
-                None => { /* TODO: report error */ }
+                None => { println!("[AppState] Game not found: {id:?}"); }
             }
         })
     }

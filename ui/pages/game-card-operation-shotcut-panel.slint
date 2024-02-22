@@ -131,9 +131,8 @@ export component GameCardOperationShortcutPanelVertical inherits VerticalLayout 
     spacing: 10px;
     alignment: start;
 
-    request-spinner := Spinner {
+    if info.request-state == GameOperationRequestState.Requesting : Spinner {
         indeterminate: true;
-        visible: info.request-state == GameOperationRequestState.Requesting;
     }
 
     StartGameButton {

@@ -183,6 +183,10 @@ export component GameInfoPage {
                     save-options(id, options) => { Callbacks.save-options(id, options); }
                     load-logs(id, type) => { Callbacks.load-logs(id, type); }
                     view-changed(id, type) => { Callbacks.view-changed(id, type); }
+                    search-maps(id, term, fuzzy) => { Callbacks.search-maps(id, term, fuzzy); }
+                    set-map-selected(id, battle-map, selected) => { Callbacks.set-map-selected(id, battle-map, selected); } 
+                    reset-selected-maps(id) => { Callbacks.reset-selected-maps(id); }
+                    save-maps(id, maps) => { Callbacks.save-maps(id, maps); }
                 }
     
                 FetchGamesIndicator {

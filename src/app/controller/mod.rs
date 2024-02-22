@@ -243,6 +243,7 @@ impl ControllerAdaptor {
                             game_info.active_view = view;
                             match view {
                                 GameInfoViewType::DoctorInfo => {}
+                                GameInfoViewType::Battle => {}
                                 GameInfoViewType::Details => todo!(),
                                 GameInfoViewType::Settings => {}
                                 GameInfoViewType::Logs => {
@@ -387,6 +388,72 @@ impl ControllerAdaptor {
             let app_weak = app.as_weak();
             app.on_return_to_login_page(move || {
                 app_weak.unwrap().invoke_do_return_to_login_page();
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_search_maps(move |id, term, fuzzy| {
+                let this: Arc<ControllerAdaptor> = this.clone();
+                let term: String = term.trim().to_ascii_uppercase();
+                if term.is_empty() || term == "-" {
+                    return;
+                }
+
+                tokio::spawn(async move {
+                    this.game_controller
+                        .on_search_map(id.into(), term, fuzzy)
+                        .await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_set_map_selected(move |id, battle_map, selected| {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller
+                        .on_select_map(id.into(), battle_map.map_id.into(), selected)
+                        .await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_reset_selected_maps(move |id| {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller.reset_selected_maps(id.into()).await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_save_maps(move |id, battle_update_fields| {
+                this.app_state_controller.exec(|x| {
+                    x.set_game_save_state(id.clone().into(), GameOptionSaveState::Saving)
+                });
+
+                let this = this.clone();
+                let battle_maps = battle_update_fields
+                    .maps
+                    .iter()
+                    .map(|x| x.map_id.into())
+                    .collect();
+                tokio::spawn(async move {
+                    this.game_controller
+                        .update_game_settings(
+                            id.into(),
+                            arkhost_api::models::api_arkhost::GameConfigFields {
+                                battle_maps: Some(battle_maps),
+                                ..Default::default()
+                            },
+                        )
+                        .await;
+                });
             });
         }
 
