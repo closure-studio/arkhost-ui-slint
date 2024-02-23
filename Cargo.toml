@@ -10,14 +10,15 @@ build = "build.rs"
 publish = false
 
 [features]
-default = ["desktop-app"]
+default = ["desktop-app", "renderer-skia"]
 desktop-app = ["dep:winit", "dep:ipc-channel", "dep:subprocess", "dep:argh"]
+renderer-skia = ["slint/renderer-skia"]
+renderer-femtovg = ["slint/renderer-femtovg"]
 
 [dependencies]
 slint = { version = "1.4.1", features = [
     "std",
     "backend-winit",
-    "renderer-skia",
     "compat-1-2"
 ], default-features = false }
 i-slint-backend-winit = "1.4.1"
@@ -58,7 +59,7 @@ http-cache-semantics = "1.0.1"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
-windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_UI_Shell"] }
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_System_Console"] }
 
 [build-dependencies]
 slint-build = "1.4.1"

@@ -4,6 +4,10 @@ use argh::FromArgs;
 /// 程序参数
 pub struct LaunchArgs {
     #[argh(switch)]
+    /// 是否在 windows_subsystem = "windows" 条件下仍然启动命令行输出
+    pub attach_console: Option<bool>,
+
+    #[argh(switch)]
     /// 是否启动 AppWindow
     pub launch_app_window: Option<bool>,
 

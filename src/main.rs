@@ -1,5 +1,5 @@
 #![cfg_attr(
-    all(target_os = "windows", not(debug_assertions),),
+    all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
 )]
 
@@ -219,6 +219,23 @@ async fn launch_app_window_if_requested(
     launch_args: &LaunchArgs,
 ) -> Option<Result<(), slint::PlatformError>> {
     if let Some(true) = launch_args.launch_app_window {
+        // 目前只支持同时使用 --launch-app-window --attach-console 显示 AppWindow 进程的 Stdout
+        #[cfg(target_os = "windows")]
+        {
+            use windows_sys::Win32::Foundation::GetLastError;
+            use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
+            if let Some(true) = launch_args.attach_console {
+                let result = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
+                if result != 0 {
+                    println!("[launch_app_window_if_requested] AttachConsole(ATTACH_PARENT_PROCESS) success ");
+                } else {
+                    println!("[launch_app_window_if_requested] Error attaching to console: {:#x}", unsafe {
+                        GetLastError()
+                    });
+                }
+            }
+        }
+
         Some(run_app().await)
     } else {
         None
