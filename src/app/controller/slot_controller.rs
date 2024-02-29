@@ -88,6 +88,7 @@ impl SlotController {
                         .user
                         .handle_retrieve_slots_result(user.slots)
                         .await;
+                    self.rt_api_model.user.update_slot_sync_state().await;
                     self.submit_slot_model_to_ui().await;
                 }
                 Err(e) => {

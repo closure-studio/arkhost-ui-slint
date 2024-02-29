@@ -52,7 +52,7 @@ pub struct GameEntry {
     pub logs: Vec<api_arkhost::LogEntry>,
     pub log_cursor_back: u64,
     pub log_cursor_front: u64,
-    pub stage_name: Option<String>
+    pub stage_name: Option<String>,
 }
 
 impl GameEntry {
@@ -63,7 +63,7 @@ impl GameEntry {
             logs: Vec::new(),
             log_cursor_back: 0,
             log_cursor_front: 0,
-            stage_name: None
+            stage_name: None,
         }
     }
 }
@@ -82,7 +82,7 @@ pub struct SlotEntry {
     pub last_update_response: Option<SlotRuleValidationResult>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlotSyncState {
     Unknown,
     Synchronized,
@@ -145,7 +145,6 @@ impl RtUserModel {
             .await;
         }
         self.initial_games_fetched.store(true, Ordering::Release);
-        self.update_slot_sync_state().await;
     }
 
     pub async fn handle_retrieve_slots_result(&self, mut slots: Vec<api_quota::Slot>) {
@@ -166,23 +165,28 @@ impl RtUserModel {
             )
             .await;
         }
-        self.update_slot_sync_state().await;
     }
 
-    async fn update_slot_sync_state(&self) {
+    pub async fn update_slot_sync_state(&self) -> bool {
         if !self.initial_games_fetched.load(Ordering::Acquire) {
-            return;
+            return false;
         }
+
+        let mut modified = false;
 
         let game_map = self.games.read().await;
         for (_, v) in self.slots.read().await.iter() {
             let mut slot_entry = v.slot.write().await;
+            let pervious_state = slot_entry.sync_state;
             slot_entry.sync_state = match &slot_entry.data.game_account {
                 None => SlotSyncState::Synchronized,
                 Some(game) if game_map.contains_key(game) => SlotSyncState::Synchronized,
                 _ => SlotSyncState::Pending,
             };
+            modified = modified || (slot_entry.sync_state != pervious_state);
         }
+
+        modified
     }
 
     pub async fn record_slot_verify_result(

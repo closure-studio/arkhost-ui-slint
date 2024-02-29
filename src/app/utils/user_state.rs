@@ -58,12 +58,12 @@ impl UserStateFileStorage {
                     "[UserStateFileStorage] user state file have been written to {}",
                     path.display()
                 ),
-                Err(e) => eprintln!(
+                Err(e) => println!(
                     "[UserStateFileStorage] unable to write user state file at {}; Err: {e}",
                     path.display()
                 ),
             },
-            Err(e) => eprintln!(
+            Err(e) => println!(
                 "[UserStateFileStorage] unable to create user state file at {}; Err: {e}",
                 path.display()
             ),

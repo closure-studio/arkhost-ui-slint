@@ -111,7 +111,7 @@ impl SessionController {
                 .run_sse_event_loop(stop_connection_token.clone())
                 .await
             {
-                eprintln!("[Controller] Games SSE connection terminated with error: {e:?}");
+                println!("[Controller] Games SSE connection terminated with error: {e:?}");
             }
         });
     }

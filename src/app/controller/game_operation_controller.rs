@@ -102,7 +102,7 @@ impl GameOperationController {
         let result = invoke_auth(account.clone()).await;
 
         if result.is_err() {
-            eprintln!("[Controller] all attempts to start game {account} failed");
+            println!("[Controller] all attempts to start game {account} failed");
         }
         self.app_state_controller
             .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
@@ -121,7 +121,7 @@ impl GameOperationController {
             )
             .await
         {
-            eprintln!("[Controller] Error stopping game {e}");
+            println!("[Controller] Error stopping game {e}");
             notification::toast(
                 &format!("{account} 停止托管时出现意外错误"),
                 None,
@@ -192,7 +192,7 @@ impl GameOperationController {
         }) {
             Ok(captcha_info) => captcha_info,
             Err(e) => {
-                eprintln!(
+                println!(
                     "[Controller] Error performing game captcha (invoking authenticator) {e}"
                 );
                 notification::toast(
@@ -222,7 +222,7 @@ impl GameOperationController {
             )
             .await
         {
-            eprintln!("[Controller] Error performing game captcha (updating game config) {e}");
+            println!("[Controller] Error performing game captcha (updating game config) {e}");
             notification::toast(
                 &format!("{account} 提交登录滑块验证结果失败"),
                 None,

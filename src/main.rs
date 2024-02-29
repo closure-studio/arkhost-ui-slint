@@ -29,6 +29,7 @@ use reqwest_retry::policies::ExponentialBackoff;
 use reqwest_retry::RetryTransientMiddleware;
 use std::env;
 use std::ffi::OsStr;
+use std::io::Read;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::oneshot;
@@ -219,23 +220,6 @@ async fn launch_app_window_if_requested(
     launch_args: &LaunchArgs,
 ) -> Option<Result<(), slint::PlatformError>> {
     if let Some(true) = launch_args.launch_app_window {
-        // 目前只支持同时使用 --launch-app-window --attach-console 显示 AppWindow 进程的 Stdout
-        #[cfg(target_os = "windows")]
-        {
-            use windows_sys::Win32::Foundation::GetLastError;
-            use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
-            if let Some(true) = launch_args.attach_console {
-                let result = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
-                if result != 0 {
-                    println!("[launch_app_window_if_requested] AttachConsole(ATTACH_PARENT_PROCESS) success ");
-                } else {
-                    println!("[launch_app_window_if_requested] Error attaching to console: {:#x}", unsafe {
-                        GetLastError()
-                    });
-                }
-            }
-        }
-
         Some(run_app().await)
     } else {
         None
@@ -245,30 +229,144 @@ async fn launch_app_window_if_requested(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let launch_args: LaunchArgs = argh::from_env();
-    if let (Some(true), Some(true)) = (&launch_args.launch_app_window, &launch_args.launch_webview)
-    {
-        bail!("invalid parameters");
-    }
+    let do_attach_console = matches!(launch_args.attach_console, Some(true))
+        || env::vars_os().any(|(k, _)| k == "ARKHOST_APP_ATTACH_CONSOLE");
 
-    #[cfg(feature = "desktop-app")]
-    if let Some(result) = app::webview::auth::subprocess_webview::launch_if_requested(&launch_args)
-    {
-        result?;
-    } else if let Some(result) = launch_app_window_if_requested(&launch_args).await {
-        result?;
-    } else {
-        println!("[main] Spawning AppWindow process");
-        let current_exe = env::current_exe().unwrap_or_default();
-        let mut app_window = spawn_executable(
-            current_exe.as_os_str(),
-            &[current_exe.as_os_str(), OsStr::new("--launch-app-window")],
-            None,
-            true,
-        )?;
+    match (&launch_args.launch_app_window, &launch_args.launch_webview) {
+        (None, None) => {
+            if cfg!(not(debug_assertions)) {
+                alloc_console();
+                show_console(do_attach_console);
+            }
 
-        let exit_status = app_window.wait()?;
-        println!("[main] AppWindow process exited with status '{exit_status:?}'");
+            println!("[main] Spawning AppWindow process");
+            let current_exe = env::current_exe().unwrap_or_default();
+
+            let mut env = vec![];
+            if let Some(true) = launch_args.attach_console {
+                env.push(("ARKHOST_APP_ATTACH_CONSOLE".into(), "1".into()));
+            }
+
+            let mut app_window = spawn_executable(
+                current_exe.as_os_str(),
+                &[current_exe.as_os_str(), OsStr::new("--launch-app-window")],
+                Some(env),
+                true,
+                None,
+                None,
+            )?;
+
+            let exit_status = app_window.wait()?;
+            println!("[main] AppWindow process exited with status '{exit_status:?}'");
+
+            if !exit_status.success() {
+                show_crash_window(format!("{exit_status:?}"));
+            }
+        }
+        (Some(true), None) => {
+            if cfg!(not(debug_assertions)) {
+                attach_console();
+            }
+            if let Some(result) = launch_app_window_if_requested(&launch_args).await {
+                result?;
+            }
+        }
+        (None, Some(true)) => {
+            if cfg!(not(debug_assertions)) {
+                attach_console();
+            }
+            #[cfg(feature = "desktop-app")]
+            if let Some(result) =
+                app::webview::auth::subprocess_webview::launch_if_requested(&launch_args)
+            {
+                result?;
+            }
+        }
+        _ => {
+            bail!("invalid parameters");
+        }
     }
 
     Ok(())
+}
+
+// TODO: 移动到app::utils::windows_console模块
+fn alloc_console() {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Foundation::GetLastError;
+        use windows_sys::Win32::System::Console::AllocConsole;
+        let result = unsafe { AllocConsole() };
+        if result != 0 {
+            println!("[alloc_console] AllocConsole() success ");
+        } else {
+            println!(
+                "[alloc_console] Error calling AllocConsole(): {:#x}",
+                unsafe { GetLastError() }
+            );
+        }
+    }
+}
+
+fn attach_console() {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Foundation::GetLastError;
+        use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
+        let result = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
+        if result != 0 {
+            println!("[attach_console] AttachConsole(ATTACH_PARENT_PROCESS) success ");
+        } else {
+            println!(
+                "[attach_console] Error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
+                unsafe { GetLastError() }
+            );
+        }
+    }
+}
+
+fn show_console(visible: bool) {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::System::Console::GetConsoleWindow;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOW};
+        let hwnd = GetConsoleWindow();
+
+        if hwnd == 0 {
+            println!("[show_console] hWnd is NULL");
+            return;
+        }
+
+        _ = ShowWindow(hwnd, if visible { SW_SHOW } else { SW_HIDE });
+    }
+}
+
+fn show_crash_window(exit_status: String) {
+    show_console(true);
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::System::Console::{
+            GetStdHandle, SetConsoleTextAttribute, FOREGROUND_RED, STD_OUTPUT_HANDLE,
+        };
+        let hconsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(hconsole, FOREGROUND_RED);
+    }
+
+    println!(
+        concat!(
+            "\n",
+            "********************************************************************************\n",
+            "\n",
+            "可露希尔罢工了！\n",
+            "- 错误码：\t{}\n",
+            "\n",
+            "请截图控制台输出，反馈至可露希尔QQ群或QQ频道“PRTS接入 - APP讨论”板块。\n",
+            "\n",
+            "********************************************************************************\n",
+        ),
+        exit_status
+    );
+    loop {
+        _ = std::io::stdin().read(&mut [0u8]);
+    }
 }

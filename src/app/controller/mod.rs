@@ -299,7 +299,7 @@ impl ControllerAdaptor {
                         this.slot_controller.update_slot(id, update_request).await;
                     });
                 } else {
-                    eprintln!("[Controller] Unprocessable update draft: {update_draft:?}; please file a bug");
+                    println!("[Controller] Unprocessable update draft: {update_draft:?}; please file a bug");
                 }
             })
         }

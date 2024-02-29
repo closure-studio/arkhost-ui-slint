@@ -107,7 +107,9 @@ impl GameController {
             .await
         {
             Ok(_) => {
-                self.slot_controller.submit_slot_model_to_ui().await;
+                if self.rt_api_model.user.update_slot_sync_state().await {
+                    self.slot_controller.submit_slot_model_to_ui().await;
+                };
                 self.process_game_details().await;
                 self.process_game_list_changes(refresh_log_cond).await;
                 self.app_state_controller
@@ -145,7 +147,9 @@ impl GameController {
                                 println!("[Controller] Games SSE connection received {} games", games.len());
 
                                 self.rt_api_model.user.handle_retrieve_games_result(games).await;
-                                self.slot_controller.submit_slot_model_to_ui().await;
+                                if self.rt_api_model.user.update_slot_sync_state().await {
+                                    self.slot_controller.submit_slot_model_to_ui().await;
+                                };
                                 self.process_game_details().await;
                                 self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
@@ -172,13 +176,13 @@ impl GameController {
                             }
                         },
                         Ok(None) => {
-                            eprintln!("[Controller] Unexpected empty event in game SSE connection");
+                            println!("[Controller] Unexpected empty event in game SSE connection");
                             /* 处理None? */
                         },
                         Err(e) => {
                             self.app_state_controller
                                 .exec(|x| x.set_sse_connect_state(SseConnectState::Disconnected));
-                            eprintln!("[Controller] Error in game SSE connection: {e:?}");
+                            println!("[Controller] Error in game SSE connection: {e:?}");
                             break;
                         }
                     }
@@ -310,7 +314,7 @@ impl GameController {
         {
             Ok(_) => {}
             Err(e) => {
-                eprintln!("[Controller] Error update game settings {e}");
+                println!("[Controller] Error update game settings {e}");
                 notification::toast(
                     &format!("{account} 更新托管设置失败"),
                     None,
@@ -349,7 +353,7 @@ impl GameController {
                     .exec(|x| x.update_game_view(id, Some(mapping), true));
             }
             Err(e) => {
-                eprintln!("[Controller] error retrieving logs for game with id {id}: {e}");
+                println!("[Controller] error retrieving logs for game with id {id}: {e}");
                 notification::toast(&format!("{id} 获取日志失败"), None, &format!("{e}"), None);
                 self.app_state_controller
                     .exec(|x| x.update_game_view(id, None, true));
@@ -677,7 +681,7 @@ impl GameController {
         {
             Ok(res) => Some(res),
             Err(e) => {
-                eprintln!("[GameController] Error loading resource '{path}' {e:?}");
+                println!("[GameController] Error loading resource '{path}' {e:?}");
                 None
             }
         }

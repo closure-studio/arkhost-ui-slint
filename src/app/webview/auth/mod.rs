@@ -203,7 +203,7 @@ impl Authenticator {
                     AuthPageMessage::ScriptInit { } => println!("[AuthWebView] Script init"),
                 },
                 Err(e) => {
-                    eprintln!("[AuthWebView] Error: cannot deserialize auth page message: '{message}', error: {e}")
+                    println!("[AuthWebView] Error: cannot deserialize auth page message: '{message}', error: {e}")
                 }
             }
         });

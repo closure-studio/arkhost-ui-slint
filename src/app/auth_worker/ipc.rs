@@ -235,6 +235,8 @@ impl IpcAuthWorker {
             ],
             None,
             true,
+            None,
+            None,
         )?;
 
         match AuthenticatorConnection::accept(ipc_server) {

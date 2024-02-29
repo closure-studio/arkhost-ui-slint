@@ -37,7 +37,7 @@ impl auth::AuthListener for Listener {
             .send_event(AuthenticatorMessage::Result { result });
 
         if let Err(e) = res {
-            eprintln!("[WebViewSubprocess] Error sending event to EventLoop: {e}")
+            println!("[WebViewSubprocess] Error sending event to EventLoop: {e}")
         }
     }
 }
@@ -208,14 +208,14 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
                 AuthenticatorMessage::PerformAction { action } => {
                     let preform_res = authenticator.auth_resolver.preform(action.clone());
                     if let Err(err) = preform_res {
-                        eprintln!("[WebViewSubprocess] Error preforming auth action: '{action:?}'; Err: {err}");
+                        println!("[WebViewSubprocess] Error preforming auth action: '{action:?}'; Err: {err}");
                     }
                     _ = tx_host.send(AuthenticatorMessage::Acknowledged);
                 }
                 AuthenticatorMessage::Result { .. } => {
                     let send_res = tx_host.send(ev);
                     if let Err(e) = send_res {
-                        eprintln!("[WebViewSubprocess] Unable to send auth result, Err: {e}");
+                        println!("[WebViewSubprocess] Unable to send auth result, Err: {e}");
                     }
                 }
                 AuthenticatorMessage::CloseRequested => {
@@ -226,11 +226,11 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
                 AuthenticatorMessage::ReloadRequested => {
                     let res = authenticator.reload();
                     if let Err(e) = res {
-                        eprintln!("[WebViewSubprocess] Unable to reload auth page, Err: {e}");
+                        println!("[WebViewSubprocess] Unable to reload auth page, Err: {e}");
                     }
                     _ = tx_host.send(AuthenticatorMessage::Acknowledged);
                 }
-                _ => eprintln!("[WebViewSubprocess] Error listening AuthenticatorEvent: handler not implemented for {ev:?}"),
+                _ => println!("[WebViewSubprocess] Error listening AuthenticatorEvent: handler not implemented for {ev:?}"),
             },
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,

@@ -1,4 +1,7 @@
-use std::{env, ffi::{OsStr, OsString}};
+use std::{
+    env,
+    ffi::{OsStr, OsString},
+};
 use subprocess::{Popen, PopenConfig, Redirection};
 
 pub fn spawn_executable(
@@ -6,6 +9,8 @@ pub fn spawn_executable(
     args: &[impl AsRef<OsStr>],
     mut env: Option<Vec<(OsString, OsString)>>,
     inherit_env: bool,
+    stdout: Option<Redirection>,
+    stderr: Option<Redirection>,
 ) -> subprocess::Result<Popen> {
     env = match env {
         Some(mut envs) => {
@@ -24,8 +29,9 @@ pub fn spawn_executable(
     Popen::create(
         args,
         PopenConfig {
-            stdout: Redirection::Merge,
-            stderr: Redirection::Merge,
+            stdout: stdout.unwrap_or(Redirection::Merge),
+            stderr: stderr.unwrap_or(Redirection::Merge),
+            detached: true,
             executable: Some(executable.to_owned()),
             env,
             ..PopenConfig::default()
