@@ -233,7 +233,12 @@ component QQVerifyArea inherits VerticalLayout {
                     enabled: !requesting;
                     text: @tr("刷新QQ验证状态");
                     primary: qq-verify-code-copied;
-                    clicked => { Callbacks.refresh-user-info(); }
+                    clicked => { 
+                        Callbacks.refresh-user-info(); 
+                        if user-info.qq-verify-code-cached != "" {
+                            Callbacks.fetch-qq-verify-code();
+                        }
+                    }
                 }
             }
         }
@@ -327,7 +332,12 @@ export component UserCard inherits Rectangle {
                         ? @image-url("../images/user_card_refresh.svg")
                         : @image-url("../images/user_card_refresh_light.svg");
 
-                    clicked => { Callbacks.refresh-user-info(); }
+                    clicked => {
+                        Callbacks.refresh-user-info(); 
+                        if user-info.qq-verify-code-cached != "" {
+                            Callbacks.fetch-qq-verify-code();
+                        }
+                    }
     
                     width: 90px;
                     height: 30px;
