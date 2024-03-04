@@ -1,9 +1,7 @@
 use crate::app::auth_worker::AuthContext;
 
 use super::rt_api_model::RtApiModel;
-use super::{
-    ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult,
-};
+use super::{ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;

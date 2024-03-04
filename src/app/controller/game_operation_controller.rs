@@ -192,9 +192,7 @@ impl GameOperationController {
         }) {
             Ok(captcha_info) => captcha_info,
             Err(e) => {
-                println!(
-                    "[Controller] Error performing game captcha (invoking authenticator) {e}"
-                );
+                println!("[Controller] Error performing game captcha (invoking authenticator) {e}");
                 notification::toast(
                     &format!("{account} 进行登录滑块验证失败"),
                     None,

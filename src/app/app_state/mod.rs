@@ -233,7 +233,9 @@ impl AppState {
             let game_info_list = ui.get_game_info_list();
             match Self::find_game_by_id(&game_info_list, &id) {
                 Some((i, game_info)) => func(game_info_list, i, game_info),
-                None => { println!("[AppState] Game not found: {id:?}"); }
+                None => {
+                    println!("[AppState] Game not found: {id:?}");
+                }
             }
         })
     }
@@ -308,7 +310,9 @@ impl AppState {
                 Some((i, slot_info)) => {
                     func(slot_info_list, i, slot_info);
                 }
-                None => { println!("[AppState] Slot not found: {id:?}"); }
+                None => {
+                    println!("[AppState] Slot not found: {id:?}");
+                }
             }
         })
     }
@@ -321,7 +325,10 @@ impl AppState {
         })
     }
 
-    pub fn state_globals(&self, func: impl FnOnce(StateGlobals<'_>) + Send + 'static) -> AppStateAsyncOp {
+    pub fn state_globals(
+        &self,
+        func: impl FnOnce(StateGlobals<'_>) + Send + 'static,
+    ) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
             func(ui.global::<StateGlobals>());
         })

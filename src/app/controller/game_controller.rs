@@ -631,7 +631,8 @@ impl GameController {
         tokio::join!(
             async {
                 if !has_stage_data {
-                    let path = arkhost_api::consts::asset::assets::gamedata("excel/stage_table.json");
+                    let path =
+                        arkhost_api::consts::asset::assets::gamedata("excel/stage_table.json");
                     let stage_data = self.load_json_table::<StageTable>(path, None).await;
                     if let Some(stage_data) = stage_data {
                         self.build_stage_search_tree(&stage_data).await;

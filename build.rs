@@ -10,7 +10,6 @@ fn main() {
     #[cfg(all(debug_assertions, windows, target_env = "msvc"))]
     println!("cargo:rustc-link-arg=/STACK:0xA00000"); // 10 MiB
 
-    let config = slint_build::CompilerConfiguration::new()
-        .with_style("fluent".into());
+    let config = slint_build::CompilerConfiguration::new().with_style("fluent".into());
     slint_build::compile_with_config("ui/app-window.slint", config).unwrap();
 }

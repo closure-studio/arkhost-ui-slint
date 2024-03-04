@@ -1,4 +1,4 @@
-use std::{path::PathBuf, env};
+use std::{env, path::PathBuf};
 
 static DATA_DIR: &str = ".arkhost-ui-slint";
 

@@ -64,7 +64,7 @@ pub struct SsrRecord {
     pub gacha_info: String,
     pub char_id: String,
     #[serde_as(as = "TimestampSeconds<i64>")]
-    pub created_at: DateTime<Utc>
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -238,5 +238,5 @@ pub struct GetLogResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SiteConfig {
     pub is_under_maintenance: bool,
-    pub announcement: Option<String>
+    pub announcement: Option<String>,
 }

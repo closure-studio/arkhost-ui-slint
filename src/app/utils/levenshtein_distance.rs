@@ -81,7 +81,8 @@ impl<T: Hash + Eq> Trie<T> {
             // 排除编辑距离等于源字符串或匹配字符串之一的长度的情况
             && self
                 .word_len
-                .is_some_and(|x| (dist as usize) < cmp::max(word.len(), x) - 1) // '$' 前缀
+                .is_some_and(|x| (dist as usize) < cmp::max(word.len(), x) - 1)
+        // '$' 前缀
         {
             for data in &self.data {
                 let entry = ResultEntry(dist, data);

@@ -1,6 +1,9 @@
-use crate::consts::passport::api;
 use crate::clients::common::UserStateDataSource;
-use crate::models::api_passport::{LoginRequest, LoginResponse, RefreshTokenResponse, SubmitSmsVerifyCodeRequest, User, UserStateData};
+use crate::consts::passport::api;
+use crate::models::api_passport::{
+    LoginRequest, LoginResponse, RefreshTokenResponse, SubmitSmsVerifyCodeRequest, User,
+    UserStateData,
+};
 use crate::models::common::{NullableData, ResponseNestedAny, ResponseWrapperNested};
 use reqwest::Url;
 use std::ops::Deref;
@@ -37,8 +40,7 @@ impl AuthClient {
     pub fn default_client_builder() -> reqwest::ClientBuilder {
         let client_builder = common::client_builder();
         let headers = common::headers();
-        client_builder
-            .default_headers(headers)
+        client_builder.default_headers(headers)
     }
 
     pub async fn login(&self, email: String, password: String) -> ApiResult<()> {

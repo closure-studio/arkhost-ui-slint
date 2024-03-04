@@ -186,8 +186,10 @@ impl OtaController {
         };
         println!("[OTA] Download file path: {}", download_file_path.display());
 
-        let download_url =
-            Url::parse(app::env::override_asset_server().unwrap_or(arkhost_api::consts::asset::API_BASE_URL))?.join(&asset_path)?;
+        let download_url = Url::parse(
+            app::env::override_asset_server().unwrap_or(arkhost_api::consts::asset::API_BASE_URL),
+        )?
+        .join(&asset_path)?;
         if !download_file_exists(mode, &download_file_path, &target_hash).await {
             self.try_download_and_save(
                 mode,
@@ -253,25 +255,46 @@ impl OtaController {
         let finish = CancellationToken::new();
         let downloader_thread = std::thread::spawn({
             let finish = finish.clone();
+            let download_file_path = download_file_path.to_owned();
             move || -> anyhow::Result<_> {
                 let _guard = finish.drop_guard();
                 let client = blocking_client();
-                let response = client.get(url).send().and_then(|x| x.error_for_status()).map_err(|e| {
-                    println!("[OTA] Download failed: error on sending request: {e}");
-                    e
-                })?;
-    
+                let response = client
+                    .get(url)
+                    .send()
+                    .and_then(|x| x.error_for_status())
+                    .map_err(|e| {
+                        notification::toast(
+                            "更新失败",
+                            None,
+                            &format!("下载失败！请重试\n{e}"),
+                            None,
+                        );
+                        println!("[OTA] Download failed: error on sending request: {e}");
+                        e
+                    })?;
+
                 let mut download_reader = DownloadReader {
                     inner: response,
                     tot_bytes_read: 0usize,
                     tx_bytes_read,
                     hasher: sha2::Sha256::new(),
                 };
-    
-                let tot_bytes_read = std::io::copy(&mut download_reader, &mut file).map_err(|e| {
-                    println!("[OTA] Download failed: error on read operation: {e}");
-                    e
-                })?;
+
+                let tot_bytes_read =
+                    std::io::copy(&mut download_reader, &mut file).map_err(|e| {
+                        notification::toast(
+                            "更新失败",
+                            None,
+                            &format!(
+                                "写入临时文件失败！请检查权限是否正确\n路径：{}\n{e}",
+                                download_file_path.display()
+                            ),
+                            None,
+                        );
+                        println!("[OTA] Download failed: error on read operation: {e}");
+                        e
+                    })?;
                 Ok((tot_bytes_read, download_reader.hasher.finalize()))
             }
         });
@@ -287,18 +310,16 @@ impl OtaController {
                         })
             }) => true,
             _ = finish.cancelled() => false
-        }
-        {
+        } {
             last_bytes_read = *rx_bytes_read.borrow();
-            self.update_download_progress(total_size, last_bytes_read).await;
+            self.update_download_progress(total_size, last_bytes_read)
+                .await;
         }
 
-        let (bytes_read, hash) = match downloader_thread.join().unwrap() 
+        let (bytes_read, hash) = match downloader_thread.join().unwrap()
             /* 下载线程panic时返回Err，此处向外传播panic */ {
             Ok(x) => x,
             Err(e) => {
-                notification::toast("更新失败", None, 
-                &format!("下载失败或写入临时文件失败！请重试\n路径：{}\n{e}", download_file_path.display()), None);
                 _ = tokio::fs::remove_file(download_file_path).await;
                 return Err(e);
             },
@@ -419,20 +440,24 @@ impl OtaController {
     async fn update_download_progress(&self, total_size: usize, downloaded_size: usize) {
         let downloaded_size_text = humansize::format_size(downloaded_size, humansize::DECIMAL);
         if total_size != 0 {
-            self.app_state_controller.exec_wait(move |x| {
-                x.state_globals(move |x| {
-                    x.set_update_downloaded_size(downloaded_size_text.into());
-                    x.set_update_progress(downloaded_size as f32 / total_size as f32);
-                    x.set_update_indeterminate(false);
+            self.app_state_controller
+                .exec_wait(move |x| {
+                    x.state_globals(move |x| {
+                        x.set_update_downloaded_size(downloaded_size_text.into());
+                        x.set_update_progress(downloaded_size as f32 / total_size as f32);
+                        x.set_update_indeterminate(false);
+                    })
                 })
-            }).await;
+                .await;
         } else {
-            self.app_state_controller.exec_wait(move |x| {
-                x.state_globals(move |x| {
-                    x.set_update_downloaded_size(downloaded_size_text.into());
-                    x.set_update_indeterminate(true);
+            self.app_state_controller
+                .exec_wait(move |x| {
+                    x.state_globals(move |x| {
+                        x.set_update_downloaded_size(downloaded_size_text.into());
+                        x.set_update_indeterminate(true);
+                    })
                 })
-            }).await;
+                .await;
         }
     }
 }
