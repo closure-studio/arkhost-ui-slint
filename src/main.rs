@@ -290,7 +290,8 @@ async fn main() -> anyhow::Result<()> {
             {
                 let patch_executable_path =
                     data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
-                if let Ok(true) = tokio::fs::try_exists(&patch_executable_path).await {
+                if matches!(tokio::fs::try_exists(&patch_executable_path).await, Ok(true) if exit_status.success())
+                {
                     if let Err(e) = self_replace::self_replace(&patch_executable_path) {
                         show_crash_window(
                             &format!("{exit_status:?}"),

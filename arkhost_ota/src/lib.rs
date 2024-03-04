@@ -86,7 +86,7 @@ pub fn try_parse_detached_signature(bytes: &[u8]) -> anyhow::Result<Signature> {
 
 pub mod consts {
     pub const DEFAULT_BRANCH: &str = "main";
-    pub const TMP_PATCH_EXECUTABLE_NAME: &str = "closure-studio.__patch__.exe";
+    pub const TMP_PATCH_EXECUTABLE_NAME: &str = "closure-studio.__exe_patch__.tmp";
     pub const RELEASE_PUB_KEY: &[u8] = include_bytes!("../resource/release.gpg");
 
     pub mod asset {

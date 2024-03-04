@@ -1,19 +1,21 @@
+use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use std::{env, io};
 
 use anyhow::bail;
 use arkhost_ota;
-use bytes::Bytes;
-use futures::{Stream, StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use sha2::Digest;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::task::JoinHandle;
+use tokio::sync::{oneshot, Mutex};
+use tokio_util::sync::CancellationToken;
+use url::Url;
 
 use crate::app::utils::{app_metadata, data_dir, notification};
-use crate::app::{asset_worker, ui};
+use crate::app::{self, asset_worker, ui};
 
 use super::app_state_controller::AppStateController;
 use super::{AssetCommand, Sender};
@@ -24,6 +26,24 @@ pub struct OtaController {
 
     cur_update_mode: Mutex<Option<asset_worker::ReleaseUpdateType>>,
     updating: AtomicBool,
+}
+
+struct DownloadReader<R> {
+    inner: R,
+    tot_bytes_read: usize,
+    tx_bytes_read: tokio::sync::watch::Sender<usize>,
+    hasher: sha2::Sha256,
+}
+
+impl<R: Read> Read for DownloadReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let bytes_read = self.inner.read(buf)?;
+        self.tot_bytes_read += bytes_read;
+        self.hasher.update(&buf[0..bytes_read]);
+        _ = self.tx_bytes_read.send_replace(self.tot_bytes_read);
+
+        Ok(bytes_read)
+    }
 }
 
 impl OtaController {
@@ -130,26 +150,28 @@ impl OtaController {
 
         let branch = app_metadata::RELEASE_UPDATE_BRANCH;
         let (resp, mut rx) = oneshot::channel();
-        let (release, download_size, asset_path, response) = self
+        let (release, download_size, asset_path) = self
             .sender
             .send_asset_request(
-                AssetCommand::DownloadReleaseUpdate {
+                AssetCommand::CheckReleaseUpdate {
                     branch: Some(branch.to_owned()),
                     mode,
                     resp,
                 },
                 &mut rx,
             )
-            .await?;
+            .await?
+            .ok_or(anyhow::anyhow!("unable to get release"))?;
         self.update_release_info(mode, &release, download_size);
-        let target_file_path = data_dir::data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
+        let target_file_path =
+            data_dir::data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
         let target_hash = hex::decode(&release.file.hash)?;
 
         let download_file_path = match mode {
             asset_worker::ReleaseUpdateType::Patch => {
                 let mut split = asset_path.trim_end_matches('/').rsplitn(3, '/');
                 let file_name = match (split.next(), split.next(), split.next()) {
-                    (Some(_), Some(file_name), _) => file_name.into(),
+                    (Some(hash_version), Some(_file_name), _) => hash_version.to_owned(),
                     _ => format!(
                         "release-{}.{}.{}-{}.tmp",
                         release.version.major,
@@ -164,10 +186,12 @@ impl OtaController {
         };
         println!("[OTA] Download file path: {}", download_file_path.display());
 
+        let download_url =
+            Url::parse(app::env::override_asset_server().unwrap_or(arkhost_api::consts::asset::API_BASE_URL))?.join(&asset_path)?;
         if !download_file_exists(mode, &download_file_path, &target_hash).await {
             self.try_download_and_save(
                 mode,
-                response.bytes_stream().boxed(),
+                download_url,
                 &download_file_path,
                 download_size,
                 &target_hash,
@@ -190,6 +214,8 @@ impl OtaController {
             asset_worker::ReleaseUpdateType::Patch => {
                 self.try_patch_self_executable(&download_file_path, &target_file_path, target_hash)
                     .await?;
+                // 移除patch临时文件
+                _ = tokio::fs::remove_file(download_file_path).await;
             }
             asset_worker::ReleaseUpdateType::FullDownload => {}
         };
@@ -198,15 +224,15 @@ impl OtaController {
         Ok(())
     }
 
-    async fn try_download_and_save<S: Stream<Item = reqwest::Result<Bytes>> + Unpin>(
+    async fn try_download_and_save(
         &self,
         mode: asset_worker::ReleaseUpdateType,
-        mut stream: S,
+        url: Url,
         download_file_path: &Path,
-        download_size: usize,
+        total_size: usize,
         target_hash: &[u8],
     ) -> Result<(), anyhow::Error> {
-        let mut file = match tokio::fs::File::create(download_file_path).await {
+        let mut file = match std::fs::File::create(download_file_path) {
             Ok(file) => file,
             Err(e) => {
                 notification::toast(
@@ -221,55 +247,68 @@ impl OtaController {
                 return Err(e.into());
             }
         };
-        let (tx_writer, mut rx_writer) = mpsc::unbounded_channel::<Bytes>();
-        let writer: JoinHandle<io::Result<()>> = tokio::spawn(async move {
-            while let Some(chunk) = rx_writer.recv().await {
-                if chunk.is_empty() {
-                    break;
-                }
-                file.write_all(&chunk).await?;
-            }
-            file.shutdown().await
-        });
-        let mut bytes_read = 0;
-        let mut last_recorded_size = 0;
-        let mut hasher = sha2::Sha256::new();
-        while let Some(data) = stream.next().await {
-            let data = match data {
-                Ok(chunk) => chunk,
-                Err(e) => {
-                    notification::toast("更新失败", None, &format!("下载失败！请重试\n{e}"), None);
-                    _ = tx_writer.send(vec![].into());
-                    _ = writer.await;
-                    _ = tokio::fs::remove_file(download_file_path).await;
-                    return Err(e.into());
-                }
-            };
+        let mut last_bytes_read = 0;
+        let (tx_bytes_read, mut rx_bytes_read) = tokio::sync::watch::channel(0usize);
 
-            bytes_read += data.len();
-            hasher.update(&data);
-            tx_writer.send(data)?;
-            self.update_download_progress(download_size, bytes_read, &mut last_recorded_size);
+        let finish = CancellationToken::new();
+        let downloader_thread = std::thread::spawn({
+            let finish = finish.clone();
+            move || -> anyhow::Result<_> {
+                let _guard = finish.drop_guard();
+                let client = blocking_client();
+                let response = client.get(url).send().and_then(|x| x.error_for_status()).map_err(|e| {
+                    println!("[OTA] Download failed: error on sending request: {e}");
+                    e
+                })?;
+    
+                let mut download_reader = DownloadReader {
+                    inner: response,
+                    tot_bytes_read: 0usize,
+                    tx_bytes_read,
+                    hasher: sha2::Sha256::new(),
+                };
+    
+                let tot_bytes_read = std::io::copy(&mut download_reader, &mut file).map_err(|e| {
+                    println!("[OTA] Download failed: error on read operation: {e}");
+                    e
+                })?;
+                Ok((tot_bytes_read, download_reader.hasher.finalize()))
+            }
+        });
+
+        while tokio::select! {
+            Ok(_) = rx_bytes_read
+            .wait_for(|x| {
+                *x == total_size
+                    || (*x - last_bytes_read)
+                        < (match total_size {
+                            0 => 50 << 10, // 50 KB
+                            total_size => total_size / 100,
+                        })
+            }) => true,
+            _ = finish.cancelled() => false
         }
+        {
+            last_bytes_read = *rx_bytes_read.borrow();
+            self.update_download_progress(total_size, last_bytes_read).await;
+        }
+
+        let (bytes_read, hash) = match downloader_thread.join().unwrap() 
+            /* 下载线程panic时返回Err，此处向外传播panic */ {
+            Ok(x) => x,
+            Err(e) => {
+                notification::toast("更新失败", None, 
+                &format!("下载失败或写入临时文件失败！请重试\n路径：{}\n{e}", download_file_path.display()), None);
+                _ = tokio::fs::remove_file(download_file_path).await;
+                return Err(e);
+            },
+        };
+
         println!(
             "[OTA] Download finished. {} read",
             humansize::format_size(bytes_read, humansize::DECIMAL)
         );
-        _ = tx_writer.send(vec![].into());
-        if let Err(e) = writer.await {
-            notification::toast(
-                "更新失败",
-                None,
-                &format!(
-                    "写入临时文件失败！请尝试重新下载\n路径：{}\n{e}",
-                    download_file_path.display()
-                ),
-                None,
-            );
-            _ = tokio::fs::remove_file(download_file_path).await;
-            return Err(e.into());
-        }
-        let hash = hasher.finalize();
+
         if matches!(mode, asset_worker::ReleaseUpdateType::FullDownload)
             && hash[..] != target_hash[..]
         {
@@ -377,40 +416,23 @@ impl OtaController {
         });
     }
 
-    fn update_download_progress(
-        &self,
-        total_size: usize,
-        downloaded_size: usize,
-        last_recorded_size: &mut usize,
-    ) {
-        if downloaded_size < total_size
-            && (downloaded_size - *last_recorded_size)
-                < (match total_size {
-                    0 => 50 << 17, // 50 KB
-                    total_size => total_size,
-                } >> 7)
-        // * (1/128)
-        {
-            return;
-        }
-        *last_recorded_size = downloaded_size;
-
+    async fn update_download_progress(&self, total_size: usize, downloaded_size: usize) {
         let downloaded_size_text = humansize::format_size(downloaded_size, humansize::DECIMAL);
         if total_size != 0 {
-            self.app_state_controller.exec(move |x| {
+            self.app_state_controller.exec_wait(move |x| {
                 x.state_globals(move |x| {
                     x.set_update_downloaded_size(downloaded_size_text.into());
                     x.set_update_progress(downloaded_size as f32 / total_size as f32);
                     x.set_update_indeterminate(false);
                 })
-            });
+            }).await;
         } else {
-            self.app_state_controller.exec(move |x| {
+            self.app_state_controller.exec_wait(move |x| {
                 x.state_globals(move |x| {
                     x.set_update_downloaded_size(downloaded_size_text.into());
                     x.set_update_indeterminate(true);
                 })
-            });
+            }).await;
         }
     }
 }
@@ -441,4 +463,24 @@ async fn download_file_exists(
             .await
             .ok()
             .map_or(false, |x| x[..] == *target_hash)
+}
+
+fn blocking_client() -> reqwest::blocking::Client {
+    let mut headers = arkhost_api::clients::common::headers();
+    headers.insert(
+        reqwest::header::REFERER,
+        reqwest::header::HeaderValue::from_static(arkhost_api::consts::asset::REFERER_URL),
+    );
+
+    reqwest::blocking::ClientBuilder::new()
+        .default_headers(headers)
+        .min_tls_version(reqwest::tls::Version::TLS_1_2)
+        .max_tls_version(reqwest::tls::Version::TLS_1_3)
+        .http1_only()
+        .use_rustls_tls()
+        .gzip(true)
+        .brotli(true)
+        .connect_timeout(Duration::from_secs(8))
+        .build()
+        .unwrap()
 }

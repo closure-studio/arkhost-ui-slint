@@ -470,7 +470,9 @@ impl ControllerAdaptor {
             let this = self.clone();
             app.on_download_update(move || {
                 let this = this.clone();
-                tokio::spawn(async move { this.ota_controller.update_release().await });
+                tokio::spawn(async move {
+                    this.ota_controller.update_release().await;
+                });
             })
         }
 
