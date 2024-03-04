@@ -1,5 +1,5 @@
 import { FontGlobals } from "../font-globals.slint";
-import { Button , VerticalBox} from "std-widgets.slint";
+import { Button , VerticalBox, ProgressIndicator} from "std-widgets.slint";
 
 export component BannerNotification inherits Rectangle {
     in property <color> background-color: #9e8c00bc;
@@ -8,6 +8,9 @@ export component BannerNotification inherits Rectangle {
     in property <bool> has-action: false;
     in property <string> action-text;
     in property <image> action-icon: @image-url("../images/banner_notification_apply.svg");
+    in property <bool> has-progress: false;
+    in property <float> progress;
+    in property <bool> indeterminate;
     in property <TextWrap> wrap;
     callback action();
 
@@ -15,68 +18,81 @@ export component BannerNotification inherits Rectangle {
     border-radius: 10px;
     clip: true;
 
-    HorizontalLayout {
-        alignment: space-between;
-        padding: 10px;
-        padding-left: 15px;
-        padding-right: 15px;
-        Text {
-            text: text;
-            font-family: FontGlobals.alphanumeric-text-sans;
-            font-size: 15px;
-            font-weight: FontGlobals.emphasis-font-weight * 0.6;
-            color: accent-color;
-            vertical-alignment: center;
-            wrap: wrap;
-        }
-        
-        if has-action: Rectangle {
-            clip: true;
+    VerticalLayout {
+        alignment: start;
 
-            HorizontalLayout {
-                spacing: 5px;
-                alignment: end;
-
-                VerticalLayout {
-                    alignment: center;
-
-                    Image {
-                        width: 22px;
-                        height: 22px;
+        HorizontalLayout {
+            alignment: space-between;
+            padding: 10px;
+            padding-left: 15px;
+            padding-right: 15px;
+            Text {
+                text: text;
+                font-family: FontGlobals.alphanumeric-text-sans;
+                font-size: 15px;
+                font-weight: FontGlobals.emphasis-font-weight * 0.6;
+                color: accent-color;
+                vertical-alignment: center;
+                wrap: wrap;
+            }
+            
+            if has-action: Rectangle {
+                clip: true;
     
-                        source: action-icon;
-                        colorize: accent-color;
+                HorizontalLayout {
+                    spacing: 5px;
+                    alignment: end;
+    
+                    VerticalLayout {
+                        alignment: center;
+    
+                        Image {
+                            width: 22px;
+                            height: 22px;
+        
+                            source: action-icon;
+                            colorize: accent-color;
+                        }
+                    }
+    
+                    Text {
+                        font-family: FontGlobals.alphanumeric-text-sans;
+                        font-size: 15px;
+                        font-weight: FontGlobals.emphasis-font-weight * 0.75;
+                        text: action-text;
+    
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+    
+                        states [
+                            up when !touch-area.has-hover && !touch-area.pressed: {
+                                color: accent-color;
+                                in { animate color { duration: 0.15s; } }
+                            }
+                            hover when touch-area.has-hover && !touch-area.pressed: {
+                                color: accent-color.darker(20%);
+                                in { animate color { duration: 0.15s; } }
+                            }
+                            down when touch-area.pressed: {
+                                color: accent-color.darker(40%);
+                                in { animate color { duration: 0.15s; } }
+                            }
+                        ]
                     }
                 }
-
-                Text {
-                    font-family: FontGlobals.alphanumeric-text-sans;
-                    font-size: 15px;
-                    font-weight: FontGlobals.emphasis-font-weight * 0.75;
-                    text: action-text;
-
-                    horizontal-alignment: right;
-                    vertical-alignment: center;
-
-                    states [
-                        up when !touch-area.has-hover && !touch-area.pressed: {
-                            color: accent-color;
-                            in { animate color { duration: 0.15s; } }
-                        }
-                        hover when touch-area.has-hover && !touch-area.pressed: {
-                            color: accent-color.darker(20%);
-                            in { animate color { duration: 0.15s; } }
-                        }
-                        down when touch-area.pressed: {
-                            color: accent-color.darker(40%);
-                            in { animate color { duration: 0.15s; } }
-                        }
-                    ]
+    
+                touch-area := TouchArea {
+                    clicked => { action(); }
                 }
             }
+        }
 
-            touch-area := TouchArea {
-                clicked => { action(); }
+        if has-progress: HorizontalLayout {
+            ProgressIndicator {
+                progress: progress;
+                indeterminate: indeterminate;
+
+                height: 5px;
             }
         }
     }

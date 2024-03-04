@@ -1,4 +1,5 @@
-use reqwest::Url;
+use reqwest::{Response, Url};
+use reqwest_middleware::RequestBuilder;
 
 use super::common;
 
@@ -19,24 +20,37 @@ impl AssetClient {
         let client_builder = common::client_builder();
         let mut headers = common::headers();
         headers.insert(
-            "Referer",
+            reqwest::header::REFERER,
             reqwest::header::HeaderValue::from_static(crate::consts::asset::REFERER_URL),
         );
         client_builder.default_headers(headers)
     }
 
-    pub async fn get_content(&self, path: String) -> anyhow::Result<bytes::Bytes> {
-        let response = self
-            .client
-            .get(self.base_url.join(&path)?)
-            .send()
-            .await?
-            .error_for_status()?;
+    pub async fn head_content(
+        &self,
+        path: &str,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<Response> {
+        let request = build_request(self.client.head(self.base_url.join(path)?));
+        Ok(request.send().await?)
+    }
 
-            let bytes = response
-            .bytes()
-            .await?;
-
+    pub async fn get_content(
+        &self,
+        path: &str,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<bytes::Bytes> {
+        let request = build_request(self.client.get(self.base_url.join(path)?));
+        let bytes = request.send().await?.error_for_status()?.bytes().await?;
         Ok(bytes)
+    }
+
+    pub async fn get_content_response(
+        &self,
+        path: &str,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<Response> {
+        let request = build_request(self.client.get(self.base_url.join(path)?));
+        Ok(request.send().await?)
     }
 }

@@ -63,7 +63,7 @@ pub mod asset {
     pub const API_BASE_URL: &str = "https://assets.closure.setonink.com/";
     pub const REFERER_URL: &str = "https://arknights.host";
 
-    pub mod api {
+    pub mod assets {
         pub fn avatar(avatar_type: &str, id: &str) -> String {
             format!("dst/avatar/{avatar_type}/{id}")
         }

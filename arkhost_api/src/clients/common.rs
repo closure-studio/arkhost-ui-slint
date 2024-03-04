@@ -207,7 +207,7 @@ pub fn headers() -> reqwest::header::HeaderMap {
         reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_IDENTIFIER),
     );
     headers.insert(
-        "User-Agent",
+        reqwest::header::USER_AGENT,
         reqwest::header::HeaderValue::from_static(crate::consts::CLIENT_USER_AGENT),
     );
 

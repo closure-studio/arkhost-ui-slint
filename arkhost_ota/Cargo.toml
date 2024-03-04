@@ -1,0 +1,16 @@
+[package]
+name = "arkhost-ota"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+semver = { version = "1.0.22", features = ["serde"] }
+serde = { version = "1.0.197", features = ["derive"] }
+qbsdiff = "1.4"
+digest = "0.10.7"
+hex = "0.4.3"
+sha2 = "0.10.8"
+bytes = "1.5.0"
+pgp = "0.11.0"
+

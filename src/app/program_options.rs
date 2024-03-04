@@ -8,6 +8,15 @@ pub struct LaunchArgs {
     pub attach_console: Option<bool>,
 
     #[argh(switch)]
+    /// 是否强制更新客户端（开发调试用）
+    pub force_update: Option<bool>,
+
+    #[argh(switch)]
+    /// 是否连接到本地资源服务器，该选项会设置环境变量
+    /// ARKHOST_APP_OVERRIDE_ASSET_SERVER='http://localhost:36888' （开发调试用）
+    pub local_asset_server: Option<bool>,
+
+    #[argh(switch)]
     /// 是否启动 AppWindow
     pub launch_app_window: Option<bool>,
 

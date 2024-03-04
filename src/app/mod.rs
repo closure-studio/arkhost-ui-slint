@@ -25,3 +25,6 @@ pub mod program_options;
 pub mod ui;
 /// 用于显示网页弹窗或WebView来进行用户验证/游戏验证
 pub mod webview;
+
+/// 环境（变量）相关
+pub mod env;

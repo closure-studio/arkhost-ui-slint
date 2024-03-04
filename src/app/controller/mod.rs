@@ -2,6 +2,7 @@ pub mod app_state_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
+pub mod ota_controller;
 pub mod rt_api_model;
 pub mod sender;
 pub mod session_controller;
@@ -12,6 +13,7 @@ extern crate alloc;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
+use self::ota_controller::OtaController;
 use self::rt_api_model::RtApiModel;
 use self::sender::Sender;
 use self::slot_controller::SlotController;
@@ -67,6 +69,7 @@ pub struct ControllerAdaptor {
     pub slot_controller: Arc<SlotController>,
     pub game_operation_controller: Arc<GameOperationController>,
     pub user_controller: Arc<UserController>,
+    pub ota_controller: Arc<OtaController>,
 }
 
 impl ControllerAdaptor {
@@ -105,12 +108,17 @@ impl ControllerAdaptor {
             slot_controller.clone(),
             game_operation_controller.clone(),
         ));
+        let ota_controller = Arc::new(OtaController::new(
+            app_state_controller.clone(),
+            sender.clone(),
+        ));
         let session_controller = Arc::new(SessionController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
             sender.clone(),
             game_controller.clone(),
             slot_controller.clone(),
+            ota_controller.clone(),
         ));
         let user_controller = Arc::new(UserController::new(
             rt_api_model.clone(),
@@ -127,6 +135,7 @@ impl ControllerAdaptor {
             slot_controller,
             game_operation_controller,
             user_controller,
+            ota_controller,
         }
     }
 
@@ -455,6 +464,14 @@ impl ControllerAdaptor {
                         .await;
                 });
             });
+        }
+
+        {
+            let this = self.clone();
+            app.on_download_update(move || {
+                let this = this.clone();
+                tokio::spawn(async move { this.ota_controller.update_release().await });
+            })
         }
 
         {

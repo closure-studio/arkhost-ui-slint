@@ -5,7 +5,7 @@ import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
 import { StyleMetrics, ScrollView , VerticalBox, Spinner } from "std-widgets.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
-import { StateGlobals, WebViewType } from "../state-globals.slint";
+import { StateGlobals, WebViewType, ReleaseUpdateType, ReleaseUpdateState } from "../state-globals.slint";
 
 export enum FetchGamesState {
     NotFetched,
@@ -85,10 +85,49 @@ export component GameInfoPage {
 
                 width: min(root.width, 1440px);
 
-                if user.status == UserStatus.Banned : BannerNotification {
-                    background-color: #dd8800;
-                    accent-color: #fffceb;
-                    text: @tr("🛑 你的可露希尔账号已经被管理员停用");
+                if StateGlobals.update-version != "": BannerNotification {
+                    pure function update-action-text() -> string {
+                        StateGlobals.update-type == ReleaseUpdateType.FullDownload
+                            ? @tr("更新客户端")
+                            : @tr("增量更新")
+                    }
+
+                    background-color: StyleMetrics.dark-color-scheme
+                        ? StyleMetrics.window-background.darker(80%).transparentize(50%)
+                        : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                    accent-color: StyleMetrics.default-text-color;
+
+                    action => {
+                        if StateGlobals.update-state == ReleaseUpdateState.Idle {
+                            Callbacks.download-update();
+                        }
+                    }
+
+                    states [
+                        idle when StateGlobals.update-state == ReleaseUpdateState.Idle: {
+                            text: @tr("🆕 可露希尔客户端有新版本可用 - ") + StateGlobals.update-version;
+                            has-action: true;
+                            action-text: "["
+                                + update-action-text()
+                                + " "
+                                + StateGlobals.update-size
+                                + "]";
+                        }
+                        downloading when StateGlobals.update-state == ReleaseUpdateState.Downloading: {
+                            text: @tr("⏳ 正在") 
+                                + update-action-text() 
+                                + @tr("…  ")  
+                                + StateGlobals.update-downloaded-size + "/" + StateGlobals.update-size;
+                            has-action: false;
+                            has-progress: true;
+                            progress: StateGlobals.update-progress;
+                            indeterminate: StateGlobals.update-indeterminate;
+                        }
+                        ready when StateGlobals.update-state == ReleaseUpdateState.Ready: {
+                            text: @tr("✅ 更新下载成功！关闭客户端后将自动开始更新。");
+                            has-action: false;
+                        }
+                    ]
                 }
 
                 if StateGlobals.site-announcement != "" 
@@ -112,6 +151,12 @@ export component GameInfoPage {
                         has-action: false;
                         text: @tr("🚧 可露希尔平台正在维护中");
                     }
+                }
+
+                if user.status == UserStatus.Banned : BannerNotification {
+                    background-color: #dd8800;
+                    accent-color: #fffceb;
+                    text: @tr("🛑 你的可露希尔账号已经被管理员停用");
                 }
 
                 if !StateGlobals.has-default-webview-installation && StateGlobals.has-webview-launch-failure: BannerNotification {

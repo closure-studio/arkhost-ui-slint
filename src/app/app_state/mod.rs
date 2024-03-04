@@ -308,7 +308,7 @@ impl AppState {
                 Some((i, slot_info)) => {
                     func(slot_info_list, i, slot_info);
                 }
-                None => { /* TODO: report error */ }
+                None => { println!("[AppState] Slot not found: {id:?}"); }
             }
         })
     }

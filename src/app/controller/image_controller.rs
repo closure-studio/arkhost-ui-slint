@@ -36,7 +36,7 @@ impl ImageController {
         };
 
         if !game.info.status.avatar.id.is_empty() {
-            let mut path = arkhost_api::consts::asset::api::avatar(
+            let mut path = arkhost_api::consts::asset::assets::avatar(
                 &game.info.status.avatar.type_val,
                 &game.info.status.avatar.sanitize_id_for_url(),
             );
@@ -65,7 +65,7 @@ impl ImageController {
             if !details.status.secretary_skin_id.is_empty() {
                 let mut skin_id = details.status.sanitize_secretary_skin_id_for_url();
                 skin_id.push_str(".webp");
-                let path: String = arkhost_api::consts::asset::api::charpack(&skin_id);
+                let path: String = arkhost_api::consts::asset::assets::charpack(&skin_id);
                 {
                     let mut image_ref = image_ref.write().await;
                     image_ref.asset_path = path.clone();

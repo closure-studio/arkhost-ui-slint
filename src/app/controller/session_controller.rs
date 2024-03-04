@@ -6,7 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     app_state_controller::AppStateController, game_controller::GameController,
-    rt_api_model::RtApiModel, sender::Sender, slot_controller::SlotController, ApiOperation,
+    ota_controller::OtaController, rt_api_model::RtApiModel, sender::Sender,
+    slot_controller::SlotController, ApiOperation,
 };
 
 pub struct SessionController {
@@ -15,6 +16,8 @@ pub struct SessionController {
     pub sender: Arc<Sender>,
     pub game_controller: Arc<GameController>,
     pub slot_controller: Arc<SlotController>,
+    pub ota_controller: Arc<OtaController>,
+
     pub stop_connections: Mutex<Option<DropGuard>>,
 }
 
@@ -25,6 +28,7 @@ impl SessionController {
         sender: Arc<Sender>,
         game_controller: Arc<GameController>,
         slot_controller: Arc<SlotController>,
+        ota_controller: Arc<OtaController>,
     ) -> Self {
         Self {
             rt_api_model,
@@ -32,6 +36,7 @@ impl SessionController {
             sender,
             game_controller,
             slot_controller,
+            ota_controller,
             stop_connections: Mutex::new(None),
         }
     }
@@ -56,7 +61,9 @@ impl SessionController {
                 );
                 self.on_login().await;
                 self.app_state_controller
-                    .exec(|x| x.set_login_state(LoginState::Logged, "登录成功".into()));
+                    .exec_wait(|x| x.set_login_state(LoginState::Logged, "登录成功".into()))
+                    .await;
+                self.on_post_login().await;
             }
             Err(e) => {
                 self.app_state_controller
@@ -80,7 +87,9 @@ impl SessionController {
                 );
                 self.on_login().await;
                 self.app_state_controller
-                    .exec(|x| x.set_login_state(LoginState::Logged, "登录成功".into()));
+                    .exec_wait(|x| x.set_login_state(LoginState::Logged, "登录成功".into()))
+                    .await;
+                self.on_post_login().await;
             }
             Err(e) => {
                 self.app_state_controller.exec(|x| {
@@ -143,7 +152,12 @@ impl SessionController {
         tokio::join!(
             self.fetch_site_config(),
             self.slot_controller.refresh_slots(),
-            self.spawn_sse_event_loop()
+            self.spawn_sse_event_loop(),
+            self.ota_controller.check_release_update()
         );
+    }
+
+    async fn on_post_login(&self) {
+        self.ota_controller.try_auto_update_release().await;
     }
 }

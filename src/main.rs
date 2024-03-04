@@ -19,6 +19,7 @@ use app::utils::cache_manager::CACacheManager;
 use app::utils::data_dir::data_dir;
 use app::utils::subprocess::spawn_executable;
 use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
+use app::utils::{app_metadata, notification};
 use app::{api_worker::Worker as ApiWorker, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
 use arkhost_api::clients::common::UserState;
@@ -76,8 +77,22 @@ fn create_asset_client() -> AssetClient {
             },
             options: HttpCacheOptions {
                 cache_mode_fn: Some(Arc::new(|req| {
+                    // TODO: 其他方式识别资源文件类型（MIME type等）
                     if req.uri.path().ends_with(".webp") {
-                        CacheMode::ForceCache
+                        return CacheMode::ForceCache;
+                    }
+                    let matches_ota_file = {
+                        // OTA 更新文件URL： http://asset.server.com/foo/bar.txt/{hash}
+                        let mut split = req.uri.path().rsplitn(2, '/');
+                        !matches!(
+                            (split.next(), split.next()), 
+                                (_, Some(path_without_hash)) if 
+                                    (path_without_hash.ends_with(".exe")
+                                    || path_without_hash.ends_with(".bspatch")))
+                        // TODO: 其他方式识别OTA更新文件
+                    };
+                    if matches_ota_file {
+                        CacheMode::NoStore
                     } else {
                         CacheMode::Default
                     }
@@ -88,7 +103,7 @@ fn create_asset_client() -> AssetClient {
         .build();
 
     AssetClient::new(
-        arkhost_api::consts::asset::API_BASE_URL,
+        app::env::override_asset_server().unwrap_or(arkhost_api::consts::asset::API_BASE_URL),
         client_with_middlewares,
     )
 }
@@ -229,22 +244,34 @@ async fn launch_app_window_if_requested(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let launch_args: LaunchArgs = argh::from_env();
-    let do_attach_console = matches!(launch_args.attach_console, Some(true))
-        || env::vars_os().any(|(k, _)| k == "ARKHOST_APP_ATTACH_CONSOLE");
+    let do_attach_console =
+        matches!(launch_args.attach_console, Some(true)) || app::env::attach_console();
 
     match (&launch_args.launch_app_window, &launch_args.launch_webview) {
         (None, None) => {
-            if cfg!(not(debug_assertions)) {
+            if !cfg!(debug_assertions) {
                 alloc_console();
                 show_console(do_attach_console);
             }
 
-            println!("[main] Spawning AppWindow process");
+            println!(
+                "\n### ArkHost-UI-Slint [Version: {}] ###\n",
+                app_metadata::CARGO_PKG_VERSION.unwrap_or("not found")
+            );
             let current_exe = env::current_exe().unwrap_or_default();
 
             let mut env = vec![];
             if let Some(true) = launch_args.attach_console {
-                env.push(("ARKHOST_APP_ATTACH_CONSOLE".into(), "1".into()));
+                env.push((app::env::consts::ATTACH_CONSOLE.into(), "1".into()));
+            }
+            if let Some(true) = launch_args.force_update {
+                env.push((app::env::consts::FORCE_UPDATE.into(), "1".into()));
+            }
+            if let Some(true) = launch_args.local_asset_server {
+                env.push((
+                    app::env::consts::OVERRIDE_ASSET_SERVER.into(),
+                    "http://localhost:36888".into(),
+                ))
             }
 
             let mut app_window = spawn_executable(
@@ -257,14 +284,34 @@ async fn main() -> anyhow::Result<()> {
             )?;
 
             let exit_status = app_window.wait()?;
-            println!("[main] AppWindow process exited with status '{exit_status:?}'");
+            println!("\n### AppWindow process exited with status '{exit_status:?}' ###\n");
 
-            if !exit_status.success() {
-                show_crash_window(format!("{exit_status:?}"));
+            #[cfg(feature = "desktop-app")]
+            {
+                let patch_executable_path =
+                    data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
+                if let Ok(true) = tokio::fs::try_exists(&patch_executable_path).await {
+                    if let Err(e) = self_replace::self_replace(&patch_executable_path) {
+                        show_crash_window(
+                            &format!("{exit_status:?}"),
+                            &format!(
+                                "更新失败\n无法替换旧客户端程序文件，请关闭其他客户端实例后再次尝试更新，或手动使用新客户端文件覆盖旧客户端\n新客户端路径：{}\n错误：{e}",
+                                patch_executable_path.display()
+                            ),
+                        );
+                    } else {
+                        _ = tokio::fs::remove_file(&patch_executable_path).await;
+                        notification::toast("可露希尔客户端更新成功！", None, "", None);
+                    }
+                }
+
+                if !exit_status.success() {
+                    show_crash_window(&format!("{exit_status:?}"), "主窗口异常退出");
+                }
             }
         }
         (Some(true), None) => {
-            if cfg!(not(debug_assertions)) {
+            if !cfg!(debug_assertions) {
                 attach_console();
             }
             if let Some(result) = launch_app_window_if_requested(&launch_args).await {
@@ -272,7 +319,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         (None, Some(true)) => {
-            if cfg!(not(debug_assertions)) {
+            if !cfg!(debug_assertions) {
                 attach_console();
             }
             #[cfg(feature = "desktop-app")]
@@ -293,16 +340,16 @@ async fn main() -> anyhow::Result<()> {
 // TODO: 移动到app::utils::windows_console模块
 fn alloc_console() {
     #[cfg(target_os = "windows")]
-    {
+    unsafe {
         use windows_sys::Win32::Foundation::GetLastError;
         use windows_sys::Win32::System::Console::AllocConsole;
-        let result = unsafe { AllocConsole() };
+        let result = AllocConsole();
         if result != 0 {
             println!("[alloc_console] AllocConsole() success ");
         } else {
             println!(
                 "[alloc_console] Error calling AllocConsole(): {:#x}",
-                unsafe { GetLastError() }
+                GetLastError()
             );
         }
     }
@@ -310,16 +357,16 @@ fn alloc_console() {
 
 fn attach_console() {
     #[cfg(target_os = "windows")]
-    {
+    unsafe {
         use windows_sys::Win32::Foundation::GetLastError;
         use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
-        let result = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
+        let result = AttachConsole(ATTACH_PARENT_PROCESS);
         if result != 0 {
             println!("[attach_console] AttachConsole(ATTACH_PARENT_PROCESS) success ");
         } else {
             println!(
                 "[attach_console] Error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
-                unsafe { GetLastError() }
+                GetLastError()
             );
         }
     }
@@ -341,7 +388,7 @@ fn show_console(visible: bool) {
     }
 }
 
-fn show_crash_window(exit_status: String) {
+fn show_crash_window(exit_status: &str, error_info: &str) {
     show_console(true);
     #[cfg(target_os = "windows")]
     unsafe {
@@ -349,23 +396,32 @@ fn show_crash_window(exit_status: String) {
             GetStdHandle, SetConsoleTextAttribute, FOREGROUND_RED, STD_OUTPUT_HANDLE,
         };
         let hconsole = GetStdHandle(STD_OUTPUT_HANDLE);
-        SetConsoleTextAttribute(hconsole, FOREGROUND_RED);
+        _ = SetConsoleTextAttribute(hconsole, FOREGROUND_RED);
     }
 
     println!(
+        "\n********************************************************************************\n"
+    );
+    println!(
         concat!(
-            "\n",
-            "********************************************************************************\n",
-            "\n",
             "可露希尔罢工了！\n",
-            "- 错误码：\t{}\n",
+            "错误信息：{}\n",
+            "- APP 版本号\t: {}\n",
+            "- SHA256\t: {}\n",
+            "- ExitStatus\t: {}\n",
             "\n",
-            "请截图控制台输出，反馈至可露希尔QQ群或QQ频道“PRTS接入 - APP讨论”板块。\n",
-            "\n",
-            "********************************************************************************\n",
+            "如果发生反复崩溃无法使用、功能异常等问题，\n请截图控制台输出，反馈至可露希尔QQ群或QQ频道“PRTS接入 - APP讨论”板块。\n",
         ),
+        error_info,
+        app_metadata::CARGO_PKG_VERSION.unwrap_or("not found"),
+        app_metadata::executable_sha256().map_or("unable to hash".into(), |x| hex::encode(*x)),
         exit_status
     );
+    println!(
+        "\n********************************************************************************\n"
+    );
+
+    #[cfg(feature = "desktop-app")]
     loop {
         _ = std::io::stdin().read(&mut [0u8]);
     }

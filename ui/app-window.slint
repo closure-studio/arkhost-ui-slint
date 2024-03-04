@@ -54,6 +54,8 @@ export component AppWindow inherits Window {
     callback open-ext-link <=> Callbacks.open-ext-link;
     callback return-to-login-page <=> Callbacks.return-to-login-page;
 
+    callback download-update <=> Callbacks.download-update;
+
     public function set-use-auth(account: string, use-auth-val: bool) {
         login-window.set-use-auth(account, use-auth-val);
     }

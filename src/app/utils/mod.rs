@@ -1,5 +1,6 @@
 #[cfg(target_os = "windows")]
 pub mod app_user_model;
+pub mod app_metadata;
 pub mod cache_manager;
 pub mod data_dir;
 pub mod ext_link;
