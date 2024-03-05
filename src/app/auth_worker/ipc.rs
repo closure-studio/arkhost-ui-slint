@@ -227,7 +227,7 @@ impl IpcAuthWorker {
             current_exe.as_os_str(),
             &[
                 current_exe.as_os_str(),
-                OsStr::new("--launch-webview"),
+                OsStr::new("webview"),
                 OsStr::new("--account"),
                 OsStr::new("UNUSED"),
                 OsStr::new("--ipc"),

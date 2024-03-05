@@ -1,7 +1,7 @@
 use super::super::auth;
 use crate::app;
 use crate::app::ipc_auth_comm::AuthenticatorMessage;
-use crate::app::program_options::LaunchArgs;
+use crate::app::program_options::LaunchWebViewArgs;
 use crate::app::utils::data_dir;
 use crate::app::webview::auth::consts;
 use anyhow::anyhow;
@@ -10,7 +10,6 @@ use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
-use thiserror::Error;
 use winit::window::WindowLevel;
 use winit::{
     dpi::LogicalPosition,
@@ -19,12 +18,6 @@ use winit::{
     window::WindowButtons,
 };
 use wry::{WebContext, WebViewBuilder};
-
-#[derive(Error, Debug)]
-pub enum ChildProcessAuthenticatorError {
-    #[error("invalid launch args: {launch_args_dbg_str}")]
-    InvalidLaunchArgs { launch_args_dbg_str: String },
-}
 
 struct Listener {
     event_loop_proxy: EventLoopProxy<AuthenticatorMessage>,
@@ -42,34 +35,15 @@ impl auth::AuthListener for Listener {
     }
 }
 
-pub fn launch_if_requested(launch_args: &LaunchArgs) -> Option<anyhow::Result<()>> {
-    match launch_args {
-        LaunchArgs {
-            launch_webview: None,
-            ..
-        } => None,
-        LaunchArgs {
-            launch_webview: Some(true),
-            account: Some(_),
-            ipc: Some(_),
-            ..
-        } => Some(launch(launch_args)),
-        _ => Some(Err(ChildProcessAuthenticatorError::InvalidLaunchArgs {
-            launch_args_dbg_str: format!("{launch_args:?}"),
-        }
-        .into())),
-    }
-}
-
-pub fn launch(args: &LaunchArgs) -> anyhow::Result<()> {
+pub fn launch(launch_args: &LaunchWebViewArgs) -> anyhow::Result<()> {
     #[cfg(target_os = "windows")]
     app::utils::app_user_model::set_to_authenticator_id();
 
-    let server_name = args.ipc.as_ref().unwrap().into();
+    let server_name = launch_args.ipc.to_owned();
     let (tx_host, rx_host) = connect_to_host_process(server_name)?;
     match {
         let tx_host = tx_host.clone();
-        launch_webview(tx_host, rx_host, args.account.as_ref().unwrap().into())
+        launch_webview(tx_host, rx_host, launch_args.account.to_owned())
     } {
         Ok(_) => Ok(()),
         Err(e) => {

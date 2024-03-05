@@ -5,7 +5,6 @@
 
 mod app;
 
-use anyhow::bail;
 use app::app_state::AppState;
 use app::asset_worker::AssetWorker;
 #[cfg(feature = "desktop-app")]
@@ -13,7 +12,7 @@ use app::auth_worker::ipc::IpcAuthWorker;
 
 use app::auth_worker::{self, AuthContext, AuthError, AuthWorker};
 use app::controller::rt_api_model::RtApiModel;
-use app::program_options::LaunchArgs;
+use app::program_options::{LaunchAppWindowArgs, LaunchArgs, LaunchSpec};
 use app::ui::*;
 use app::utils::cache_manager::CACacheManager;
 use app::utils::data_dir::data_dir;
@@ -231,27 +230,26 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     ui.run()
 }
 
-async fn launch_app_window_if_requested(
-    launch_args: &LaunchArgs,
-) -> Option<Result<(), slint::PlatformError>> {
-    if let Some(true) = launch_args.launch_app_window {
-        Some(run_app().await)
-    } else {
-        None
-    }
+async fn launch_app_window(_launch_args: &LaunchAppWindowArgs) -> Result<(), slint::PlatformError> {
+    run_app().await
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let launch_args: LaunchArgs = argh::from_env();
-    let do_attach_console =
+    let attach_console_requested =
         matches!(launch_args.attach_console, Some(true)) || app::env::attach_console();
 
-    match (&launch_args.launch_app_window, &launch_args.launch_webview) {
-        (None, None) => {
+    match &launch_args.launch_spec {
+        // Bootstrap
+        None => {
             if !cfg!(debug_assertions) {
-                alloc_console();
-                show_console(do_attach_console);
+                if attach_console_requested {
+                    attach_console();
+                } else {
+                    alloc_console();
+                    show_console(false);
+                }
             }
 
             println!(
@@ -267,16 +265,16 @@ async fn main() -> anyhow::Result<()> {
             if let Some(true) = launch_args.force_update {
                 env.push((app::env::consts::FORCE_UPDATE.into(), "1".into()));
             }
-            if let Some(true) = launch_args.local_asset_server {
+            if let Some(port) = launch_args.local_asset_server_port {
                 env.push((
                     app::env::consts::OVERRIDE_ASSET_SERVER.into(),
-                    "http://localhost:36888".into(),
+                    format!("http://localhost:{port}").into(),
                 ))
             }
 
             let mut app_window = spawn_executable(
                 current_exe.as_os_str(),
-                &[current_exe.as_os_str(), OsStr::new("--launch-app-window")],
+                &[current_exe.as_os_str(), OsStr::new("app")],
                 Some(env),
                 true,
                 None,
@@ -311,27 +309,17 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        (Some(true), None) => {
+        Some(LaunchSpec::AppWindow(launch_args)) => {
             if !cfg!(debug_assertions) {
                 attach_console();
             }
-            if let Some(result) = launch_app_window_if_requested(&launch_args).await {
-                result?;
-            }
+            launch_app_window(launch_args).await?;
         }
-        (None, Some(true)) => {
+        Some(LaunchSpec::WebView(launch_args)) => {
             if !cfg!(debug_assertions) {
                 attach_console();
             }
-            #[cfg(feature = "desktop-app")]
-            if let Some(result) =
-                app::webview::auth::subprocess_webview::launch_if_requested(&launch_args)
-            {
-                result?;
-            }
-        }
-        _ => {
-            bail!("invalid parameters");
+            app::webview::auth::subprocess_webview::launch(launch_args)?;
         }
     }
 

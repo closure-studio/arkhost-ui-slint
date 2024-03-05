@@ -4,31 +4,46 @@ use argh::FromArgs;
 /// 程序参数
 pub struct LaunchArgs {
     #[argh(switch)]
-    /// 是否在 windows_subsystem = "windows" 条件下仍然启动命令行输出
+    /// 附加到命令行窗口，等同于设置环境变量
+    /// ARKHOST_APP_ATTACH_CONSOLE='1'
     pub attach_console: Option<bool>,
 
     #[argh(switch)]
-    /// 是否强制更新客户端（开发调试用）
+    /// 在OTA存在任意版本时将其作为可更新选项，等同于设置环境变量
+    /// ARKHOST_APP_FORCE_UPDATE='1'
     pub force_update: Option<bool>,
 
-    #[argh(switch)]
-    /// 是否连接到本地资源服务器，该选项会设置环境变量
-    /// ARKHOST_APP_OVERRIDE_ASSET_SERVER='http://localhost:36888' （开发调试用）
-    pub local_asset_server: Option<bool>,
+    #[argh(option)]
+    /// 指定localhost端口作为资源服务器，等同于设置环境变量
+    /// ARKHOST_APP_OVERRIDE_ASSET_SERVER='http://localhost:port'
+    pub local_asset_server_port: Option<u16>,
 
-    #[argh(switch)]
-    /// 是否启动 AppWindow
-    pub launch_app_window: Option<bool>,
+    #[argh(subcommand)]
+    pub launch_spec: Option<LaunchSpec>,
+}
 
-    #[argh(switch)]
-    /// 是否启动 WebView
-    pub launch_webview: Option<bool>,
+#[derive(Debug, Clone, FromArgs)]
+#[argh(subcommand)]
+pub enum LaunchSpec {
+    AppWindow(LaunchAppWindowArgs),
+    WebView(LaunchWebViewArgs),
+}
+
+#[derive(Debug, Clone, FromArgs)]
+#[argh(subcommand, name = "app")]
+/// 启动 AppWindow
+pub struct LaunchAppWindowArgs {}
+
+#[derive(Debug, Clone, FromArgs)]
+#[argh(subcommand, name = "webview")]
+
+/// 启动 WebView
+pub struct LaunchWebViewArgs {
+    #[argh(option)]
+    /// 用户账号（WebView）
+    pub account: String,
 
     #[argh(option)]
-    /// 要验证的账号
-    pub account: Option<String>,
-
-    #[argh(option)]
-    /// 父进程的 IPC Server 名称
-    pub ipc: Option<String>,
+    /// 父进程 IPC Server 名称（WebView）
+    pub ipc: String,
 }
