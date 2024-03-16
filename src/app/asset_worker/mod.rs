@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::bail;
 use arkhost_api::clients::asset::AssetClient;
-use bytes::Buf;
 use derivative::Derivative;
 use reqwest::Response;
 use semver::Version;
@@ -187,20 +186,16 @@ impl AssetWorker {
             Some(version) => Version::parse(version)?,
             None => bail!("no version found in APP metadata"),
         };
-        let release_pub_key = match arkhost_ota::release_public_key() {
-            Some(key) => key,
-            None => bail!("no valid release public key found"),
-        };
         let index_bytes = self
             .asset_client
-            .get_content(arkhost_ota::consts::asset::ui::ota::v1::INDEX, |x| x)
+            .get_content(arkhost_ota::consts::url::asset::ui_ota_v1::INDEX, |x| x)
             .await?;
         let sig_bytes = self
             .asset_client
-            .get_content(arkhost_ota::consts::asset::ui::ota::v1::INDEX_SIG, |x| x)
+            .get_content(arkhost_ota::consts::url::asset::ui_ota_v1::INDEX_SIG, |x| x)
             .await?;
-        let sig = arkhost_ota::try_parse_detached_signature(&sig_bytes)?;
-        sig.verify(release_pub_key, index_bytes.clone().reader())?;
+        let sig = arkhost_ota::try_parse_signature(&sig_bytes)?;
+        arkhost_ota::release_public_key().verify_strict(&index_bytes, &sig)?;
 
         let index: ReleaseIndexV1 = serde_json::de::from_slice(&index_bytes)?;
         let release = match index.branches.get(branch) {
@@ -212,7 +207,7 @@ impl AssetWorker {
         if !force_update && (self_hash[..] == release_hash[..] || release.version <= cur_version) {
             return Ok(None);
         }
-        let mut path = arkhost_ota::consts::asset::ui::ota::v1::FILES.to_owned();
+        let mut path = arkhost_ota::consts::url::asset::ui_ota_v1::FILES.to_owned();
         match mode {
             ReleaseUpdateType::Patch => {
                 path.push_str(&arkhost_ota::file_bspatch_path(

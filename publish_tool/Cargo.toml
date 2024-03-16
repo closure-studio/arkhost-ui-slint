@@ -1,5 +1,5 @@
 [package]
-name = "release_tool"
+name = "publish-tool"
 version = "0.1.0"
 edition = "2021"
 

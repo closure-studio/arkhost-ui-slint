@@ -3,6 +3,8 @@ pub mod app_metadata;
 pub mod app_user_model;
 pub mod cache_manager;
 pub mod data_dir;
+pub mod db;
+pub mod db_store;
 pub mod ext_link;
 pub mod levenshtein_distance;
 pub mod notification;

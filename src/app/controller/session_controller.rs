@@ -137,7 +137,9 @@ impl SessionController {
                     if let Some(announcement) = cfg.announcement {
                         s.set_site_announcement(announcement.into());
                     }
-                    s.set_is_site_under_maintenance(cfg.is_under_maintenance);
+                    s.set_is_site_under_maintenance(
+                        cfg.is_under_maintenance || !cfg.allow_game_login,
+                    );
                 })
             }),
             Err(e) => {

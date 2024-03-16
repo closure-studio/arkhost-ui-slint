@@ -15,9 +15,13 @@ pub mod rt_api_model;
 /// 工具类
 pub mod utils;
 
+/// 环境（变量）相关
+pub mod env;
 #[cfg(feature = "desktop-app")]
 /// 用于在桌面端中处理UI进程和验证网页弹窗进程的通讯
 pub mod ipc_auth_comm;
+/// APP OTA 功能相关类型
+pub mod ota;
 /// 启动参数
 pub mod program_options;
 /// Slint codegen
@@ -25,6 +29,3 @@ pub mod program_options;
 pub mod ui;
 /// 用于显示网页弹窗或WebView来进行用户验证/游戏验证
 pub mod webview;
-
-/// 环境（变量）相关
-pub mod env;

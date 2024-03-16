@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use arkhost_api::models::api_quota::{SlotRuleValidationResult, UpdateSlotAccountRequest};
 use arkhost_api::models::{api_arkhost, api_quota};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -49,7 +49,7 @@ pub struct InnerGameRef {
 pub struct GameEntry {
     pub info: api_arkhost::GameInfo,
     pub details: Option<api_arkhost::GameDetails>,
-    pub logs: Vec<api_arkhost::LogEntry>,
+    pub logs: VecDeque<api_arkhost::LogEntry>,
     pub log_cursor_back: u64,
     pub log_cursor_front: u64,
     pub stage_name: Option<String>,
@@ -60,7 +60,7 @@ impl GameEntry {
         Self {
             info,
             details: None,
-            logs: Vec::new(),
+            logs: VecDeque::with_capacity(512),
             log_cursor_back: 0,
             log_cursor_front: 0,
             stage_name: None,

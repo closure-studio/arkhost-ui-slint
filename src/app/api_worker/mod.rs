@@ -235,20 +235,23 @@ impl Worker {
                         .map_or(latest_logs_truncate_len, |(i, _x)| i);
                 }
                 latest_logs.truncate(latest_logs_truncate_len);
-                latest_logs.append(&mut game.logs);
-                game.logs = latest_logs;
+                for log_entry in latest_logs.into_iter().rev() {
+                    game.logs.push_front(log_entry);
+                }
             }
             RetrieveLogSpec::Former {} => {
-                let mut new_logs = self
+                let new_logs = self
                     .arkhost_client
                     .get_logs(&account, game.log_cursor_back)
                     .await?;
 
-                game.logs.append(&mut new_logs.logs);
+                for log_entry in new_logs.logs.into_iter() {
+                    game.logs.push_back(log_entry);
+                }
             }
         }
-        game.log_cursor_front = game.logs.first().map_or(0, |x| x.id);
-        game.log_cursor_back = game.logs.last().map_or(0, |x| x.id);
+        game.log_cursor_front = game.logs.front().map_or(0, |x| x.id);
+        game.log_cursor_back = game.logs.back().map_or(0, |x| x.id);
         drop(game);
 
         Ok(game_ref)

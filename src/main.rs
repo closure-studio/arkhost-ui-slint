@@ -5,6 +5,7 @@
 
 mod app;
 
+use anyhow::bail;
 use app::app_state::AppState;
 use app::asset_worker::AssetWorker;
 #[cfg(feature = "desktop-app")]
@@ -14,10 +15,9 @@ use app::auth_worker::{self, AuthContext, AuthError, AuthWorker};
 use app::controller::rt_api_model::RtApiModel;
 use app::program_options::{LaunchAppWindowArgs, LaunchArgs, LaunchSpec};
 use app::ui::*;
-use app::utils::cache_manager::CACacheManager;
-use app::utils::data_dir::data_dir;
+use app::utils::cache_manager::DBCacheManager;
 use app::utils::subprocess::spawn_executable;
-use app::utils::user_state::{UserStateFileStorage, UserStateFileStoreSetting};
+use app::utils::user_state::UserStateDBStore;
 use app::utils::{app_metadata, notification};
 use app::{api_worker::Worker as ApiWorker, controller::ControllerAdaptor};
 use arkhost_api::clients::asset::AssetClient;
@@ -71,11 +71,13 @@ fn create_asset_client() -> AssetClient {
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .with(Cache(HttpCache {
             mode: CacheMode::Default,
-            manager: CACacheManager {
-                path: data_dir().join("cache/assets/"),
-            },
+            manager: DBCacheManager::new(),
             options: HttpCacheOptions {
                 cache_mode_fn: Some(Arc::new(|req| {
+                    if matches!(req.method.as_str(), "HEAD" | "OPTIONS") {
+                        return CacheMode::NoStore;
+                    }
+
                     // TODO: 其他方式识别资源文件类型（MIME type等）
                     if req.uri.path().ends_with(".webp") {
                         return CacheMode::ForceCache;
@@ -85,9 +87,9 @@ fn create_asset_client() -> AssetClient {
                         let mut split = req.uri.path().rsplitn(2, '/');
                         !matches!(
                             (split.next(), split.next()), 
-                                (_, Some(path_without_hash)) if 
-                                    (path_without_hash.ends_with(".exe")
-                                    || path_without_hash.ends_with(".bspatch")))
+                                (Some(hash_versioned_file), Some(hash_version_dir)) if 
+                                    (hash_version_dir.ends_with(".exe")
+                                    || hash_versioned_file.ends_with(".bspatch")))
                         // TODO: 其他方式识别OTA更新文件
                     };
                     if matches_ota_file {
@@ -115,10 +117,8 @@ async fn run_app() -> Result<(), slint::PlatformError> {
     }
 
     #[cfg(feature = "desktop-app")]
-    let mut user_state =
-        UserStateFileStorage::new(UserStateFileStoreSetting::DataDirWithCurrentDirFallback);
-
-    user_state.load_from_file();
+    let mut user_state = UserStateDBStore::new();
+    user_state.load_from_db();
     let user_state_data_or_null = user_state.user_state_data();
     let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
 
@@ -240,9 +240,24 @@ async fn main() -> anyhow::Result<()> {
     let attach_console_requested =
         matches!(launch_args.attach_console, Some(true)) || app::env::attach_console();
 
+    let _cleanup_guard = app::utils::db::CleanupGuard::new();
+
     match &launch_args.launch_spec {
         // Bootstrap
         None => {
+            #[cfg(feature = "desktop-app")]
+            let _instance = {
+                let instance =
+                    single_instance::SingleInstance::new("arkhost-ui-slint-single-instance")
+                        .unwrap();
+                if !instance.is_single() {
+                    on_duplicated_instance();
+                    bail!("duplicated instance");
+                }
+
+                instance
+            };
+
             if !cfg!(debug_assertions) {
                 if attach_console_requested {
                     attach_console();
@@ -286,25 +301,11 @@ async fn main() -> anyhow::Result<()> {
 
             #[cfg(feature = "desktop-app")]
             {
-                let patch_executable_path =
-                    data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
-                if matches!(tokio::fs::try_exists(&patch_executable_path).await, Ok(true) if exit_status.success())
-                {
-                    if let Err(e) = self_replace::self_replace(&patch_executable_path) {
-                        show_crash_window(
-                            &format!("{exit_status:?}"),
-                            &format!(
-                                "更新失败\n无法替换旧客户端程序文件，请关闭其他客户端实例后再次尝试更新，或手动使用新客户端文件覆盖旧客户端\n新客户端路径：{}\n错误：{e}",
-                                patch_executable_path.display()
-                            ),
-                        );
-                    } else {
-                        _ = tokio::fs::remove_file(&patch_executable_path).await;
-                        notification::toast("可露希尔客户端更新成功！", None, "", None);
+                if exit_status.success() {
+                    if let Err(e) = update_client_if_exist().await {
+                        show_crash_window(&format!("{exit_status:?}"), &format!("更新失败\n{e}"));
                     }
-                }
-
-                if !exit_status.success() {
+                } else {
                     show_crash_window(&format!("{exit_status:?}"), "主窗口异常退出");
                 }
             }
@@ -414,4 +415,82 @@ fn show_crash_window(exit_status: &str, error_info: &str) {
     loop {
         _ = std::io::stdin().read(&mut [0u8]);
     }
+}
+
+fn on_duplicated_instance() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        // TODO: 根据进程查找
+        use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow};
+        let window_name: Vec<u16> = consts::WINDOWS_TITLE.encode_utf16().chain([0]).collect();
+        let hwnd = FindWindowW(std::ptr::null(), window_name.as_ptr());
+        if hwnd != 0 {
+            SetForegroundWindow(hwnd);
+        }
+    }
+}
+
+async fn update_client_if_exist() -> anyhow::Result<()> {
+    use sha2::Digest;
+    use tokio::io::AsyncBufReadExt;
+
+    let pending_update = match app::ota::pending_update()
+        .map_err(|e| {
+            println!("[update_client_if_exist] Error reading pending update record from DB: {e}");
+        })
+        .ok()
+        .flatten()
+    {
+        Some(pending_update) => pending_update,
+        None => return Ok(()),
+    };
+    println!(
+        "[update_client_if_exist] Found pending update: {}",
+        &pending_update.version
+    );
+
+    let file_path = match &pending_update.binary.blob {
+        app::ota::Blob::File(file_path) => file_path,
+        #[allow(unused)]
+        _ => bail!("不支持更新数据类型，请提交Bug"),
+    };
+
+    if !matches!(tokio::fs::try_exists(file_path).await, Ok(true)) {
+        return Ok(());
+    }
+
+    {
+        let release_file = tokio::fs::File::open(file_path).await?;
+        let mut reader = tokio::io::BufReader::new(release_file);
+        let mut hasher = sha2::Sha256::new();
+        let mut buf;
+        while {
+            buf = reader.fill_buf().await?;
+            !buf.is_empty()
+        } {
+            hasher.update(buf);
+            let len = buf.len();
+            reader.consume(len);
+        }
+
+        if hasher.finalize()[..] != pending_update.binary.sha256[..] {
+            bail!("更新未完整下载或校验错误，请重试");
+        }
+    }
+
+    if let Err(e) = self_replace::self_replace(file_path) {
+        bail!(format!(
+            "无法替换旧客户端程序文件，请重新运行更新或手动使用新客户端文件覆盖旧客户端\n新客户端路径：{}\n错误：{e}",
+            file_path.display()
+        ));
+    }
+
+    _ = tokio::fs::remove_file(file_path).await;
+    _ = app::ota::remove_pending_update();
+    notification::toast("可露希尔客户端更新成功！", None, "", None);
+    Ok(())
+}
+
+mod consts {
+    pub const WINDOWS_TITLE: &str = "Closure Studio";
 }

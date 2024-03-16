@@ -1,50 +1,66 @@
-use std::path::PathBuf;
-
-use cacache::RemoveOpts;
 use http_cache::{CacheManager, HttpResponse, Result};
 
 use http_cache_semantics::CachePolicy;
+use polodb_core::bson::doc;
+use polodb_core::IndexModel;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use url::Url;
 
-#[derive(Debug, Clone)]
-pub struct CACacheManager {
-    /// Directory where the cache will be stored.
-    pub path: PathBuf,
+use super::db;
+
+pub struct DBCacheManager {
+    collection: polodb_core::Collection<Store>,
 }
 
-impl Default for CACacheManager {
-    fn default() -> Self {
-        Self {
-            path: "./http-cacache".into(),
-        }
-    }
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "HttpResponse")]
+struct HttpResponseDef {
+    #[serde(with = "serde_bytes")] // 防止body被序列化成数组
+    pub body: Vec<u8>,
+    pub headers: HashMap<String, String>,
+    pub status: u16,
+    pub url: Url,
+    pub version: http_cache::HttpVersion,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Store {
+    _id: Option<polodb_core::bson::oid::ObjectId>,
+    cache_key: String,
+    #[serde(with = "HttpResponseDef")]
     response: HttpResponse,
     policy: CachePolicy,
 }
 
 #[allow(dead_code)]
-impl CACacheManager {
+impl DBCacheManager {
+    pub fn new() -> Self {
+        let col = db::instance().collection::<Store>(db::consts::collection::HTTP_CACHE);
+        col.create_index(IndexModel {
+            keys: doc! {
+                "cache_key": 1
+            },
+            options: None,
+        })
+        .expect("Unable to create index on cache collection");
+        Self { collection: col }
+    }
+
     /// Clears out the entire cache.
     pub async fn clear(&self) -> Result<()> {
-        cacache::clear(&self.path).await?;
         Ok(())
     }
 }
 
 #[async_trait::async_trait]
-impl CacheManager for CACacheManager {
+impl CacheManager for DBCacheManager {
     async fn get(&self, cache_key: &str) -> Result<Option<(HttpResponse, CachePolicy)>> {
-        let store: Store = match cacache::read(&self.path, cache_key).await {
-            Ok(d) => bincode::deserialize(&d)?,
-            Err(_e) => {
-                return Ok(None);
-            }
-        };
-        Ok(Some((store.response, store.policy)))
+        if let Some(store) = self.collection.find_one(doc! { "cache_key": cache_key })? {
+            Ok(Some((store.response, store.policy)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn put(
@@ -53,32 +69,42 @@ impl CacheManager for CACacheManager {
         response: HttpResponse,
         policy: CachePolicy,
     ) -> Result<HttpResponse> {
-        let data = Store {
-            response: response.clone(),
+        let store = Store {
+            _id: None,
+            cache_key: cache_key.to_owned(),
+            response,
             policy,
         };
-        let bytes = bincode::serialize(&data)?;
-        _ = self.delete(&cache_key).await;
-        cacache::write(&self.path, cache_key, bytes).await?;
-        Ok(response)
+
+        let mut session = db::instance().start_session()?;
+        session.start_transaction(Some(polodb_core::TransactionType::Write))?;
+        if let Some(Store {
+            _id: Some(ref oid), ..
+        }) = self
+            .collection
+            .find_one_with_session(doc! { "cache_key": { "$eq": &cache_key } }, &mut session)?
+        {
+            let mut update = polodb_core::bson::to_document(&store)?;
+            update.remove("_id");
+            update.remove("cache_key");
+            self.collection.update_one_with_session(
+                doc! { "_id": oid },
+                doc! {
+                    "$set": update,
+                },
+                &mut session,
+            )?;
+        } else {
+            self.collection
+                .insert_one_with_session(&store, &mut session)?;
+        };
+        session.commit_transaction()?;
+        Ok(store.response)
     }
 
     async fn delete(&self, cache_key: &str) -> Result<()> {
-        while let Ok(Some(metadata)) = cacache::metadata(&self.path, cache_key).await {
-            if cacache::exists(&self.path, &metadata.integrity).await {
-                if let Err(e) = cacache::remove_hash(&self.path, &metadata.integrity).await {
-                    println!("[CACacheManager] failed to remove cache content: {e}");
-                    break;
-                }
-            } else if let Err(e) = cacache::remove(&self.path, cache_key).await {
-                println!("[CACacheManager] failed to remove cache entry '{cache_key}': {e}");
-                break;
-            }
-        }
-
-        Ok(RemoveOpts::new()
-            .remove_fully(true)
-            .remove(&self.path, cache_key)
-            .await?)
+        self.collection
+            .delete_many(doc! { "cache_key": cache_key })?;
+        Ok(())
     }
 }

@@ -14,6 +14,7 @@ use tokio::sync::{oneshot, Mutex};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
+use crate::app::ota::ReleaseRecord;
 use crate::app::utils::{app_metadata, data_dir, notification};
 use crate::app::{self, asset_worker, ui};
 
@@ -166,6 +167,18 @@ impl OtaController {
         let target_file_path =
             data_dir::data_dir().join(arkhost_ota::consts::TMP_PATCH_EXECUTABLE_NAME);
         let target_hash = hex::decode(&release.file.hash)?;
+        app::ota::upsert_pending_update(&ReleaseRecord {
+            rel_type: app::ota::RecordType::PendingUpdate,
+            version: release.version.clone(),
+            binary: app::ota::Resource {
+                blob: app::ota::Blob::File(target_file_path.clone()),
+                sha256: target_hash.clone().try_into().or(Err(anyhow::anyhow!(
+                    "哈希值格式错误！请反馈Bug (expected len: 32; got: {})",
+                    target_hash.len()
+                )))?,
+            },
+        })
+        .map_err(|e| anyhow::anyhow!("在数据库创建更新记录失败！请反馈Bug：\n{e}"))?;
 
         let download_file_path = match mode {
             asset_worker::ReleaseUpdateType::Patch => {

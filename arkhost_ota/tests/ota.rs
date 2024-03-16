@@ -1,11 +1,7 @@
 #[cfg(test)]
 pub mod tests {
     use arkhost_ota::*;
-    use bytes::Buf;
-    use pgp::{
-        packet::{Packet, PacketParser},
-        Deserializable, Signature, SignedPublicKey,
-    };
+    use ed25519_dalek::{pkcs8::DecodePublicKey, Signature, VerifyingKey};
 
     #[test]
     pub fn test_file_url() {
@@ -40,34 +36,22 @@ pub mod tests {
 
     #[test]
     pub fn test_release_sign() {
-        let key = release_public_key().unwrap();
+        let key = release_public_key();
         let other_key =
-            SignedPublicKey::from_bytes(include_bytes!("./input/other.gpg").as_slice()).unwrap();
+            VerifyingKey::from_public_key_pem(include_str!("./input/other.pub")).unwrap();
         let text_bytes = include_bytes!("./input/test.txt");
 
         let sig = read_sig(include_bytes!("./input/test.sig"));
         let sig_fail = read_sig(include_bytes!("./input/test_fail.sig"));
         let other_sig = read_sig(include_bytes!("./input/other.sig"));
 
-        key.verify().unwrap();
-        other_key.verify().unwrap();
-        sig.verify(key, text_bytes.reader()).unwrap();
-        assert!(sig_fail.verify(key, text_bytes.reader()).is_err());
-        other_sig.verify(&other_key, text_bytes.reader()).unwrap();
-        assert!(other_sig.verify(key, text_bytes.reader()).is_err());
+        key.verify_strict(text_bytes, &sig).unwrap();
+        assert!(key.verify_strict(text_bytes, &sig_fail).is_err());
+        other_key.verify_strict(text_bytes, &other_sig).unwrap();
+        assert!(key.verify_strict(text_bytes, &other_sig).is_err());
     }
 
     fn read_sig(bytes: &[u8]) -> Signature {
-        let mut packets: PacketParser<bytes::buf::Reader<&[u8]>> =
-            PacketParser::new(bytes.reader()).into_iter();
-
-        loop {
-            match packets.next() {
-                Some(Ok(Packet::Signature(sig))) => break sig,
-                Some(Ok(_)) => continue,
-                Some(Err(e)) => panic!("{e}"),
-                None => panic!("no signature packet found in detached signature file"),
-            }
-        }
+        Signature::from_slice(bytes).unwrap()
     }
 }

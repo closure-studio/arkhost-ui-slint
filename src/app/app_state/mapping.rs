@@ -12,22 +12,6 @@ pub struct GameInfoMapping {
     pub game: GameEntry,
 }
 
-/**
-GameInfo {
-    ap: (),
-    battle_map: (),
-    doctor_level: (),
-    doctor_name: (),
-    doctor_serial: (),
-    game_state: (),
-    id: (),
-    log_loaded: (),
-    logs: (),
-    options: (),
-    request_state: (),
-    save_state: (),
-}
-*/
 impl GameInfoMapping {
     pub fn from(game: &GameEntry) -> Self {
         Self { game: game.clone() }
@@ -85,7 +69,8 @@ impl GameInfoMapping {
 
         game_info.id = self.game.info.status.account.clone().into();
         if refresh_logs {
-            let log_mapping = GameLogMapping::from(&self.game.logs, self.game.log_cursor_back);
+            let log_mapping =
+                GameLogMapping::from(self.game.logs.as_slices(), self.game.log_cursor_back);
             log_mapping.mutate(game_info);
         }
         let options_mapping = GameOptionsMapping::from(&self.game.info.game_config);
@@ -121,17 +106,17 @@ impl GameDetailsMapping {
     }
 }
 
-pub struct GameLogMapping {
-    logs: Vec<api_arkhost::LogEntry>,
+pub struct GameLogMapping<'a> {
+    logs: (&'a [api_arkhost::LogEntry], &'a [api_arkhost::LogEntry]),
     log_cursor: u64,
 }
 
-impl GameLogMapping {
-    pub fn from(logs: &[api_arkhost::LogEntry], log_cursor: u64) -> Self {
-        Self {
-            logs: logs.to_owned(),
-            log_cursor,
-        }
+impl<'a> GameLogMapping<'a> {
+    pub fn from(
+        logs: (&'a [api_arkhost::LogEntry], &'a [api_arkhost::LogEntry]),
+        log_cursor: u64,
+    ) -> Self {
+        Self { logs, log_cursor }
     }
 
     pub fn mutate(&self, game_info: &mut GameInfo) {
@@ -140,9 +125,9 @@ impl GameLogMapping {
             0 => GameLogLoadState::NotLoaded,
             _ => GameLogLoadState::Loaded,
         };
-        let logs: Vec<GameLogEntry> = self
-            .logs
-            .iter()
+
+        let it = self.logs.0.iter().chain(self.logs.1.iter());
+        let logs: Vec<GameLogEntry> = it
             .map(|x| {
                 let mut str = x.content.to_string();
                 str.push(' '); // bug: 在开启word-wrap时，字符串尾部是中文标点会导致错误换行
@@ -152,7 +137,6 @@ impl GameLogMapping {
                 }
             })
             .collect();
-
         game_info.logs = ModelRc::from(Rc::new(VecModel::from(logs)));
     }
 }
@@ -160,17 +144,6 @@ impl GameLogMapping {
 pub struct GameOptionsMapping {
     options: api_arkhost::GameConfigFields,
 }
-
-/**
-GameOptions {
-    ap_reserve: (),
-    battle_maps: (),
-    enable_auto_battle: (),
-    enable_building_arrange: (),
-    recruit_ignore_robot: (),
-    recruit_reserve: (),
-}
-*/
 
 impl GameOptionsMapping {
     pub fn from(options: &api_arkhost::GameConfigFields) -> Self {

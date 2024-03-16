@@ -23,6 +23,6 @@ pub fn set_id(id: impl AsRef<OsStr>) {
 }
 
 pub mod consts {
-    pub const DEFAULT_ID: &str = "net.ClosureStudio.ArkHostApp.UI.0.2.0";
-    pub const AUTHENTICATOR_ID: &str = "net.ClosureStudio.ArkHostApp.Authenticator.0.2.0";
+    pub const DEFAULT_ID: &str = "net.ClosureStudio.ArkHostApp.UI";
+    pub const AUTHENTICATOR_ID: &str = "net.ClosureStudio.ArkHostApp.Authenticator";
 }

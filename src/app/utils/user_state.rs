@@ -1,87 +1,59 @@
-use std::{
-    fs::{self, File},
-    io::{Read, Write},
-    path::PathBuf,
-};
-
 use arkhost_api::clients::common::UserState;
+use polodb_core::bson::doc;
+use serde::{Deserialize, Serialize};
 
-static FILE_NAME: &str = "user-state.token";
-
-#[derive(Debug)]
-pub enum UserStateFileStoreSetting {
-    DataDirWithCurrentDirFallback,
-    #[allow(unused)]
-    Path(String),
-}
+use super::db;
 
 #[derive(Debug)]
-pub struct UserStateFileStorage {
-    store_setting: UserStateFileStoreSetting,
+pub struct UserStateDBStore {
     jwt: Option<String>,
 }
 
-impl UserStateFileStorage {
-    pub fn new(store_setting: UserStateFileStoreSetting) -> Self {
-        UserStateFileStorage {
-            jwt: None,
-            store_setting,
+#[derive(Debug, Serialize, Deserialize)]
+struct Store {
+    jwt: String,
+}
+
+impl UserStateDBStore {
+    pub fn new() -> Self {
+        UserStateDBStore { jwt: None }
+    }
+
+    pub fn load_from_db(&mut self) {
+        let collection = db::instance().collection::<Store>(db::consts::collection::USER_STATE);
+        if let Ok(Some(store)) = collection.find_one(None).map_err(|e| {
+            println!("[UserStateDBStore] Error loading user state from DB: {e}");
+        }) {
+            self.jwt = Some(store.jwt);
         }
     }
 
-    pub fn load_from_file(&mut self) {
-        let path = self.store_path().join(FILE_NAME);
-        let open_res = File::open(&path);
-        if let Ok(mut f) = open_res {
-            let mut jwt = String::new();
-            if f.read_to_string(&mut jwt).is_ok() {
-                self.jwt = Some(jwt);
-                println!(
-                    "[UserStateFileStorage] loaded user state file from {}",
-                    path.display()
-                );
-            };
-        }
-    }
-
-    pub fn save_to_file(&self) {
-        if self.jwt.is_none() {
-            return;
-        }
-
-        let dir_path = self.store_path();
-        _ = fs::create_dir_all(&dir_path);
-        let path = dir_path.join(FILE_NAME);
-        match File::create(&path) {
-            Ok(mut file) => match file.write_all(self.jwt.clone().unwrap().as_bytes()) {
-                Ok(_) => println!(
-                    "[UserStateFileStorage] user state file have been written to {}",
-                    path.display()
-                ),
-                Err(e) => println!(
-                    "[UserStateFileStorage] unable to write user state file at {}; Err: {e}",
-                    path.display()
-                ),
-            },
-            Err(e) => println!(
-                "[UserStateFileStorage] unable to create user state file at {}; Err: {e}",
-                path.display()
-            ),
+    pub fn save_to_db(&self) -> polodb_core::Result<()> {
+        let jwt = match self.jwt.as_ref() {
+            Some(jwt) => jwt,
+            None => return Ok(()),
         };
-    }
 
-    pub fn store_path(&self) -> PathBuf {
-        match &self.store_setting {
-            UserStateFileStoreSetting::DataDirWithCurrentDirFallback => super::data_dir::data_dir(),
-            UserStateFileStoreSetting::Path(path) => PathBuf::from(path),
-        }
+        let collection = db::instance().collection::<Store>(db::consts::collection::USER_STATE);
+        let mut session = db::instance().start_session()?;
+        session.start_transaction(None)?;
+        collection.delete_one_with_session(doc! {}, &mut session)?;
+        collection.insert_one_with_session(
+            &Store {
+                jwt: jwt.to_owned(),
+            },
+            &mut session,
+        )?;
+        session.commit_transaction()
     }
 }
 
-impl UserState for UserStateFileStorage {
+impl UserState for UserStateDBStore {
     fn set_login_state(&mut self, jwt: String) {
         self.jwt = Some(jwt);
-        self.save_to_file();
+        if let Err(e) = self.save_to_db() {
+            println!("[UserStateDBStore] Unable to write user state: {e}");
+        }
     }
 
     fn login_state(&self) -> Option<String> {
@@ -90,6 +62,10 @@ impl UserState for UserStateFileStorage {
 
     fn erase_login_state(&mut self) {
         self.jwt = None;
-        self.save_to_file();
+        if let Err(e) = self.save_to_db() {
+            println!("[UserStateDBStore] Unable to write user state: {e}");
+        } else {
+            println!("[UserStateDBStore] User state has been written to DB");
+        }
     }
 }

@@ -237,6 +237,10 @@ pub struct GetLogResponse {
 #[derive(Default, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SiteConfig {
+    pub allow_game_create: bool,
+    pub allow_game_delete: bool,
+    pub allow_game_login: bool,
+    pub is_debug_mode: bool,
     pub is_under_maintenance: bool,
     pub announcement: Option<String>,
 }

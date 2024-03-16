@@ -87,7 +87,7 @@ async fn main() {
 
             println!(
                 "Generating patch for pervious version:\n\tSHA256: {}",
-                hex::encode(&perv_version_hash)
+                hex::encode(perv_version_hash)
             );
             if perv_version_hash == release_hash {
                 println!("\tFile hash matches release hash, skipping");

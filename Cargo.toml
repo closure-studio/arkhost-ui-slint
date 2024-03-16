@@ -1,5 +1,5 @@
 [workspace]
-members = ["arkhost_api", "arkhost_ota", "release_tool"]
+members = ["arkhost_api", "arkhost_ota", "publish_tool"]
 
 [package]
 name = "arkhost-ui-slint"
@@ -11,21 +11,13 @@ publish = false
 
 [features]
 default = ["desktop-app", "renderer-skia"]
-desktop-app = ["dep:winit", "dep:ipc-channel", "dep:subprocess", "dep:argh"]
+desktop-app = ["dep:winit", "dep:ipc-channel", "dep:subprocess", "dep:argh", "dep:single-instance"]
 renderer-skia = ["slint/renderer-skia"]
 renderer-femtovg = ["slint/renderer-femtovg"]
 
 [dependencies]
 arkhost-api = { path = "arkhost_api" }
 arkhost-ota = { path = "arkhost_ota" }
-
-# for implementing http-cache CacheManager
-bincode = "1.3.3"
-cacache = { version = "12.0.0", default-features = false, features = [
-    "mmap",
-    "tokio-runtime",
-] }
-http-cache-semantics = "1.0.1"
 
 slint = { version = "1.4.1", features = [
     "std",
@@ -43,6 +35,7 @@ winit = { version = "0.29", features = ["rwh_05"], optional = true }
 ipc-channel = { version = "0.18.0", features = ["async"], optional = true }
 subprocess = { version = "0.2.9", optional = true }
 argh = { version = "0.1.12", optional = true }
+single-instance = { version = "0.3.3", optional = true }
 anyhow = "1.0.75"
 thiserror = "1.0.50"
 home = "0.5.5"
@@ -53,7 +46,7 @@ reqwest = { version = "0.11.22", features = [
     "gzip",
     "brotli",
     "rustls-tls",
-    "blocking"
+    "blocking",
 ], default-features = false }
 reqwest-middleware = "0.2.4"
 reqwest-retry = "0.3.0"
@@ -74,6 +67,9 @@ semver = { version = "1.0.22", features = ["serde"] }
 humansize = "2.1.3"
 chrono = "0.4"
 self-replace = "=1.2.0" # 1.3本地实测没有生效
+http-cache-semantics = "1.0.1"
+polodb_core = "4.4.1"
+serde_bytes = "0.11.14"
 
 
 [target.'cfg(windows)'.dependencies]

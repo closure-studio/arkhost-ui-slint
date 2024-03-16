@@ -2,11 +2,7 @@ pub mod bin_diff;
 
 use std::{collections::HashMap, sync::OnceLock};
 
-use bytes::Buf;
-use pgp::{
-    packet::{Packet, PacketParser},
-    Deserializable, Signature, SignedPublicKey,
-};
+use ed25519_dalek::{pkcs8::DecodePublicKey, Signature, VerifyingKey};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -56,48 +52,29 @@ pub fn file_bspatch_path(file: &Resource, source_hash: &str) -> String {
     }
 }
 
-pub fn release_public_key() -> Option<&'static SignedPublicKey> {
-    static RELEASE_PUB_KEY: OnceLock<Option<SignedPublicKey>> = OnceLock::new();
-    RELEASE_PUB_KEY
-        .get_or_init(|| {
-            SignedPublicKey::from_bytes(consts::RELEASE_PUB_KEY)
-                .map_err(|e| {
-                    println!("[OTA] Invalid embedded release public key data: {e}");
-                })
-                .ok()
-        })
-        .as_ref()
+pub fn release_public_key() -> &'static VerifyingKey {
+    static RELEASE_PUB_KEY: OnceLock<VerifyingKey> = OnceLock::new();
+    RELEASE_PUB_KEY.get_or_init(|| {
+        VerifyingKey::from_public_key_pem(consts::RELEASE_PUB_KEY_PKCS8)
+            .expect("invalid public key PEM")
+    })
 }
 
-pub fn try_parse_detached_signature(bytes: &[u8]) -> anyhow::Result<Signature> {
-    let mut packets = PacketParser::new(bytes.reader());
-
-    loop {
-        match packets.next() {
-            Some(Ok(Packet::Signature(sig))) => break Ok(sig),
-            Some(Ok(_)) => continue,
-            Some(Err(e)) => break Err(e.into()),
-            None => {
-                anyhow::bail!("no signature packet found in given data");
-            }
-        }
-    }
+pub fn try_parse_signature(bytes: &[u8]) -> signature::Result<Signature> {
+    Signature::from_slice(bytes)
 }
 
 pub mod consts {
     pub const DEFAULT_BRANCH: &str = "main";
     pub const TMP_PATCH_EXECUTABLE_NAME: &str = "closure-studio.__exe_patch__.tmp";
-    pub const RELEASE_PUB_KEY: &[u8] = include_bytes!("../resource/release.gpg");
+    pub const RELEASE_PUB_KEY_PKCS8: &str = include_str!("../resource/release.pub");
 
-    pub mod asset {
-
-        pub mod ui {
-            pub mod ota {
-                pub mod v1 {
-                    pub const INDEX: &str = "ui/ota/v1/index.json";
-                    pub const INDEX_SIG: &str = "ui/ota/v1/index.json.sig";
-                    pub const FILES: &str = "ui/ota/v1/";
-                }
+    pub mod url {
+        pub mod asset {
+            pub mod ui_ota_v1 {
+                pub const INDEX: &str = "ui/ota/v1/index.json";
+                pub const INDEX_SIG: &str = "ui/ota/v1/index.json.sig";
+                pub const FILES: &str = "ui/ota/v1/";
             }
         }
     }
