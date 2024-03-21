@@ -129,11 +129,18 @@ impl<'a> GameLogMapping<'a> {
         let it = self.logs.0.iter().chain(self.logs.1.iter());
         let logs: Vec<GameLogEntry> = it
             .map(|x| {
+                let attributes = if x.log_level.bits() == api_arkhost::LogLevel::NOTICE.bits() {
+                    SharedString::new()
+                } else {
+                    x.log_level.attributes_tag().into()
+                };
+
                 let mut str = x.content.to_string();
                 str.push(' '); // bug: 在开启word-wrap时，字符串尾部是中文标点会导致错误换行
                 GameLogEntry {
                     timestamp: x.local_ts().format("%m-%d.%H:%M:%S").to_string().into(),
                     content: str.into(),
+                    attributes,
                 }
             })
             .collect();
@@ -377,6 +384,7 @@ pub struct UserInfoMapping {
     pub uuid: String,
     pub nickname: String,
     pub status: api_passport::UserStatus,
+    pub is_admin: bool,
     pub phone: String,
     pub qq: String,
     pub sms_verify_slot_added: bool,
@@ -413,6 +421,7 @@ impl UserInfoMapping {
 
         user_info.phone = self.phone.clone().into();
         user_info.qq = self.qq.clone().into();
+        user_info.is_admin = self.is_admin;
     }
 }
 

@@ -46,6 +46,21 @@ bitflags! {
     }
 }
 
+impl LogLevel {
+    pub fn attributes_tag(&self) -> String {
+        const ATTRIBUTES: [char; 8] = ['D', 'H', 'C', 'S', 'W', 'E', 'N', 'F'];
+        let mut result = String::with_capacity(8);
+        for i in 0..ATTRIBUTES.len() {
+            result.push(if self.0 & (1 << i) as u32 != 0 {
+                ATTRIBUTES[i]
+            } else {
+                '-'
+            })
+        }
+        result
+    }
+}
+
 pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
 pub enum GameSseEvent {
     Game(Vec<GameInfo>),

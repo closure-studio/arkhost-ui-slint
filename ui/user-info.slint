@@ -31,19 +31,18 @@ export struct UserInfo {
     uuid: string,
     nickname: string,
     status: UserStatus,
+    is-admin: bool,
     tier: UserTier,
     progress: UserProgress,
     phone: string,
     qq: string,
-    qq-verify-code-cached: string
+    qq-verify-code-cached: string,
 }
 
 export global UserInfoUtils {
     public pure function is-sms-verified(user-info: UserInfo) -> bool {
         user-info.phone != ""
-    }
-
-    public pure function is-qq-verified(user-info: UserInfo) -> bool  {
+    }public pure function is-qq-verified(user-info: UserInfo) -> bool {
         user-info.qq != ""
     }
 }

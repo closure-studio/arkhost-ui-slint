@@ -2,6 +2,7 @@ use std::sync::{atomic::Ordering, Arc};
 
 use anyhow::anyhow;
 use arkhost_api::clients::common::ResponseError;
+use arkhost_api::models::api_passport::UserPermissions;
 use arkhost_api::models::api_quota::{
     SlotRuleValidationResult, UpdateSlotAccountRequest, UpdateSlotAccountResponse,
 };
@@ -77,6 +78,9 @@ impl SlotController {
                         uuid: user.uuid,
                         nickname: user_state_data.account,
                         status: user.id_server_status,
+                        is_admin: user
+                            .id_server_permission
+                            .contains(UserPermissions::SUPER_ADMIN),
                         phone: user.id_server_phone,
                         qq: user.id_server_qq,
                         sms_verify_slot_added: initial_slot_added,

@@ -27,7 +27,7 @@ pub enum AssetRef {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReleaseUpdateType {
-    Patch,
+    Delta,
     FullDownload,
 }
 
@@ -209,7 +209,7 @@ impl AssetWorker {
         }
         let mut path = arkhost_ota::consts::url::asset::ui_ota_v1::FILES.to_owned();
         match mode {
-            ReleaseUpdateType::Patch => {
+            ReleaseUpdateType::Delta => {
                 path.push_str(&arkhost_ota::file_bspatch_path(
                     &release.file,
                     &hex::encode(*self_hash),

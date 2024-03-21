@@ -4,6 +4,7 @@ import { FontGlobals } from "../font-globals.slint";
 
 component GameCardLogEntry {
     in property <string> timestamp;
+    in property <string> attributes;
     in property <string> content;
 
     HorizontalLayout {
@@ -17,6 +18,15 @@ component GameCardLogEntry {
             font-size: 14px;
             font-family: FontGlobals.alphanumeric-text-sans;
             color: StyleMetrics.default-text-color.transparentize(50%);
+            horizontal-alignment: left;
+        }
+
+        if attributes != "": Text {
+            text: attributes;
+            color: #dd8800;
+            height: 18px;
+            font-size: 14px;
+            font-family: "Courier New";
             horizontal-alignment: left;
         }
 
@@ -62,6 +72,7 @@ export component GameCardLog inherits VerticalLayout {
     ListView {
         for log-entry in info.logs: GameCardLogEntry {
             timestamp: log-entry.timestamp;
+            attributes: log-entry.attributes;
             content: log-entry.content;
         }
 

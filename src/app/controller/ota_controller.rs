@@ -60,7 +60,7 @@ impl OtaController {
 
     pub async fn check_release_update(&self) {
         let mut attempts = [
-            asset_worker::ReleaseUpdateType::Patch,
+            asset_worker::ReleaseUpdateType::Delta,
             asset_worker::ReleaseUpdateType::FullDownload,
         ]
         .into_iter();
@@ -102,7 +102,7 @@ impl OtaController {
 
     pub async fn try_auto_update_release(&self) {
         let mode = *self.cur_update_mode.lock().await;
-        if matches!(mode, Some(asset_worker::ReleaseUpdateType::Patch)) {
+        if matches!(mode, Some(asset_worker::ReleaseUpdateType::Delta)) {
             self.update_release().await;
         }
     }
@@ -181,7 +181,7 @@ impl OtaController {
         .map_err(|e| anyhow::anyhow!("在数据库创建更新记录失败！请反馈Bug：\n{e}"))?;
 
         let download_file_path = match mode {
-            asset_worker::ReleaseUpdateType::Patch => {
+            asset_worker::ReleaseUpdateType::Delta => {
                 let mut split = asset_path.trim_end_matches('/').rsplitn(3, '/');
                 let file_name = match (split.next(), split.next(), split.next()) {
                     (Some(hash_version), Some(_file_name), _) => hash_version.to_owned(),
@@ -226,7 +226,7 @@ impl OtaController {
         });
 
         match mode {
-            asset_worker::ReleaseUpdateType::Patch => {
+            asset_worker::ReleaseUpdateType::Delta => {
                 self.try_patch_self_executable(&download_file_path, &target_file_path, target_hash)
                     .await?;
                 // 移除patch临时文件
@@ -432,7 +432,7 @@ impl OtaController {
         let update_version = release.version.to_string();
 
         let update_type = match mode {
-            asset_worker::ReleaseUpdateType::Patch => ui::ReleaseUpdateType::Patch,
+            asset_worker::ReleaseUpdateType::Delta => ui::ReleaseUpdateType::Delta,
             asset_worker::ReleaseUpdateType::FullDownload => ui::ReleaseUpdateType::FullDownload,
         };
 

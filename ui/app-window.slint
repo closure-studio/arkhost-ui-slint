@@ -121,4 +121,20 @@ export component AppWindow inherits Window {
         login-state: login-state;
         login-status-text: login-status-text;
     }
+
+    if user-info.is-admin: Rectangle {
+        border-radius: 5px;
+        background: #0661d0;
+
+        Text {
+            text: "Sudo mode";
+            font-size: 16px;
+            color: #ebf3ff;
+        }
+
+        x: parent.width - 125px;
+        y: parent.height - 35px;
+        width: 120px;
+        height: 30px;
+    }
 }
