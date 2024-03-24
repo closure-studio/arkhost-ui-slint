@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     env,
-    os::windows::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
@@ -135,7 +134,7 @@ async fn read_file_with_hash(
 ) -> anyhow::Result<(Vec<u8>, digest::Output<sha2::Sha256>)> {
     let mut hasher = sha2::Sha256::new();
     let file = tokio::fs::File::open(path).await?;
-    let mut bytes = Vec::with_capacity(file.metadata().await?.file_size() as usize);
+    let mut bytes = Vec::new();
     let mut reader = BufReader::new(file);
 
     let mut buf;

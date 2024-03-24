@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
 use crate::app::auth_worker::AuthContext;
 use crate::app::controller::AuthCommand;
-use crate::app::ui::UserIdApiRequestState;
+use crate::app::ui::{SlotUpdateRequestState, UserIdApiRequestState};
 use crate::app::utils::notification;
 
 use super::AuthResult;
@@ -108,11 +108,7 @@ impl SlotController {
 
     pub async fn update_slot(&self, id: String, update_request: UpdateSlotAccountRequest) {
         self.app_state_controller.exec(|x| {
-            x.set_slot_update_request_state(
-                id.clone(),
-                crate::SlotUpdateRequestState::Requesting,
-                None,
-            )
+            x.set_slot_update_request_state(id.clone(), SlotUpdateRequestState::Requesting, None)
         });
         let (resp1, rx1) = oneshot::channel();
         let (resp2, rx2) = oneshot::channel();
@@ -200,9 +196,9 @@ impl SlotController {
                     x.set_slot_update_request_state(
                         id,
                         if available {
-                            crate::SlotUpdateRequestState::Success
+                            SlotUpdateRequestState::Success
                         } else {
-                            crate::SlotUpdateRequestState::Fail
+                            SlotUpdateRequestState::Fail
                         },
                         Some(status_text),
                     )
@@ -213,7 +209,7 @@ impl SlotController {
                 self.app_state_controller.exec(move |x| {
                     x.set_slot_update_request_state(
                         id.clone(),
-                        crate::SlotUpdateRequestState::Fail,
+                        SlotUpdateRequestState::Fail,
                         Some(error_info),
                     )
                 });

@@ -193,6 +193,13 @@ impl EventSourceClient {
                 builder = builder.header(header_name.as_str(), v.to_str()?)?;
             }
         }
+
+        let conn = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_webpki_roots()
+            .https_or_http()
+            .enable_http1()
+            .build();
+
         let client = builder
             .reconnect(
                 es::ReconnectOptions::reconnect(true)
@@ -202,7 +209,7 @@ impl EventSourceClient {
                     .delay_max(Duration::from_secs(30))
                     .build(),
             )
-            .build();
+            .build_with_conn(conn);
 
         Ok(client)
     }
