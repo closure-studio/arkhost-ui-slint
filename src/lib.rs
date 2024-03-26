@@ -1,5 +1,6 @@
 mod app;
 
+#[cfg(feature = "android-app")]
 #[no_mangle]
 #[tokio::main]
 async fn android_main(app: slint::android::AndroidApp) {

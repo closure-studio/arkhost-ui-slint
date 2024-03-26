@@ -1,4 +1,6 @@
-fn alloc_console() {
+use crate::app;
+
+pub fn alloc_console() {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::Foundation::GetLastError;
@@ -15,7 +17,7 @@ fn alloc_console() {
     }
 }
 
-fn attach_console() {
+pub fn attach_console() {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::Foundation::GetLastError;
@@ -32,7 +34,7 @@ fn attach_console() {
     }
 }
 
-fn show_console(visible: bool) {
+pub fn show_console(visible: bool) {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::System::Console::GetConsoleWindow;
@@ -48,7 +50,7 @@ fn show_console(visible: bool) {
     }
 }
 
-fn show_crash_window(exit_status: &str, error_info: &str) {
+pub fn show_crash_window(exit_status: &str, error_info: &str) {
     show_console(true);
     #[cfg(target_os = "windows")]
     unsafe {
@@ -87,7 +89,7 @@ fn show_crash_window(exit_status: &str, error_info: &str) {
     }
 }
 
-fn on_duplicated_instance() {
+pub fn on_duplicated_instance() {
     #[cfg(target_os = "windows")]
     unsafe {
         // TODO: 根据进程查找
@@ -100,7 +102,7 @@ fn on_duplicated_instance() {
     }
 }
 
-async fn update_client_if_exist() -> anyhow::Result<()> {
+pub async fn update_client_if_exist() -> anyhow::Result<()> {
     use sha2::Digest;
     use tokio::io::AsyncBufReadExt;
 
@@ -122,7 +124,7 @@ async fn update_client_if_exist() -> anyhow::Result<()> {
     let file_path = match &pending_update.binary.blob {
         app::ota::Blob::File(file_path) => file_path,
         #[allow(unused)]
-        _ => bail!("不支持更新数据类型，请提交Bug"),
+        _ => anyhow::bail!("不支持更新数据类型，请提交Bug"),
     };
 
     if !matches!(tokio::fs::try_exists(file_path).await, Ok(true)) {
@@ -144,12 +146,12 @@ async fn update_client_if_exist() -> anyhow::Result<()> {
         }
 
         if hasher.finalize()[..] != pending_update.binary.sha256[..] {
-            bail!("更新未完整下载或校验错误，请重试");
+            anyhow::bail!("更新未完整下载或校验错误，请重试");
         }
     }
 
     if let Err(e) = self_replace::self_replace(file_path) {
-        bail!(format!(
+        anyhow::bail!(format!(
             "无法替换旧客户端程序文件，请重新运行更新或手动使用新客户端文件覆盖旧客户端\n新客户端路径：{}\n错误：{e}",
             file_path.display()
         ));
@@ -162,6 +164,6 @@ async fn update_client_if_exist() -> anyhow::Result<()> {
 }
 
 #[allow(unused)]
-mod consts {
+pub mod consts {
     pub const WINDOWS_TITLE: &str = "Closure Studio";
 }

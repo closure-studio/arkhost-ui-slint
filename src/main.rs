@@ -41,13 +41,11 @@ async fn main() -> anyhow::Result<()> {
             };
 
             #[cfg(all(feature = "desktop-app", debug_assertions))]
-            {
-                if matches!(launch_args.attach_console, Some(true)) || app::env::attach_console() {
-                    attach_console();
-                } else {
-                    alloc_console();
-                    show_console(false);
-                }
+            if matches!(launch_args.attach_console, Some(true)) || app::env::attach_console() {
+                attach_console();
+            } else {
+                alloc_console();
+                show_console(false);
             }
 
             println!(
@@ -57,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
 
             #[cfg(feature = "desktop-app")]
             {
-                let current_exe = env::current_exe().unwrap_or_default();
+                let current_exe = std::env::current_exe().unwrap_or_default();
 
                 let mut env = vec![];
                 if let Some(true) = launch_args.attach_console {
@@ -75,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut app_window = spawn_executable(
                     current_exe.as_os_str(),
-                    &[current_exe.as_os_str(), OsStr::new("app")],
+                    &[current_exe.as_os_str(), std::ffi::OsStr::new("app")],
                     Some(env),
                     true,
                     None,
@@ -96,17 +94,13 @@ async fn main() -> anyhow::Result<()> {
         }
         Some(LaunchSpec::AppWindow(launch_args)) => {
             #[cfg(all(feature = "desktop-app", debug_assertions))]
-            {
-                attach_console();
-            }
+            attach_console();
             launch_app_window(launch_args).await?;
         }
         #[allow(unused)]
         Some(LaunchSpec::WebView(launch_args)) => {
             #[cfg(all(feature = "desktop-app", debug_assertions))]
-            {
-                attach_console();
-            }
+            attach_console();
             #[cfg(feature = "desktop-app")]
             app::webview::auth::subprocess_webview::launch(launch_args)?;
         }

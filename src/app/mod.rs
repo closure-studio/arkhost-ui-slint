@@ -46,6 +46,7 @@ use api_worker::Worker as ApiWorker;
 use asset_worker::AssetWorker;
 use ui::*;
 
+#[allow(unused)]
 use auth_worker::AuthWorker;
 
 use self::{
@@ -80,6 +81,8 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     let mut auth_worker = auth_worker::ipc::IpcAuthWorker::new();
     #[cfg(feature = "android-app")]
     let mut auth_worker = auth_worker::geetest_sdk::GeeTestSdkAuthWorker::new();
+    #[cfg(all(not(feature = "desktop-app"), not(feature = "android-app")))]
+    let mut auth_worker = compile_error!("No AuthWorker implementation available");
 
     let (tx_auth_command, rx_auth_command) = mpsc::channel(16);
     let stop = stop.clone();
