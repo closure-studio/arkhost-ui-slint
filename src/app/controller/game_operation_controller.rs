@@ -1,7 +1,7 @@
+use crate::app::auth::AuthResult;
 use crate::app::auth_worker::AuthContext;
 use crate::app::ui::*;
 use crate::app::utils::notification;
-use crate::app::webview::auth::AuthResult;
 use arkhost_api::clients::common::ResponseError;
 use arkhost_api::models::api_arkhost;
 use tokio::sync::mpsc;

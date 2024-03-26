@@ -4,55 +4,52 @@ pub mod api_worker;
 pub mod app_state;
 /// 资源处理器，用于接收资源命令并请求资源文件及缓存等
 pub mod asset_worker;
+/// 验证参数相关
+pub mod auth;
 /// 验证处理器，用于接收处理验证命令并在WebView窗口中进行用户验证/游戏验证
 pub mod auth_worker;
 /// UI控制器类，用于在Rust运行时和UI组件之间传输数据和执行操作
 pub mod controller;
-/// 游戏资源数据类，用于关卡信息显示、立绘定位等
-pub mod game_data;
-/// 运行时API数据模型
-pub mod rt_api_model;
-/// 工具类
-pub mod utils;
-
 /// 环境（变量）相关
 pub mod env;
-#[cfg(feature = "desktop-app")]
+/// 游戏资源数据类，用于关卡信息显示、立绘定位等
+pub mod game_data;
 /// 用于在桌面端中处理UI进程和验证网页弹窗进程的通讯
+#[cfg(feature = "desktop-app")]
 pub mod ipc_auth_comm;
 /// APP OTA 功能相关类型
 pub mod ota;
 /// 启动参数
 pub mod program_options;
+/// 运行时API数据模型
+pub mod rt_api_model;
 /// Slint codegen
 #[allow(clippy::all)]
 pub mod ui;
+/// 工具类
+pub mod utils;
 /// 用于显示网页弹窗或WebView来进行用户验证/游戏验证
+#[cfg(feature = "desktop-app")]
 pub mod webview;
-
-use std::sync::{Arc, RwLock};
-
-use arkhost_api::clients::{
-    asset::AssetClient,
-    common::{UserState, UserStateDataSource},
-    id_server::AuthClient,
-};
-use tokio::sync::{mpsc, oneshot};
-
-use tokio_util::sync::CancellationToken;
-use utils::user_state::UserStateDBStore;
-
-use api_worker::Worker as ApiWorker;
-use asset_worker::AssetWorker;
-use ui::*;
-
-#[allow(unused)]
-use auth_worker::AuthWorker;
 
 use self::{
     app_state::AppState,
     controller::{rt_api_model::RtApiModel, ControllerAdaptor},
 };
+use api_worker::Worker as ApiWorker;
+use arkhost_api::clients::{
+    asset::AssetClient,
+    common::{UserState, UserStateDataSource},
+    id_server::AuthClient,
+};
+use asset_worker::AssetWorker;
+#[allow(unused)]
+use auth_worker::AuthWorker;
+use std::sync::{Arc, RwLock};
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
+use ui::*;
+use utils::user_state::UserStateDBStore;
 
 pub async fn run() -> Result<(), slint::PlatformError> {
     #[cfg(target_os = "windows")]

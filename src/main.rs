@@ -4,14 +4,12 @@
 )]
 
 mod app;
-
 #[cfg(feature = "desktop-app")]
 mod desktop_utils;
 
 use app::program_options::{LaunchAppWindowArgs, LaunchArgs, LaunchSpec};
 #[cfg(feature = "desktop-app")]
 use app::utils::subprocess::spawn_executable;
-
 #[cfg(feature = "desktop-app")]
 use desktop_utils::*;
 

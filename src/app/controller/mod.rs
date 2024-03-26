@@ -37,7 +37,7 @@ type AuthCommand = super::auth_worker::Command;
 type AssetCommand = super::asset_worker::Command;
 
 type ApiResult<T> = arkhost_api::clients::common::ApiResult<T>;
-type AuthResult = super::webview::auth::AuthResult;
+type AuthResult = super::auth::AuthResult;
 type AssetResult<T> = anyhow::Result<T>;
 
 #[derive(Debug, Clone)]

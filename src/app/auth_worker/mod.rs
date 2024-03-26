@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
-use super::webview::auth::AuthResult;
+use super::auth::AuthResult;
 
 #[derive(Debug, Error)]
 #[allow(unused)]
