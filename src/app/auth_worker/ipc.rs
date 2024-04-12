@@ -11,7 +11,7 @@ use super::Command;
 use crate::app::ipc_auth_comm::AuthenticatorCommError;
 use crate::app::ipc_auth_comm::AuthenticatorServerSideChannel;
 use crate::app::ipc_auth_comm::{AuthenticatorConnection, AuthenticatorMessage};
-use crate::app::webview::auth::{AuthAction, AuthResult};
+use crate::app::auth::{AuthAction, AuthResult};
 use async_trait::async_trait;
 use futures_util::future::BoxFuture;
 use futures_util::future::Fuse;

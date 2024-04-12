@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::webview::auth;
+use crate::app::auth;
 use futures_util::StreamExt;
 use ipc_channel::asynch::IpcStream;
 use ipc_channel::ipc::{self, IpcOneShotServer, IpcReceiver, IpcSender};
