@@ -140,27 +140,32 @@ impl GameOperationController {
         gt: String,
         challenge: String,
     ) -> anyhow::Result<()> {
-        match self.captcha_states.lock().await.get(&account) {
-            Some((
-                ChallengeInfo {
-                    gt: existing_gt,
-                    challenge: existing_challenge,
-                },
-                _,
-            )) if existing_gt == &gt && existing_challenge == &challenge => {
-                return Err(anyhow!("challenge is still running or used"));
-            }
-            _ => {}
-        }
         let challenge_info = ChallengeInfo {
             gt: gt.clone(),
             challenge: challenge.clone(),
         };
 
-        self.captcha_states.lock().await.insert(
-            account.clone(),
-            (challenge_info.clone(), CaptchaState::Running),
-        );
+        {
+            let mut captcha_states = self.captcha_states.lock().await;
+            match captcha_states.get(&account) {
+                Some((
+                    ChallengeInfo {
+                        gt: existing_gt,
+                        challenge: existing_challenge,
+                    },
+                    _,
+                )) if existing_gt == &gt && existing_challenge == &challenge => {
+                    return Err(anyhow!("challenge is still running or expired"));
+                }
+                _ => {}
+            }
+    
+            captcha_states.insert(
+                account.clone(),
+                (challenge_info.clone(), CaptchaState::Running),
+            );
+        }
+        
 
         let invoke_auth = |gt| async move {
             let (tx_command, rx_command) = mpsc::channel(1);
@@ -207,6 +212,7 @@ impl GameOperationController {
             }
         };
 
+        println!("[Controller] Captcha result: {captcha_info:?}");
         let (resp, mut rx) = oneshot::channel();
         if let Err(e) = self
             .sender

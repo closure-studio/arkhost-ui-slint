@@ -252,13 +252,15 @@ impl GameController {
         for game_ref in game_map.values() {
             let game = game_ref.game.read().await;
             if game.info.status.code == GameStatus::Captcha {
+                let game_operation_controller = self.game_operation_controller.clone();
                 let account = game.info.status.account.clone();
                 let gt = game.info.captcha_info.gt.clone();
                 let challenge = game.info.captcha_info.challenge.clone();
-                _ = self
-                    .game_operation_controller
-                    .try_preform_game_captcha(account, gt, challenge)
-                    .await;
+                tokio::spawn(async move {
+                    _ = game_operation_controller
+                        .try_preform_game_captcha(account, gt, challenge)
+                        .await;
+                });
             }
 
             game_list.push((
