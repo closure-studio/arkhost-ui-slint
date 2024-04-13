@@ -137,11 +137,16 @@ impl GameController {
             .exec(|x| x.set_sse_connect_state(SseConnectState::Connected));
 
         let mut stream = rx.await??;
+        let mut recover_interval = consts::SSE_RECOVER_INITIAL_INTERVAL;
         tokio::select! {
             _ = async {
                 let mut is_initial = true;
                 loop {
-                    match stream.try_next().await {
+                    let ev_next = stream.try_next().await;
+                    if ev_next.is_ok() && !matches!(&ev_next, Ok(Some(GameSseEvent::RecoverableError(_)))) {
+                        recover_interval = consts::SSE_RECOVER_INITIAL_INTERVAL;
+                    }
+                    match ev_next {
                         Ok(Some(ev)) => match ev {
                             GameSseEvent::Game(games) => {
                                 println!("[Controller] Games SSE connection received {} games", games.len());
@@ -172,7 +177,11 @@ impl GameController {
                                 println!("[Controller] Unrecognized SSE event: {ev_type}");
                             },
                             GameSseEvent::RecoverableError(e) => {
-                                println!("[Controller] SSE Client is recovering on error: {e}")
+                                println!("[Controller] SSE Client is recovering on error: {e}");
+                                tokio::time::sleep(recover_interval).await;
+                                recover_interval = std::cmp::max(
+                                    recover_interval * consts::SSE_RECOVER_INTERVAL_BASE, 
+                                    consts::SSE_RECOVER_MAX_INTERVAL);
                             }
                         },
                         Ok(None) => {
@@ -766,7 +775,12 @@ impl GameController {
 }
 
 mod consts {
+    use std::time::Duration;
+
     pub const SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE: i32 = 1;
     pub const SEARCH_MAP_MAX_LEVENSHTEIN_DISTANCE_FUZZY: i32 = 5;
     pub const SEARCH_MAP_RESULT_LIMIT: usize = 50;
+    pub const SSE_RECOVER_INITIAL_INTERVAL: Duration = Duration::from_secs(1);
+    pub const SSE_RECOVER_MAX_INTERVAL: Duration = Duration::from_secs(60);
+    pub const SSE_RECOVER_INTERVAL_BASE: u32 = 2;
 }
