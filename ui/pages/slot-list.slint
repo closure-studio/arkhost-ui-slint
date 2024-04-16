@@ -1,4 +1,4 @@
-import { StyleMetrics } from "std-widgets.slint";
+import { StyleMetrics, Palette } from "std-widgets.slint";
 import { MockData } from "../mock-data.slint";
 import { 
     SlotInfo,
@@ -18,9 +18,7 @@ export component SlotListItem inherits Rectangle {
         : #1978e3;
 
     callback slot-selected(string);
-    private property <brush> plain-background: StyleMetrics.dark-color-scheme
-        ? #242424
-        : StyleMetrics.window-background;
+    private property <brush> plain-background: Palette.alternate-background;
 
     border-radius: 10px;
     clip: true;

@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , GroupBox, LineEdit, TextEdit, StandardButton} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , GroupBox, LineEdit, TextEdit, Palette } from "std-widgets.slint";
 import { UserInfo, UserInfoUtils, UserIdApiRequestState } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
@@ -260,9 +260,7 @@ export component UserCard inherits Rectangle {
     }
 
     border-radius: 10px;
-    background: StyleMetrics.dark-color-scheme
-        ? #242424
-        : StyleMetrics.window-background;
+    background: Palette.alternate-background;
     drop-shadow-blur: StyleMetrics.dark-color-scheme
         ? 0px
         : 5px;

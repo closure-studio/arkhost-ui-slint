@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics, Palette } from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
 
@@ -81,9 +81,7 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
 
 export component GameStatusBadgeWide inherits GameStatusBadgeBase {
     border-radius: 4px;
-    background: StyleMetrics.dark-color-scheme
-        ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-        : StyleMetrics.window-background.darker(20%).transparentize(50%);
+    background: Palette.control-background;
 
     clip: true;
 

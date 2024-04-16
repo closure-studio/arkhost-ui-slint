@@ -1,4 +1,4 @@
-import { ScrollView , VerticalBox, StyleMetrics } from "std-widgets.slint";
+import { ScrollView, VerticalBox, StyleMetrics, Palette } from "std-widgets.slint";
 import { MockData } from "../mock-data.slint";
 import { SlotInfo, SlotState, SlotDetailsViewState } from "../slot-info.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
@@ -38,9 +38,7 @@ export component SlotPage {
                     spacing: 10px;
 
                     BannerNotification {
-                        background-color: StyleMetrics.dark-color-scheme
-                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        background-color: Palette.alternate-background;
                         accent-color: StyleMetrics.default-text-color;
                         has-action: false;
                         text: @tr("👀 该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
@@ -109,9 +107,7 @@ export component SlotPage {
                         opacity: !has-selected-slot
                             ? 1
                             : 0;
-                        background: StyleMetrics.dark-color-scheme
-                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        background: Palette.alternate-background;
                         border-radius: 10px;
 
                         Text {

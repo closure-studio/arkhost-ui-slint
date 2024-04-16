@@ -1,4 +1,16 @@
-import { GridBox, Button, HorizontalBox, VerticalBox, StyleMetrics, GroupBox , LineEdit, ComboBox, Spinner, ListView} from "std-widgets.slint";
+import { 
+    GridBox, 
+    Button, 
+    HorizontalBox, 
+    VerticalBox, 
+    StyleMetrics, 
+    GroupBox, 
+    LineEdit, 
+    ComboBox, 
+    Spinner, 
+    ListView, 
+    Palette 
+} from "std-widgets.slint";
 import { 
     SlotInfo,
     SlotRequirement, 
@@ -69,7 +81,7 @@ component SlotRequirementItem inherits Rectangle {
 
         if requirement.has-result && requirement.status-text != "" : HorizontalLayout {
             padding-left: 10px;
-            padding-bottom: 5px;
+            padding-bottom: 2px;
             spacing: 5px;
             Text {
                 font-size: 13px;
@@ -373,7 +385,7 @@ component CardView inherits Rectangle {
     border-radius: 10px;
     background: StyleMetrics.dark-color-scheme
         ? #242424
-        : StyleMetrics.window-background;
+        : whitesmoke;
     drop-shadow-blur: StyleMetrics.dark-color-scheme
         ? 0px
         : 5px;
@@ -522,7 +534,7 @@ export component SlotCard inherits Rectangle {
     
     background: StyleMetrics.dark-color-scheme
         ? #2b2b2b
-        : StyleMetrics.window-background;
+        : Palette.alternate-background.darker(5%);
     border-radius: 10px;
 
     card-view := CardView {
@@ -650,7 +662,7 @@ export component SlotCard inherits Rectangle {
                 Rectangle {
                     background: StyleMetrics.dark-color-scheme
                     ? #3c3c3c
-                    : StyleMetrics.window-background.darker(10%);
+                    : whitesmoke.darker(10%);
 
                     animate opacity { duration: 0.15s; easing: ease; }
 

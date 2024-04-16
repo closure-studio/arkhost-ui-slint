@@ -1,11 +1,13 @@
+import { StyleMetrics, ScrollView , VerticalBox, Spinner, Palette } from "std-widgets.slint";
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
 import { UserInfo, UserStatus, UserProgress } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
-import { StyleMetrics, ScrollView , VerticalBox, Spinner } from "std-widgets.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
 import { StateGlobals, WebViewType, ReleaseUpdateType, ReleaseUpdateState } from "../state-globals.slint";
+import { LoadingPlaceholder } from "../components/placeholder-card.slint";
+import { MapSelector } from "../components/map-selector.slint";
 
 export enum FetchGamesState {
     NotFetched,
@@ -20,31 +22,52 @@ export enum SseConnectState {
     Connected
 }
 
-component FetchGamesIndicator inherits VerticalBox {
-    alignment: start;
+component FetchGamesIndicator inherits Rectangle {
     in property <[GameInfo]> game-info-list;
-    in property <FetchGamesState> fetch-games-state;
+    in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
     private property <string> fetch-games-status-text;
+    private property <[string]> loading-icon-seq: [
+        "🏃",
+        "🏂",
+        "🏊",
+        "🏇",
+        "🚵",
+        "🏄",
+        "🚴",
+        "🚣",
+        "🧑‍🦽",
+    ];
+    private property <int> loading-icon-seq-len: 9;
 
-    if fetch-games-state != FetchGamesState.NotFetched 
-    && game-info-list.length == 0: VerticalLayout {
-    alignment: start;
-    HorizontalLayout {
+    border-radius: 10px;
+    background: Palette.alternate-background;
+    drop-shadow-blur: StyleMetrics.dark-color-scheme
+        ? 0px
+        : 5px;
+    clip: true;
+
+    LoadingPlaceholder {
+        HorizontalLayout {
+            spacing: 5px;
             alignment: center;
-            spacing: 10px;
 
             Text {
-                text: fetch-games-status-text;
+                text: loading-icon-seq[floor(mod(animation-tick(), 0.4s * loading-icon-seq-len) / 0.4s)];
+                color: Palette.alternate-foreground;
+                font-size: 20px;
+                horizontal-alignment: center;
                 vertical-alignment: center;
             }
 
-            if fetch-games-state != FetchGamesState.Fetched : Spinner {
-                indeterminate: true;
+            Text {
+                text: fetch-games-status-text;
+                color: Palette.alternate-foreground;
+                font-size: 15px;
+                vertical-alignment: center;
+                horizontal-alignment: center;
             }
-
-            height: 50px;
         }
-    } 
+    }
 
     states [
         fetching when fetch-games-state == FetchGamesState.Fetching: {
@@ -66,9 +89,11 @@ export component GameInfoPage {
         MockData.game-info,
         MockData.game-info,
     ];
-    in property <FetchGamesState> fetch-games-state;
+    in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
     in property <SseConnectState> sse-connect-state;
     private property <string> fetch-games-status-text;
+    private property <int> map-selector-target-idx;
+    private property <length> map-selector-width: min(self.width - 10px, 350px);
 
     callback goto-slot-page(); // TODO: 把导航回调放到全局
 
@@ -92,9 +117,7 @@ export component GameInfoPage {
                             : @tr("增量更新")
                     }
 
-                    background-color: StyleMetrics.dark-color-scheme
-                        ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                        : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                    background-color: Palette.alternate-background;
                     accent-color: StyleMetrics.default-text-color;
 
                     action => {
@@ -134,9 +157,7 @@ export component GameInfoPage {
                     || StateGlobals.is-site-under-maintenance : HorizontalLayout {
                     spacing: 10px;
                     if StateGlobals.site-announcement != "" : BannerNotification {
-                        background-color: StyleMetrics.dark-color-scheme
-                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        background-color: Palette.alternate-background;
                         accent-color: StyleMetrics.default-text-color;
                         has-action: false;
                         text: @tr("📢 ") + StateGlobals.site-announcement;
@@ -144,9 +165,7 @@ export component GameInfoPage {
                     }
 
                     if StateGlobals.is-site-under-maintenance : BannerNotification {
-                        background-color: StyleMetrics.dark-color-scheme
-                            ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                            : StyleMetrics.window-background.darker(20%).transparentize(50%);
+                        background-color: Palette.alternate-background;
                         accent-color: StyleMetrics.default-text-color;
                         has-action: false;
                         text: @tr("🚧 可露希尔平台正在维护中");
@@ -219,7 +238,7 @@ export component GameInfoPage {
                     action => { goto-slot-page(); }
                 }
     
-                for game-info in game-info-list: GameCard {
+                for game-info[game-info-idx] in game-info-list: GameCard {
                     info: game-info;
     
                     start-game(id) => { Callbacks.start-game(id); }
@@ -228,17 +247,71 @@ export component GameInfoPage {
                     save-options(id, options) => { Callbacks.save-options(id, options); }
                     load-logs(id, type) => { Callbacks.load-logs(id, type); }
                     view-changed(id, type) => { Callbacks.view-changed(id, type); }
-                    search-maps(id, term, fuzzy) => { Callbacks.search-maps(id, term, fuzzy); }
-                    set-map-selected(id, battle-map, selected) => { Callbacks.set-map-selected(id, battle-map, selected); } 
-                    reset-selected-maps(id) => { Callbacks.reset-selected-maps(id); }
-                    save-maps(id, maps) => { Callbacks.save-maps(id, maps); }
+                    select-map => { 
+                        map-selector-target-idx = game-info-idx;
+                        map-selector.show();
+                    }
                 }
-    
-                FetchGamesIndicator {
+
+                if fetch-games-state != FetchGamesState.NotFetched 
+                    && game-info-list.length == 0: FetchGamesIndicator {
                     game-info-list: game-info-list;
                     fetch-games-state: fetch-games-state;
+
+                    height: 100px;
                 }
             }
         }
+    }
+
+    map-selector := PopupWindow {
+        private property <GameInfo> target-game: game-info-list[map-selector-target-idx];
+        
+        close-on-click: false;
+        init => {
+            map-selector-control.focus-search-box();
+        }
+
+        Rectangle {
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+            background: Palette.background;
+            drop-shadow-blur: 5px;
+
+            FocusScope {
+                VerticalLayout {
+                    padding: 5px;
+
+                    map-selector-control := MapSelector {
+                        info: target-game;
+        
+                        search-maps(id, term, fuzzy) => { Callbacks.search-maps(id, term, fuzzy); }
+                        set-map-selected(id, battle-map, selected) => { Callbacks.set-map-selected(id, battle-map, selected); } 
+                        reset-selected-maps(id) => { 
+                            Callbacks.reset-selected-maps(id);
+                            map-selector.close();
+                        }
+                        save-maps(id, maps) => { 
+                            Callbacks.save-maps(id, maps);
+                            map-selector.close();
+                        }
+                    }
+                }
+
+                key-pressed(ev) => {
+                    if ev.text == Key.Escape {
+                        map-selector-control.reset-selected-maps(target-game.id);
+                        EventResult.accept
+                    } else {
+                        EventResult.reject
+                    }
+                }
+            }
+        }
+
+        x: 0px;
+        y: 0px;
+        width: map-selector-width;
+        height: root.height;
     }
 }

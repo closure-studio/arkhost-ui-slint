@@ -12,8 +12,8 @@ export enum LoginState {
 export component LoginWindow {
     width: 360px;
     vertical-stretch: 0;
-    in-out property <LoginState> login-state;
-    in-out property <string> login-status-text: "";
+    in-out property <LoginState> login-state: LoginState.Errored;
+    in-out property <string> login-status-text: "登陆失败 ";
 
     private property <bool> logging;
     private property <bool> use-auth;
@@ -125,18 +125,34 @@ export component LoginWindow {
     
             HorizontalBox {
                 alignment: center;
+
+                Rectangle {
+                    border-radius: 5px;
+                    
+                    background: login-state == LoginState.Errored
+                        ? #dd8800
+                        : #0000;
     
-                login-spinner := Spinner {
-                    visible: logging;
-                    indeterminate: true;
-                    width: self.visible ? 40px : 0px;
-                }
-    
-                Text {
-                    vertical-alignment: center;
-    
-                    text: login-status-text;
-                    wrap: word-wrap;
+                    HorizontalBox {
+                        alignment: center;
+            
+                        login-spinner := Spinner {
+                            visible: logging;
+                            indeterminate: true;
+                            width: self.visible ? 40px : 0px;
+                        }
+            
+                        Text {
+                            vertical-alignment: center;
+                            color: whitesmoke;
+                            font-size: 13px;
+            
+                            text: login-status-text;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    width: parent.width - 40px;
                 }
             }
         }
