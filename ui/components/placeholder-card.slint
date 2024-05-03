@@ -1,6 +1,8 @@
 import { Palette } from "std-widgets.slint";
 
 export component LoadingPlaceholder inherits Rectangle {
+    in property <bool> loading: true;
+
     pure function get-flash-ratio-unclamped() -> float {
         Math.mod(animation-tick(), 1.5s) / 1s * 150% - 25%
     }
@@ -19,10 +21,12 @@ export component LoadingPlaceholder inherits Rectangle {
 
     pure function get-gradient(angle: angle) -> brush {
         @linear-gradient(angle, 
-            #ffffff00 get-flash-left-ratio(), 
+            #fff0 get-flash-left-ratio(), 
             Palette.foreground.transparentize(90%) get-flash-ratio(), 
-            #ffffff00 get-flash-right-ratio())
+            #fff0 get-flash-right-ratio())
     }
 
-    background: get-gradient(150deg);
+    background: loading 
+        ? get-gradient(150deg)
+        : #fff0;
 }

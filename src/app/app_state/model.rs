@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -7,7 +9,6 @@ use crate::app::game_data;
 pub enum ImageDataRaw {
     #[default]
     Empty,
-    Pending,
     Rgba8 {
         raw: bytes::Bytes,
         width: u32,
@@ -40,4 +41,12 @@ pub type ImageDataRef = Arc<RwLock<ImageData>>;
 pub struct CharIllust {
     pub image: ImageData,
     pub positions: game_data::CharPack,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct UserConfig {
+    #[serde(default)]
+    pub data_saver_mode_enabled: bool,
+    #[serde(default)]
+    pub last_ssr_record_ts: DateTime<Utc>,
 }

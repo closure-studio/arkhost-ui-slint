@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
         None => {
             #[cfg(feature = "desktop-app")]
             let _instance = {
-                let instance =
+                let instance: single_instance::SingleInstance =
                     single_instance::SingleInstance::new("arkhost-ui-slint-single-instance")
                         .unwrap();
                 if !instance.is_single() {
@@ -38,7 +38,10 @@ async fn main() -> anyhow::Result<()> {
                 instance
             };
 
-            #[cfg(all(feature = "desktop-app", debug_assertions))]
+            #[cfg(any(
+                feature = "desktop-app",
+                all(feature = "desktop-app", debug_assertions)
+            ))]
             if matches!(launch_args.attach_console, Some(true)) || app::env::attach_console() {
                 attach_console();
             } else {
@@ -47,9 +50,11 @@ async fn main() -> anyhow::Result<()> {
             }
 
             println!(
-                "\n### ArkHost-UI-Slint [Version: {}] ###\n",
+                "\n### arkhost-ui-slint {} ###\n",
                 app::utils::app_metadata::CARGO_PKG_VERSION.unwrap_or("not found")
             );
+
+            app::utils::db::handle_self_delete(true);
 
             #[cfg(feature = "desktop-app")]
             {
@@ -62,42 +67,48 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(true) = launch_args.force_update {
                     env.push((app::env::consts::FORCE_UPDATE.into(), "1".into()));
                 }
-                if let Some(port) = launch_args.local_asset_server_port {
+                if let Some(ref asset_server) = launch_args.asset_server {
                     env.push((
                         app::env::consts::OVERRIDE_ASSET_SERVER.into(),
-                        format!("http://localhost:{port}").into(),
+                        asset_server.into(),
                     ))
                 }
 
                 let mut app_window = spawn_executable(
                     current_exe.as_os_str(),
-                    &[current_exe.as_os_str(), std::ffi::OsStr::new("app")],
+                    &[std::ffi::OsStr::new("app")],
                     Some(env),
                     true,
                     None,
                     None,
                 )?;
 
-                let exit_status = app_window.wait()?;
-                println!("\n### AppWindow process exited with status '{exit_status:?}' ###\n");
+                let exit_status = app_window.wait().await?;
+                println!("\n### AppWindow process exited with status '{exit_status}' ###\n");
 
                 if exit_status.success() {
                     if let Err(e) = update_client_if_exist().await {
-                        show_crash_window(&format!("{exit_status:?}"), &format!("更新失败\n{e}"));
+                        show_crash_window(&format!("{exit_status}"), &format!("更新失败\n{e}"));
                     }
                 } else {
-                    show_crash_window(&format!("{exit_status:?}"), "主窗口异常退出");
+                    show_crash_window(&format!("{exit_status}"), "主窗口非正常退出");
                 }
             }
         }
         Some(LaunchSpec::AppWindow(launch_args)) => {
-            #[cfg(all(feature = "desktop-app", debug_assertions))]
+            #[cfg(any(
+                feature = "desktop-app",
+                all(feature = "desktop-app", debug_assertions)
+            ))]
             attach_console();
             launch_app_window(launch_args).await?;
         }
         #[allow(unused)]
         Some(LaunchSpec::WebView(launch_args)) => {
-            #[cfg(all(feature = "desktop-app", debug_assertions))]
+            #[cfg(any(
+                feature = "desktop-app",
+                all(feature = "desktop-app", debug_assertions)
+            ))]
             attach_console();
             #[cfg(feature = "desktop-app")]
             app::webview::auth::subprocess_webview::launch(launch_args)?;

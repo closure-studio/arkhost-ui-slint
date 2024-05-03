@@ -1,4 +1,5 @@
 pub mod app_state_controller;
+pub mod config_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
@@ -10,6 +11,7 @@ pub mod slot_controller;
 pub mod user_controller;
 extern crate alloc;
 
+use self::config_controller::ConfigController;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
@@ -63,6 +65,7 @@ pub struct ControllerAdaptor {
     pub rt_api_model: Arc<RtApiModel>,
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
+    pub config_controller: Arc<ConfigController>,
     pub image_controller: Arc<ImageController>,
     pub session_controller: Arc<SessionController>,
     pub game_controller: Arc<GameController>,
@@ -84,6 +87,7 @@ impl ControllerAdaptor {
         let app_state_controller = Arc::new(AppStateController {
             app_state: app_state.clone(),
         });
+        let config_controller = Arc::new(ConfigController::new(app_state_controller.clone()));
         let sender = Arc::new(Sender {
             rt_api_model: rt_api_model.clone(),
             tx_api_worker,
@@ -103,6 +107,7 @@ impl ControllerAdaptor {
         let game_controller = Arc::new(GameController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
+            config_controller.clone(),
             sender.clone(),
             image_controller.clone(),
             slot_controller.clone(),
@@ -130,6 +135,7 @@ impl ControllerAdaptor {
             app_state,
             app_state_controller,
             image_controller,
+            config_controller,
             session_controller,
             game_controller,
             slot_controller,
@@ -472,6 +478,40 @@ impl ControllerAdaptor {
                 let this = this.clone();
                 tokio::spawn(async move {
                     this.ota_controller.update_release().await;
+                });
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_set_data_saver_mode(move |val| {
+                this.config_controller.set_data_saver_mode_enabled(val);
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_set_clean_data(move |val| {
+                _ = this
+                    .config_controller
+                    .set_clean_data(val)
+                    .map_err(|e| println!("[Controller] error cleaning cache: {e}"));
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_recalculate_data_disk_usage(move || {
+                this.config_controller.recalculate_disk_usage();
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_confirm_gacha_records(move || {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller.confirm_gacha_records().await;
                 });
             })
         }

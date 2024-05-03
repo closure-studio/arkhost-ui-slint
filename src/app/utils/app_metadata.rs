@@ -12,6 +12,7 @@ use arkhost_ota;
 pub const CARGO_PKG_VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 pub const RELEASE_UPDATE_BRANCH: &str = arkhost_ota::consts::DEFAULT_BRANCH;
 
+#[cfg(feature = "desktop-app")]
 pub fn executable_hash<T: digest::Digest>(mut hasher: T) -> io::Result<digest::Output<T>> {
     let current_exe = File::open(env::current_exe()?)?;
     let mut reader = BufReader::new(current_exe);
@@ -25,6 +26,14 @@ pub fn executable_hash<T: digest::Digest>(mut hasher: T) -> io::Result<digest::O
         reader.consume(len);
     }
     Ok(hasher.finalize())
+}
+
+#[cfg(feature = "android-app")]
+pub fn executable_hash<T: digest::Digest>(mut hasher: T) -> io::Result<digest::Output<T>> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "Executable hash is not available on Android OS",
+    ))
 }
 
 pub fn executable_sha256() -> io::Result<Arc<digest::Output<sha2::Sha256>>> {

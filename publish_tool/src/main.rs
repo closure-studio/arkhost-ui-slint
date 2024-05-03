@@ -8,8 +8,8 @@ use argh::FromArgs;
 use arkhost_ota::{Release, ReleaseIndexV1, Resource};
 use cargo::{
     self,
-    core::{compiler::CompileMode, Shell, Workspace},
-    ops::CompileOptions,
+    core::{compiler::CompileMode, resolver::CliFeatures, Shell, Workspace},
+    ops::{CompileFilter, CompileOptions, FilterRule, LibRule},
     Config,
 };
 use sha2::Digest;
@@ -17,10 +17,16 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Debug, Clone, FromArgs)]
 /// CLI发布工具
-pub struct ProgramOptions {}
+struct ProgramOptions {
+    #[argh(option)]
+    /// 除基本 Feature FLag 外（如 desktop-app）外指定的 Feature Flag
+    pub features: Option<String>,
+}
 
 #[tokio::main]
 async fn main() {
+    let po: ProgramOptions = argh::from_env();
+
     let cwd = env::current_dir().expect("invalid env::current_dir()");
     let pervious_versions_dir = cwd.join("pervious_versions/");
     tokio::fs::create_dir_all(&pervious_versions_dir)
@@ -36,6 +42,22 @@ async fn main() {
 
     let mut compile_opts = CompileOptions::new(cfg, CompileMode::Build).unwrap();
     compile_opts.build_config.requested_profile = "release".into();
+    compile_opts.filter = CompileFilter::Only {
+        all_targets: false,
+        lib: LibRule::False,
+        bins: FilterRule::new(vec![consts::BINARY_TARGET.into()], false),
+        examples: FilterRule::none(),
+        tests: FilterRule::none(),
+        benches: FilterRule::none(),
+    };
+    let mut cli_features: Vec<String> = vec!["desktop-app".into()];
+    if let Some(features) = po.features {
+        cli_features.push(features);
+    }
+    println!("Requested features: {cli_features:#?}");
+
+    compile_opts.cli_features =
+        CliFeatures::from_command_line(&cli_features, false, false).unwrap();
 
     let compilation = cargo::ops::compile(&ws, &compile_opts).unwrap();
     let release_path = compilation

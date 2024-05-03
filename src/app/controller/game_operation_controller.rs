@@ -159,13 +159,12 @@ impl GameOperationController {
                 }
                 _ => {}
             }
-    
+
             captcha_states.insert(
                 account.clone(),
                 (challenge_info.clone(), CaptchaState::Running),
             );
         }
-        
 
         let invoke_auth = |gt| async move {
             let (tx_command, rx_command) = mpsc::channel(1);

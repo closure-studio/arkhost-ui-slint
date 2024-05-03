@@ -1,10 +1,7 @@
 #![allow(dead_code)]
-use std::path::PathBuf;
-
-use polodb_core::bson::doc;
-use serde::{Deserialize, Serialize};
-
 use super::utils::db;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RecordType {
@@ -29,32 +26,39 @@ pub struct ReleaseRecord {
     pub binary: Resource,
 }
 
-pub fn upsert_pending_update(release_record: &ReleaseRecord) -> polodb_core::Result<()> {
-    let collection =
-        db::instance().collection::<ReleaseRecord>(db::consts::collection::OTA_RELEASE);
-    let mut session = db::instance().start_session()?;
-    session.start_transaction(Some(polodb_core::TransactionType::Write))?;
-    collection
-        .delete_one_with_session(record_type_filter(RecordType::PendingUpdate), &mut session)?;
-    collection.insert_one_with_session(release_record, &mut session)?;
-    session.commit_transaction()
+pub fn upsert_pending_update(release_record: &ReleaseRecord) -> heed::Result<()> {
+    let env = db::env();
+    let db = db()?;
+    let mut wtxn = env.write_txn()?;
+    db.put(
+        &mut wtxn,
+        &record_type_key(RecordType::PendingUpdate)?,
+        release_record,
+    )?;
+    wtxn.commit()
 }
 
-pub fn pending_update() -> polodb_core::Result<Option<ReleaseRecord>> {
-    let collection =
-        db::instance().collection::<ReleaseRecord>(db::consts::collection::OTA_RELEASE);
+pub fn pending_update() -> heed::Result<Option<ReleaseRecord>> {
+    let env = db::env();
+    let db = db()?;
+    let rtxn = env.read_txn()?;
 
-    collection.find_one(record_type_filter(RecordType::PendingUpdate))
+    db.get(&rtxn, &record_type_key(RecordType::PendingUpdate)?)
 }
 
-pub fn remove_pending_update() -> polodb_core::Result<()> {
-    let collection =
-        db::instance().collection::<ReleaseRecord>(db::consts::collection::OTA_RELEASE);
-
-    collection.delete_many(record_type_filter(RecordType::PendingUpdate))?;
-    Ok(())
+pub fn remove_pending_update() -> heed::Result<()> {
+    let env = db::env();
+    let db = db()?;
+    let mut wtxn = env.write_txn()?;
+    db.delete(&mut wtxn, &record_type_key(RecordType::PendingUpdate)?)?;
+    wtxn.commit()
 }
 
-fn record_type_filter(rel_type: RecordType) -> polodb_core::bson::Document {
-    doc! { "rel_type": { "$eq": polodb_core::bson::to_bson(&rel_type).unwrap() } }
+fn db() -> heed::Result<heed::Database<heed::types::Str, heed::types::SerdeBincode<ReleaseRecord>>>
+{
+    db::database(Some(db::consts::db::OTA_RELEASE))
+}
+
+fn record_type_key(rel_type: RecordType) -> heed::Result<String> {
+    serde_json::ser::to_string(&rel_type).map_err(|e| heed::Error::Encoding(e.into()))
 }

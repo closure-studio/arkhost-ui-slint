@@ -97,22 +97,3 @@ export component SlotListItem inherits Rectangle {
         }
     ]
 }
-
-export component SlotList inherits VerticalLayout {
-    in property <[SlotInfo]> slot-info-list: [
-        MockData.slot-info,
-        MockData.slot-info,
-        MockData.slot-info,
-    ];
-    
-    callback slot-selected(string);
-
-    alignment: start;
-    spacing: 10px;
-
-    for slot-info[idx] in slot-info-list: SlotListItem {
-        index: idx + 1;
-        info: slot-info;
-        slot-selected(id) => { slot-selected(id); }
-    }
-}

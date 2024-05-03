@@ -1,40 +1,32 @@
-use std::{
-    env,
-    ffi::{OsStr, OsString},
-};
-use subprocess::{Popen, PopenConfig, Redirection};
+use std::ffi::{OsStr, OsString};
+use tokio::process::{Child, Command};
 
 pub fn spawn_executable(
     executable: &OsStr,
     args: &[impl AsRef<OsStr>],
-    mut env: Option<Vec<(OsString, OsString)>>,
+    env: Option<Vec<(OsString, OsString)>>,
     inherit_env: bool,
-    stdout: Option<Redirection>,
-    stderr: Option<Redirection>,
-) -> subprocess::Result<Popen> {
-    env = match env {
-        Some(mut envs) => {
-            if inherit_env {
-                for (k, v) in env::vars_os() {
-                    envs.push((k, v))
-                }
-            }
+    stdout: Option<std::process::Stdio>,
+    stderr: Option<std::process::Stdio>,
+) -> std::io::Result<Child> {
+    let mut cmd = Command::new(executable);
+    cmd.args(args);
 
-            Some(envs)
-        }
-        None if !inherit_env => Some(vec![]),
-        _ => env,
-    };
+    if !inherit_env {
+        cmd.env_clear();
+    }
 
-    Popen::create(
-        args,
-        PopenConfig {
-            stdout: stdout.unwrap_or(Redirection::Merge),
-            stderr: stderr.unwrap_or(Redirection::Merge),
-            detached: true,
-            executable: Some(executable.to_owned()),
-            env,
-            ..PopenConfig::default()
-        },
-    )
+    if let Some(env) = env {
+        cmd.envs(env);
+    }
+
+    if let Some(stdout) = stdout {
+        cmd.stdout(stdout);
+    }
+
+    if let Some(stderr) = stderr {
+        cmd.stdout(stderr);
+    }
+
+    cmd.kill_on_drop(true).spawn()
 }

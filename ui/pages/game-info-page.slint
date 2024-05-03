@@ -1,6 +1,6 @@
-import { StyleMetrics, ScrollView , VerticalBox, Spinner, Palette } from "std-widgets.slint";
+import { StyleMetrics, ScrollView , VerticalBox, Spinner, Palette, Button } from "std-widgets.slint";
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
-import { UserInfo, UserStatus, UserProgress } from "../user-info.slint";
+import { UserInfo, UserStatus, UserTier, UserProgress } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { GameCard } from "game-card.slint";
@@ -8,6 +8,10 @@ import { BannerNotification } from "../components/banner-notification.slint";
 import { StateGlobals, WebViewType, ReleaseUpdateType, ReleaseUpdateState } from "../state-globals.slint";
 import { LoadingPlaceholder } from "../components/placeholder-card.slint";
 import { MapSelector } from "../components/map-selector.slint";
+import { SlotTierCard } from "slot-tier-card.slint";
+import { SlotTierConsts } from "../slot-tier-consts.slint";
+import { GachaCarouselAutoScroll } from "../components/gacha-carousel.slint";
+import { ClosureStudioLogoSingleRow } from "../components/closure-studio-logo.slint";
 
 export enum FetchGamesState {
     NotFetched,
@@ -26,39 +30,28 @@ component FetchGamesIndicator inherits Rectangle {
     in property <[GameInfo]> game-info-list;
     in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
     private property <string> fetch-games-status-text;
-    private property <[string]> loading-icon-seq: [
-        "🏃",
-        "🏂",
-        "🏊",
-        "🏇",
-        "🚵",
-        "🏄",
-        "🚴",
-        "🚣",
-        "🧑‍🦽",
-    ];
-    private property <int> loading-icon-seq-len: 9;
-
+    private property <bool> loading;
+    private property <[string]> loading-icon-seq: ["🏃", "🏊", "🏇", "🚴", "🚣", "🧗", "⛷️", "🧑‍🦽"];
+    private property <[string]> retrying-icon-seq: ["⚡", "💣", "🤯", "💥", "☢️", "🚨", "😱"];
+    pure function loading-icon(seq: [string]) -> string {
+        seq[floor(mod(animation-tick(), 0.4s * seq.length) / 0.4s)]
+    }
     border-radius: 10px;
-    background: Palette.alternate-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
-        ? 0px
-        : 5px;
+    background: loading ? Palette.alternate-background : #fff0;
+    drop-shadow-blur: StyleMetrics.dark-color-scheme ? 0px : 5px;
     clip: true;
-
-    LoadingPlaceholder {
+    loading-placeholder := LoadingPlaceholder {
+        loading: loading;
         HorizontalLayout {
             spacing: 5px;
             alignment: center;
-
-            Text {
-                text: loading-icon-seq[floor(mod(animation-tick(), 0.4s * loading-icon-seq-len) / 0.4s)];
+            if loading: Text {
+                text: fetch-games-state == FetchGamesState.Retrying ? loading-icon(retrying-icon-seq) : loading-icon(loading-icon-seq);
                 color: Palette.alternate-foreground;
                 font-size: 20px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
-
             Text {
                 text: fetch-games-status-text;
                 color: Palette.alternate-foreground;
@@ -71,15 +64,60 @@ component FetchGamesIndicator inherits Rectangle {
 
     states [
         fetching when fetch-games-state == FetchGamesState.Fetching: {
+            loading: true;
             fetch-games-status-text: @tr("正在加载账号列表…… ");
         }
         empty when fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: {
+            loading: false;
             fetch-games-status-text: @tr("这里似乎没有游戏账号 ");
         }
         retrying when fetch-games-state == FetchGamesState.Retrying: {
+            loading: true;
             fetch-games-status-text: @tr("加载账号列表似乎不太顺利…… ");
         }
     ]
+}
+
+component GachaRecordConfirmBox inherits Rectangle {
+    in property <bool> is-wide;
+    callback confirmed();
+    border-radius: 10px;
+    background: Palette.alternate-background;
+    HorizontalLayout {
+        padding-left: 15px;
+        padding-right: 15px;
+        padding-top: 7px;
+        padding-bottom: 7px;
+        spacing: 10px;
+        alignment: is-wide ? space-between : stretch;
+        VerticalLayout {
+            alignment: is-wide ? center : space-between;
+            spacing: 10px;
+            Text {
+                text: @tr("🎉 最近{}，全站抽取到了以上 {} 位高稀有度干员", StateGlobals.gacha-record-time, StateGlobals.gacha-record-count);
+                font-size: 15px;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+
+            if !is-wide: HorizontalLayout {
+                alignment: end;
+                Button {
+                    text: @tr("😎 已阅，我不羡慕");
+                    clicked => {
+                        confirmed();
+                    }
+                }
+            }
+        }
+
+        if is-wide: Button {
+            text: @tr("😎 已阅，我不羡慕");
+            clicked => {
+                confirmed();
+            }
+        }
+    }
 }
 
 export component GameInfoPage {
@@ -90,57 +128,43 @@ export component GameInfoPage {
         MockData.game-info,
     ];
     in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
-    in property <SseConnectState> sse-connect-state;
+    in property <SseConnectState> sse-connect-state: SseConnectState.Connected;
     private property <string> fetch-games-status-text;
     private property <int> map-selector-target-idx;
     private property <length> map-selector-width: min(self.width - 10px, 350px);
-
-    callback goto-slot-page(); // TODO: 把导航回调放到全局
+    callback goto-slot-page();
+    // TODO: 把导航回调放到全局
 
     ScrollView {
         HorizontalLayout {
+            private property <bool> is-wide: root.width > 950px;
             alignment: space-around;
-
             VerticalBox {
                 alignment: start;
                 padding-left: 10px;
                 padding-right: 15px;
                 padding-top: 10px;
                 spacing: 10px;
-
                 width: min(root.width, 1440px);
-
                 if StateGlobals.update-version != "": BannerNotification {
                     pure function update-action-text() -> string {
-                        StateGlobals.update-type == ReleaseUpdateType.FullDownload
-                            ? @tr("更新客户端")
-                            : @tr("增量更新")
+                        StateGlobals.update-type == ReleaseUpdateType.FullDownload ? @tr("更新客户端") : @tr("增量更新")
                     }
-
                     background-color: Palette.alternate-background;
                     accent-color: StyleMetrics.default-text-color;
-
                     action => {
                         if StateGlobals.update-state == ReleaseUpdateState.Idle {
                             Callbacks.download-update();
                         }
                     }
-
                     states [
                         idle when StateGlobals.update-state == ReleaseUpdateState.Idle: {
                             text: @tr("🆕 可露希尔客户端有新版本可用 - ") + StateGlobals.update-version;
                             has-action: true;
-                            action-text: "["
-                                + update-action-text()
-                                + "："
-                                + StateGlobals.update-size
-                                + "]";
+                            action-text: "[" + update-action-text() + "：" + StateGlobals.update-size + "]";
                         }
                         downloading when StateGlobals.update-state == ReleaseUpdateState.Downloading: {
-                            text: @tr("⏳ 正在") 
-                                + update-action-text() 
-                                + @tr("…  ")  
-                                + StateGlobals.update-downloaded-size + "/" + StateGlobals.update-size;
+                            text: @tr("⏳ 正在") + update-action-text() + @tr("…  ") + StateGlobals.update-downloaded-size + "/" + StateGlobals.update-size;
                             has-action: false;
                             has-progress: true;
                             progress: StateGlobals.update-progress;
@@ -152,46 +176,181 @@ export component GameInfoPage {
                         }
                     ]
                 }
-
-                if StateGlobals.site-announcement != "" 
-                    || StateGlobals.is-site-under-maintenance : HorizontalLayout {
+                HorizontalLayout {
+                    alignment: stretch;
                     spacing: 10px;
-                    if StateGlobals.site-announcement != "" : BannerNotification {
-                        background-color: Palette.alternate-background;
-                        accent-color: StyleMetrics.default-text-color;
-                        has-action: false;
-                        text: @tr("📢 ") + StateGlobals.site-announcement;
-                        wrap: word-wrap;
+                    Rectangle {
+                        background: Palette.alternate-background;
+                        border-radius: 10px;
+                        clip: true;
+                        HorizontalLayout {
+                            alignment: stretch;
+                            if StateGlobals.site-announcement != "": BannerNotification {
+                                background-color: #0000;
+                                accent-color: StyleMetrics.default-text-color;
+                                has-action: false;
+                                text: @tr("📢 ") + StateGlobals.site-announcement;
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                            }
+                            if !StateGlobals.is-site-under-maintenance: BannerNotification {
+                                background-color: #0000;
+                                accent-color: StyleMetrics.default-text-color;
+                                has-action: false;
+                                text: @tr("🚧 可露希尔平台正在维护中");
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                            }
+                        }
+
+                        horizontal-stretch: 1;
                     }
 
-                    if StateGlobals.is-site-under-maintenance : BannerNotification {
-                        background-color: Palette.alternate-background;
-                        accent-color: StyleMetrics.default-text-color;
-                        has-action: false;
-                        text: @tr("🚧 可露希尔平台正在维护中");
+                    HorizontalLayout {
+                        spacing: 10px;
+                        if is-wide: Rectangle {
+                            border-radius: 10px;
+                            // 史
+                            clip: true;
+                            slot-tier-card := SlotTierCard {
+                                data: SlotTierConsts.get-tier-card-data(user.tier);
+                                width: 540px;
+                                x: 0;
+                                y: 0;
+                            }
+
+                            height: slot-tier-card.height;
+                            width: 370px;
+                        }
+                        Rectangle {
+                            background: Palette.control-background;
+                            border-radius: 10px;
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 10px;
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                padding-top: 7px;
+                                padding-bottom: 7px;
+                                Rectangle {
+                                    ticket-tip-hover := TouchArea {
+                                        Button {
+                                            primary: true;
+                                            text: @tr("工单系统… ");
+                                            icon: StyleMetrics.dark-color-scheme ? @image-url("../images/ext_link_light.svg") : @image-url("../images/ext_link.svg");
+                                            clicked => {
+                                                Callbacks.open-ext-link("https://closure.ltsc.vip/ticket")
+                                            }
+                                            width: parent.width;
+                                            height: parent.height;
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        border-radius: min(10px, self.width / 2);
+                                        background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+                                        if self.width > 0px: VerticalLayout {
+                                            padding-left: 10px;
+                                            alignment: center;
+                                            Text {
+                                                text: @tr("🤗 有问题和建议请发送工单");
+                                                font-size: 14px;
+                                                color: whitesmoke;
+                                                vertical-alignment: top;
+                                                horizontal-alignment: left;
+                                                overflow: elide;
+                                            }
+                                        }
+                                        width: is-wide && ticket-tip-hover.has-hover ? 220px : 0px;
+                                        animate width {
+                                            duration: 0.2s;
+                                            easing: ease;
+                                        }
+                                        x: parent.width - self.width;
+                                        y: parent.height + 5px;
+                                    }
+
+                                    width: 135px;
+                                }
+                            }
+                        }
+
+                        horizontal-stretch: 0;
+                        height: 50px;
                     }
+
+                    z: 1;
                 }
 
-                if user.status == UserStatus.Banned : BannerNotification {
+                if StateGlobals.show-gacha-records && StateGlobals.gacha-record-count > 0: VerticalLayout {
+                    // 大致估计
+                    property <bool> is-single-row: StateGlobals.gacha-record-count * 100px + 300px < root.width && is-wide;
+                    alignment: start;
+                    spacing: 5px;
+                    HorizontalLayout {
+                        alignment: stretch;
+                        spacing: 10px;
+                        gacha-carousel := GachaCarouselAutoScroll {
+                            gacha-groups: StateGlobals.gacha-record;
+                            height: self.min-height;
+                            horizontal-stretch: 10;
+                        }
+
+                        if is-single-row: Rectangle {
+                            border-radius: 10px;
+                            background: Palette.control-background.transparentize(50%);
+                            clip: true;
+                            HorizontalLayout {
+                                alignment: end;
+                                GachaRecordConfirmBox {
+                                    background: Palette.alternate-background.transparentize(10%);
+                                    is-wide: false;
+                                    confirmed => {
+                                        Callbacks.confirm-gacha-records();
+                                    }
+                                }
+
+                                z: 1;
+                            }
+
+                            Rectangle {
+                                // TODO: 背景
+
+                                width: 54px;
+                                height: 54px;
+                                x: 0px;
+                                y: parent.height - self.height;
+                                z: 0;
+                            }
+
+                            horizontal-stretch: 1;
+                        }
+                    }
+
+                    if !is-single-row: GachaRecordConfirmBox {
+                        is-wide: true;
+                        confirmed => {
+                            Callbacks.confirm-gacha-records();
+                        }
+                    }
+                }
+                if user.status == UserStatus.Banned: BannerNotification {
                     background-color: #dd8800;
                     accent-color: #fffceb;
                     text: @tr("🛑 你的可露希尔账号已经被管理员停用");
                 }
-
                 if !StateGlobals.has-default-webview-installation && StateGlobals.has-webview-launch-failure: BannerNotification {
                     private property <bool> is-ms-edge-webview2: 
                         StateGlobals.default-webview-installation-type == WebViewType.MicrosoftEdgeWebView2;
-
                     background-color: #dd8800;
                     accent-color: #fffceb;
                     has-action: true;
                     action-icon: @image-url("../images/ext_link.svg");
-                    action => { 
+                    action => {
                         if is-ms-edge-webview2 {
                             Callbacks.open-ext-link("https://developer.microsoft.com/microsoft-edge/webview2/consumer/");
                         }
                     }
-
                     states [
                         ms-edge-webview2 when is-ms-edge-webview2: {
                             text: @tr("🚧 内置浏览器启动失败，无法进行进行滑块验证等操作。请尝试安装 Microsoft Edge WebView2 后重启客户端 👉");
@@ -199,25 +358,23 @@ export component GameInfoPage {
                         }
                     ]
                 }
-    
                 if sse-connect-state != SseConnectState.Connected: BannerNotification {
                     background-color: #dd8800;
                     accent-color: #fffceb;
                     has-action: true;
                     action-text: @tr("[重新连接]");
-                    action => { Callbacks.reconnect-sse(); }
-    
+                    action => {
+                        Callbacks.reconnect-sse();
+                    }
                     states [
                         disconnected when sse-connect-state == SseConnectState.Disconnected: {
                             text: @tr("📡 与服务器的连接意外断开，请重新连接 👉");
                         }
-                        disconnected-occupied-elaswhere when 
-                            sse-connect-state == SseConnectState.DisconnectedOccupiedElsewhere: {
+                        disconnected-occupied-elaswhere when sse-connect-state == SseConnectState.DisconnectedOccupiedElsewhere: {
                             text: @tr("🚧 你已经在其他位置登入可露希尔管理终端，请重新上线 👉");
                         }
                     ]
                 }
-                
                 if user.progress == UserProgress.SmsVerifySlotAdded: BannerNotification {
                     background-color: #0661d0;
                     accent-color: #ebf3ff;
@@ -225,9 +382,10 @@ export component GameInfoPage {
                     has-action: true;
                     action-text: @tr("[已收到验证码]");
                     action-icon: @image-url("../images/ext_link.svg");
-                    action => { goto-slot-page(); }
+                    action => {
+                        goto-slot-page();
+                    }
                 }
-    
                 if fetch-games-state == FetchGamesState.Fetched && game-info-list.length == 0: BannerNotification {
                     background-color: #0661d0;
                     accent-color: #ebf3ff;
@@ -235,29 +393,38 @@ export component GameInfoPage {
                     has-action: true;
                     action-text: @tr("[转到账号管理]");
                     action-icon: @image-url("../images/ext_link.svg");
-                    action => { goto-slot-page(); }
+                    action => {
+                        goto-slot-page();
+                    }
                 }
-    
                 for game-info[game-info-idx] in game-info-list: GameCard {
                     info: game-info;
-    
-                    start-game(id) => { Callbacks.start-game(id); }
-                    stop-game(id) => { Callbacks.stop-game(id); }
-                    restart-game(id) => { Callbacks.restart-game(id); }
-                    save-options(id, options) => { Callbacks.save-options(id, options); }
-                    load-logs(id, type) => { Callbacks.load-logs(id, type); }
-                    view-changed(id, type) => { Callbacks.view-changed(id, type); }
-                    select-map => { 
+                    start-game(id) => {
+                        Callbacks.start-game(id);
+                    }
+                    stop-game(id) => {
+                        Callbacks.stop-game(id);
+                    }
+                    restart-game(id) => {
+                        Callbacks.restart-game(id);
+                    }
+                    save-options(id, options) => {
+                        Callbacks.save-options(id, options);
+                    }
+                    load-logs(id, type) => {
+                        Callbacks.load-logs(id, type);
+                    }
+                    view-changed(id, type) => {
+                        Callbacks.view-changed(id, type);
+                    }
+                    select-map => {
                         map-selector-target-idx = game-info-idx;
                         map-selector.show();
                     }
                 }
-
-                if fetch-games-state != FetchGamesState.NotFetched 
-                    && game-info-list.length == 0: FetchGamesIndicator {
+                if fetch-games-state != FetchGamesState.NotFetched && game-info-list.length == 0: FetchGamesIndicator {
                     game-info-list: game-info-list;
                     fetch-games-state: fetch-games-state;
-
                     height: 100px;
                 }
             }
@@ -266,32 +433,32 @@ export component GameInfoPage {
 
     map-selector := PopupWindow {
         private property <GameInfo> target-game: game-info-list[map-selector-target-idx];
-        
         close-on-click: false;
         init => {
             map-selector-control.focus-search-box();
         }
-
         Rectangle {
             border-top-right-radius: 10px;
             border-bottom-right-radius: 10px;
             background: Palette.background;
-            drop-shadow-blur: 5px;
-
+            drop-shadow-blur: 10px;
+            drop-shadow-color: #000;
             FocusScope {
                 VerticalLayout {
                     padding: 5px;
-
                     map-selector-control := MapSelector {
                         info: target-game;
-        
-                        search-maps(id, term, fuzzy) => { Callbacks.search-maps(id, term, fuzzy); }
-                        set-map-selected(id, battle-map, selected) => { Callbacks.set-map-selected(id, battle-map, selected); } 
-                        reset-selected-maps(id) => { 
+                        search-maps(id, term, fuzzy) => {
+                            Callbacks.search-maps(id, term, fuzzy);
+                        }
+                        set-map-selected(id, battle-map, selected) => {
+                            Callbacks.set-map-selected(id, battle-map, selected);
+                        }
+                        reset-selected-maps(id) => {
                             Callbacks.reset-selected-maps(id);
                             map-selector.close();
                         }
-                        save-maps(id, maps) => { 
+                        save-maps(id, maps) => {
                             Callbacks.save-maps(id, maps);
                             map-selector.close();
                         }

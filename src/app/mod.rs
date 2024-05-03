@@ -58,7 +58,9 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     }
 
     let mut user_state = UserStateDBStore::new();
-    user_state.load_from_db();
+    _ = user_state
+        .load_from_db()
+        .map_err(|e| println!("[main] Error loading user state from DB {e}"));
     let user_state_data_or_null = user_state.user_state_data();
     let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
 
@@ -109,6 +111,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         tx_asset_command.clone(),
     ));
     adaptor.clone().attach(&ui);
+    adaptor.config_controller.sync_to_ui();
 
     #[cfg(target_os = "windows")]
     let default_webview_installation_found = {
@@ -185,7 +188,7 @@ fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
-        .connect_timeout(Duration::from_secs(8))
+        .connect_timeout(Duration::from_secs(5))
         .build()
         .unwrap();
 
@@ -207,48 +210,25 @@ fn create_asset_client() -> AssetClient {
     use reqwest_retry::policies::ExponentialBackoff;
     use reqwest_retry::RetryTransientMiddleware;
     use std::time::Duration;
+    use utils::cache_control::default_cache_mode_fn;
     use utils::cache_manager::DBCacheManager;
 
     let client = AssetClient::default_client_builder()
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
-        .connect_timeout(Duration::from_secs(8))
+        .connect_timeout(Duration::from_secs(5))
         .build()
         .unwrap();
 
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
     let client_with_middlewares = reqwest_middleware::ClientBuilder::new(client)
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .with(Cache(HttpCache {
             mode: CacheMode::Default,
             manager: DBCacheManager::new(),
             options: HttpCacheOptions {
-                cache_mode_fn: Some(Arc::new(|req| {
-                    if matches!(req.method.as_str(), "HEAD" | "OPTIONS") {
-                        return CacheMode::NoStore;
-                    }
-
-                    // TODO: 其他方式识别资源文件类型（MIME type等）
-                    if req.uri.path().ends_with(".webp") {
-                        return CacheMode::ForceCache;
-                    }
-                    let matches_ota_file = {
-                        // OTA 更新文件URL： http://asset.server.com/foo/bar.txt/{hash}
-                        let mut split = req.uri.path().rsplitn(2, '/');
-                        !matches!(
-                            (split.next(), split.next()), 
-                                (Some(hash_versioned_file), Some(hash_version_dir)) if
-                                    (hash_version_dir.ends_with(".exe")
-                                    || hash_versioned_file.ends_with(".bspatch")))
-                        // TODO: 其他方式识别OTA更新文件
-                    };
-                    if matches_ota_file {
-                        CacheMode::NoStore
-                    } else {
-                        CacheMode::Default
-                    }
-                })),
+                cache_mode_fn: Some(default_cache_mode_fn()),
                 ..Default::default()
             },
         }))

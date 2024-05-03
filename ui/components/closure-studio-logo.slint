@@ -1,4 +1,4 @@
-import { StyleMetrics, HorizontalBox } from "std-widgets.slint";
+import { StyleMetrics, Palette, HorizontalBox } from "std-widgets.slint";
 import { FontGlobals } from "../font-globals.slint";
 
 export component ClosureStudioLogoSingleRow inherits HorizontalBox {
@@ -123,9 +123,7 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
                     }
                 }
 
-                background: StyleMetrics.dark-color-scheme
-                    ? #303030
-                    : StyleMetrics.window-background;
+                background: Palette.alternate-background;
             }
         }
     }

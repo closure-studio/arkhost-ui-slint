@@ -171,14 +171,20 @@ impl EventSourceClient {
         let stream = client.stream().filter_map(|res| async {
             match res {
                 Ok(ev) => match ev {
-                    es::SSE::Event(ev) => Some(Self::try_parse_ev(ev)),
+                    es::SSE::Event(ev) => Some(Ok(Self::try_parse_ev(&ev).unwrap_or_else(|err| {
+                        GameSseEvent::Malformed {
+                            ev: ev.event_type,
+                            data: ev.data,
+                            err,
+                        }
+                    }))),
                     es::SSE::Comment(_) => None, // Error on unexpected comment?
                 },
                 Err(e) => {
                     // 先前出现读到EOF时 eventsource_client 仍可继续重试，
                     // 但仍抛出eventsource_client::Error 错误导致下游中止连接
                     // 故忽略错误并全部交由 eventsource_client::Client 重试
-                    Some(Ok(GameSseEvent::RecoverableError(anyhow::Error::from(e))))
+                    Some(Ok(GameSseEvent::Reconnect(anyhow::Error::from(e))))
                 }
             }
         });
@@ -214,7 +220,7 @@ impl EventSourceClient {
         Ok(client)
     }
 
-    fn try_parse_ev(ev: es::Event) -> anyhow::Result<GameSseEvent> {
+    fn try_parse_ev(ev: &es::Event) -> anyhow::Result<GameSseEvent> {
         match ev.event_type.as_str() {
             api::sse::EVENT_TYPE_GAME => {
                 let games: NullableData<Vec<GameInfo>> = serde_json::de::from_str(&ev.data)?;
@@ -224,11 +230,21 @@ impl EventSourceClient {
                 })
             }
             api::sse::EVENT_TYPE_SSR => {
-                let ssr_list: Vec<SsrRecord> = serde_json::de::from_str(&ev.data)?;
-                Ok(GameSseEvent::Ssr(ssr_list))
+                #[derive(serde::Deserialize)]
+                #[serde(untagged)]
+                enum SsrEventData {
+                    List(Vec<SsrRecord>),
+                    Single(SsrRecord),
+                }
+
+                let ssr_data: SsrEventData = serde_json::de::from_str(&ev.data)?;
+                Ok(GameSseEvent::Ssr(match ssr_data {
+                    SsrEventData::List(ssr_list) => ssr_list,
+                    SsrEventData::Single(ssr_data) => vec![ssr_data],
+                }))
             }
             api::sse::EVENT_TYPE_CLOSE => Ok(GameSseEvent::Close),
-            other => Ok(GameSseEvent::Unrecognized(other.into())),
+            other => Ok(GameSseEvent::Unrecognized { ev: other.into() }),
         }
     }
 }

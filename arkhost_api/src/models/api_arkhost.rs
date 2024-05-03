@@ -50,9 +50,9 @@ impl LogLevel {
     pub fn attributes_tag(&self) -> String {
         const ATTRIBUTES: [char; 8] = ['D', 'H', 'C', 'S', 'W', 'E', 'N', 'F'];
         let mut result = String::with_capacity(8);
-        for i in 0..ATTRIBUTES.len() {
+        for (i, tag) in ATTRIBUTES.iter().enumerate() {
             result.push(if self.0 & (1 << i) as u32 != 0 {
-                ATTRIBUTES[i]
+                *tag
             } else {
                 '-'
             })
@@ -65,9 +65,16 @@ pub type FetchGamesResult = NullableData<Vec<GameInfo>>;
 pub enum GameSseEvent {
     Game(Vec<GameInfo>),
     Ssr(Vec<SsrRecord>),
+    Unrecognized {
+        ev: String,
+    },
+    Malformed {
+        ev: String,
+        data: String,
+        err: anyhow::Error,
+    },
+    Reconnect(anyhow::Error),
     Close,
-    Unrecognized(String),
-    RecoverableError(anyhow::Error),
 }
 
 #[serde_as]
@@ -158,7 +165,7 @@ pub struct Screenshots {
     pub type_val: u32,
 }
 
-#[derive(Default, Deserialize, Clone, Debug)]
+#[derive(Default, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct Avatar {
     #[serde(rename = "type")]

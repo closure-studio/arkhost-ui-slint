@@ -13,13 +13,13 @@ component GameStatusBadgeBase inherits Rectangle {
 
     states [
         logging when info.game-state == GameState.Logging: {
-            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-color: @linear-gradient(15deg, #3299d4 0%, #1299be 100%);
             status-text: @tr("登录中");
             status-icon: @image-url("../images/game_status_logging.svg");
             status-icon-blinking: true;
         }
         running when info.game-state == GameState.Running: {
-            status-color: @linear-gradient(15deg, #59b72a 0%, #5db813 100%);
+            status-color: @linear-gradient(15deg, #28a508 0%, #28b25f 100%);
             status-text: @tr("运行中");
             status-icon: @image-url("../images/game_status_running.svg");
             status-icon-blinking: false;
@@ -37,7 +37,7 @@ component GameStatusBadgeBase inherits Rectangle {
             status-icon-blinking: false;
         }
         captcha when info.game-state == GameState.Captcha: {
-            status-color: @linear-gradient(15deg, #32b1d4 0%, #1299be 100%);
+            status-color: @linear-gradient(15deg, #3299d4 0%, #1299be 100%);
             status-text: @tr("进行人机验证");
             status-icon: @image-url("../images/game_status_captcha.svg");
             status-icon-blinking: true;

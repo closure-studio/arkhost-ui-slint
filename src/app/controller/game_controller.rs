@@ -2,7 +2,7 @@ use crate::app::{
     api_worker::RetrieveLogSpec,
     app_state::{
         mapping::{BattleMapMapping, GameInfoMapping},
-        model::{CharIllust, ImageDataRaw, ImageDataRef},
+        model::{CharIllust, ImageData, ImageDataRaw, ImageDataRef},
     },
     asset_worker::AssetRef,
     controller::RefreshLogsCondition,
@@ -16,18 +16,17 @@ use crate::app::{
 };
 use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, GameStatus};
-use futures_util::{future::join_all, TryStreamExt};
+use async_scoped::TokioScope;
+use futures_util::TryStreamExt;
 use serde::Deserialize;
 use slint::{Model, ModelRc, VecModel};
-use tokio::{
-    join,
-    sync::{oneshot, RwLock},
-};
+use tokio::sync::{oneshot, RwLock};
 use tokio_util::sync::CancellationToken;
 
 use std::{
     cmp,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
+    mem,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -35,9 +34,10 @@ use std::{
 };
 
 use super::{
-    app_state_controller::AppStateController, game_operation_controller::GameOperationController,
-    image_controller::ImageController, rt_api_model::RtApiModel, sender::Sender,
-    slot_controller::SlotController, ApiOperation, AssetCommand,
+    app_state_controller::AppStateController, config_controller::ConfigController,
+    game_operation_controller::GameOperationController, image_controller::ImageController,
+    rt_api_model::RtApiModel, sender::Sender, slot_controller::SlotController, ApiOperation,
+    AssetCommand,
 };
 
 #[derive(Default, Debug)]
@@ -54,9 +54,11 @@ pub struct GameController {
     stage_search_tree: RwLock<levenshtein_distance::Trie<Arc<String>>>,
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
     refreshing: AtomicBool,
+    current_last_gacha_record_ts: RwLock<chrono::DateTime<chrono::Utc>>,
 
     rt_api_model: Arc<RtApiModel>,
     app_state_controller: Arc<AppStateController>,
+    config_controller: Arc<ConfigController>,
     sender: Arc<Sender>,
     image_controller: Arc<ImageController>,
     slot_controller: Arc<SlotController>,
@@ -67,6 +69,7 @@ impl GameController {
     pub fn new(
         rt_api_model: Arc<RtApiModel>,
         app_state_controller: Arc<AppStateController>,
+        config_controller: Arc<ConfigController>,
         sender: Arc<Sender>,
         image_controller: Arc<ImageController>,
         slot_controller: Arc<SlotController>,
@@ -78,9 +81,11 @@ impl GameController {
             stage_search_tree: Default::default(),
             char_pack_summaries: RwLock::new(None),
             refreshing: AtomicBool::new(false),
+            current_last_gacha_record_ts: RwLock::new(chrono::DateTime::<chrono::Utc>::MIN_UTC),
 
             rt_api_model,
             app_state_controller,
+            config_controller,
             sender,
             image_controller,
             slot_controller,
@@ -143,7 +148,7 @@ impl GameController {
                 let mut is_initial = true;
                 loop {
                     let ev_next = stream.try_next().await;
-                    if ev_next.is_ok() && !matches!(&ev_next, Ok(Some(GameSseEvent::RecoverableError(_)))) {
+                    if ev_next.is_ok() && !matches!(&ev_next, Ok(Some(GameSseEvent::Reconnect(_)))) {
                         recover_interval = consts::SSE_RECOVER_INITIAL_INTERVAL;
                     }
                     match ev_next {
@@ -166,6 +171,9 @@ impl GameController {
                             },
                             GameSseEvent::Ssr(ssr_list) => {
                                 println!("[Controller] Games SSE connection received {} ssr records", ssr_list.len());
+                                if !self.config_controller.data_saver_mode_enabled() {
+                                    self.on_gacha_records(ssr_list).await;
+                                }
                             },
                             GameSseEvent::Close => {
                                 println!("[Controller] Games SSE connection closed on occupied");
@@ -173,14 +181,17 @@ impl GameController {
                                     .exec(|x| x.set_sse_connect_state(SseConnectState::DisconnectedOccupiedElsewhere));
                                 break;
                             },
-                            GameSseEvent::Unrecognized(ev_type) => {
+                            GameSseEvent::Unrecognized { ev: ev_type } => {
                                 println!("[Controller] Unrecognized SSE event: {ev_type}");
                             },
-                            GameSseEvent::RecoverableError(e) => {
+                            GameSseEvent::Malformed { ev: ev_type, data, err } => {
+                                println!("[Controller] Malformed SSE event: {ev_type}\n- Err: {err}\n- Data:\n{data}");
+                            },
+                            GameSseEvent::Reconnect(e) => {
                                 println!("[Controller] SSE Client is recovering on error: {e}");
                                 tokio::time::sleep(recover_interval).await;
                                 recover_interval = std::cmp::max(
-                                    recover_interval * consts::SSE_RECOVER_INTERVAL_BASE, 
+                                    recover_interval * consts::SSE_RECOVER_INTERVAL_BASE,
                                     consts::SSE_RECOVER_MAX_INTERVAL);
                             }
                         },
@@ -229,31 +240,34 @@ impl GameController {
                 games_to_fetch_details.push(game.info.status.account.clone());
             }
         }
-        let tasks = games_to_fetch_details
-            .into_iter()
-            .map(|account| async move {
-                let (resp, mut rx) = oneshot::channel();
-                let result = self
-                    .sender
-                    .send_api_request(
-                        ApiOperation::RetrieveGameDetails {
-                            account: account.clone(),
-                            resp,
-                        },
-                        &mut rx,
-                    )
-                    .await;
-                if let Err(e) = result {
-                    println!(
-                        "[Controller] Error retrieving detail for game '{}' {}",
-                        account, e
-                    );
-                }
-            });
-        join_all(tasks).await;
+
+        let _ = TokioScope::scope_and_block(|s| {
+            for account in games_to_fetch_details {
+                s.spawn(async move {
+                    let (resp, mut rx) = oneshot::channel();
+                    let result = self
+                        .sender
+                        .send_api_request(
+                            ApiOperation::RetrieveGameDetails {
+                                account: account.clone(),
+                                resp,
+                            },
+                            &mut rx,
+                        )
+                        .await;
+                    if let Err(e) = result {
+                        println!(
+                            "[Controller] Error retrieving detail for game '{}' {}",
+                            account, e
+                        );
+                    }
+                });
+            }
+        });
     }
 
     pub async fn process_game_list_changes(&self, refresh_log_cond: super::RefreshLogsCondition) {
+        let do_load_images = !self.config_controller.data_saver_mode_enabled();
         let mut game_list: Vec<(i32, String, GameInfoMapping)> = Vec::new();
         let game_map = self.rt_api_model.game_map_read().await;
 
@@ -278,11 +292,13 @@ impl GameController {
                 GameInfoMapping::from(&game),
             ));
 
-            load_images_task.push(async {
-                let game = game_ref.game.read().await;
-                self.try_ensure_game_images(&game, game.info.status.account.clone())
-                    .await;
-            });
+            if do_load_images {
+                load_images_task.push(async {
+                    let game = game_ref.game.read().await;
+                    self.try_ensure_game_images(&game, game.info.status.account.clone())
+                        .await;
+                });
+            }
         }
 
         game_list.sort_by_key(|(order, _, _)| *order);
@@ -299,14 +315,24 @@ impl GameController {
             }
         }
 
-        join_all(load_images_task).await;
+        let _ = TokioScope::scope_and_block(|s| {
+            for task in load_images_task {
+                s.spawn(task);
+            }
+        });
         let mut refresh_log_tasks = vec![];
         for id in game_ids {
             refresh_log_tasks
                 .push(self.refresh_logs_if_needed(id.clone(), refresh_log_cond.clone()));
-            self.try_apply_game_images(id).await;
+            if do_load_images {
+                self.try_apply_game_images(id).await;
+            }
         }
-        join_all(refresh_log_tasks).await;
+        let _ = TokioScope::scope_and_block(|s| {
+            for task in refresh_log_tasks {
+                s.spawn(task);
+            }
+        });
     }
 
     pub async fn update_game_settings(&self, account: String, config_fields: GameConfigFields) {
@@ -587,7 +613,10 @@ impl GameController {
             }
         }
 
-        join!(load_game_avatar, load_game_image);
+        let _ = TokioScope::scope_and_block(|s| {
+            s.spawn(load_game_avatar);
+            s.spawn(load_game_image);
+        });
     }
 
     pub async fn try_apply_game_images(&self, id: String) {
@@ -639,8 +668,8 @@ impl GameController {
         let has_stage_data = self.stage_data.read().await.is_some();
         let has_char_pack_summary = self.char_pack_summaries.read().await.is_some();
 
-        tokio::join!(
-            async {
+        _ = TokioScope::scope_and_block(|s| {
+            s.spawn(async {
                 if !has_stage_data {
                     let path =
                         arkhost_api::consts::asset::assets::gamedata("excel/stage_table.json");
@@ -650,9 +679,9 @@ impl GameController {
                         _ = self.stage_data.write().await.insert(stage_data);
                     }
                 }
-            },
-            async {
-                if !has_char_pack_summary {
+            });
+            s.spawn(async {
+                if !self.config_controller.data_saver_mode_enabled() && !has_char_pack_summary {
                     let path = arkhost_api::consts::asset::assets::charpack("summary.json");
                     let char_pack_summary = self
                         .load_json_table::<CharPackSummaryTable>(path, None)
@@ -665,8 +694,147 @@ impl GameController {
                             .insert(char_pack_summary);
                     }
                 }
+            });
+        });
+    }
+
+    pub async fn confirm_gacha_records(&self) {
+        self.config_controller
+            .set_last_ssr_record_ts(*self.current_last_gacha_record_ts.read().await);
+        self.app_state_controller
+            .exec(|x| x.state_globals(|x| x.set_show_gacha_records(false)));
+    }
+
+    pub async fn on_gacha_records(&self, mut records: Vec<api_arkhost::SsrRecord>) {
+        let last_gacha_record_ts = self.config_controller.last_ssr_record_ts();
+        records.retain(|x| x.created_at > last_gacha_record_ts);
+        if records.is_empty() {
+            return;
+        }
+
+        let now = chrono::Utc::now();
+        let earliest_gacha_record_ts = records
+            .iter()
+            .fold(now, |acc, x| cmp::min(acc, x.created_at));
+        let last_gacha_record_ts = records
+            .iter()
+            .fold(chrono::DateTime::<chrono::Utc>::MIN_UTC, |acc, x| {
+                cmp::max(acc, x.created_at)
+            });
+        let record_period = now - earliest_gacha_record_ts;
+        let record_period_str = if record_period > chrono::Duration::days(7) {
+            "一段时间".into()
+        } else {
+            let mut str: String = " ".into();
+            str.push_str(&crate::app::utils::time::approximate_period_str(
+                record_period,
+            ));
+            str
+        };
+        let mut char_avatar_load_map: HashMap<&str, ImageDataRef> = HashMap::new();
+
+        TokioScope::scope_and_block(|s| {
+            for record in &records {
+                char_avatar_load_map
+                    .entry(&record.char_id)
+                    .or_insert_with(|| {
+                        let image_ref: ImageDataRef = Default::default();
+                        s.spawn({
+                            let char_id = record.char_id.clone();
+                            let image_ref = image_ref.clone();
+                            async move {
+                                self.image_controller
+                                    .load_avatar(
+                                        &api_arkhost::Avatar {
+                                            type_val: "ASSISTANT".into(),
+                                            id: char_id,
+                                        },
+                                        image_ref,
+                                    )
+                                    .await;
+                            }
+                        });
+                        image_ref
+                    });
             }
+        });
+
+        let char_avatar_map = {
+            let mut set: HashMap<String, ImageData> = HashMap::new();
+            for (k, v) in char_avatar_load_map.into_iter() {
+                let image_ref = &mut *v.write().await;
+                if !matches!(&image_ref.loaded_image, ImageDataRaw::Empty) {
+                    let mut image_data = Default::default();
+                    mem::swap(&mut image_data, image_ref);
+                    set.insert(k.to_owned(), image_data);
+                }
+            }
+            set
+        };
+
+        println!(
+            "[Controller] Loaded {} SSR record avatars",
+            char_avatar_map.len()
         );
+
+        if char_avatar_map.is_empty() {
+            return;
+        }
+        *self.current_last_gacha_record_ts.write().await = last_gacha_record_ts;
+
+        let gacha_group_map = {
+            let mut map: BTreeMap<String, Vec<api_arkhost::SsrRecord>> = BTreeMap::new();
+            for record in records {
+                map.entry(record.gacha_info.clone())
+                    .or_default()
+                    .push(record);
+            }
+            map
+        };
+
+        self.app_state_controller.exec(move |x| {
+            x.state_globals(move |x| {
+                let char_avatar_image_map: HashMap<String, slint::Image> = char_avatar_map
+                    .into_iter()
+                    .filter_map(|(k, v)| v.to_slint_image().map(|v| (k, v)))
+                    .collect();
+
+                let gacha_groups: Vec<GachaGroup> = gacha_group_map
+                    .into_iter()
+                    .rev()
+                    .filter_map(|(group, records)| {
+                        let gacha_pulls: Vec<GachaPull> = records
+                            .into_iter()
+                            .filter_map(|x| {
+                                char_avatar_image_map.get(&x.char_id).map(|y| GachaPull {
+                                    character_avatar: y.clone(),
+                                    doc_name: x.nick_name.into(),
+                                    rarity: "6★".into(), // 只有这个现在
+                                })
+                            })
+                            .collect();
+
+                        match gacha_pulls.len() {
+                            0 => None,
+                            _ => Some(GachaGroup {
+                                pool_name: group.into(),
+                                pulls: ModelRc::new(VecModel::from(gacha_pulls)),
+                            }),
+                        }
+                    })
+                    .collect();
+
+                x.set_gacha_record_time(record_period_str.into());
+                x.set_gacha_record_count(
+                    gacha_groups
+                        .iter()
+                        .fold(0usize, |acc, x| acc + x.pulls.row_count())
+                        as i32,
+                );
+                x.set_gacha_record(ModelRc::new(VecModel::from(gacha_groups)));
+                x.set_show_gacha_records(true);
+            })
+        })
     }
 
     async fn load_json_table<T>(&self, path: String, cache_key: Option<String>) -> Option<T>

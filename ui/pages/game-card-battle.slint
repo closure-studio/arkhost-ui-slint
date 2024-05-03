@@ -1,22 +1,71 @@
 import { Palette, HorizontalBox, Button, GroupBox } from "std-widgets.slint";
 import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields } from "../game-info.slint";
+import { FontGlobals } from "../font-globals.slint";
 
 export component GameCardBattle inherits HorizontalLayout {
     in property <GameInfo> info;
-    
     callback select-map();
-
     alignment: center;
-
     VerticalLayout {
-        GroupBox {
-            HorizontalBox {
+        alignment: stretch;
+        spacing: 10px;
+
+        Rectangle {
+            background: Palette.alternate-background.darker(5%);
+            border-radius: 10px;
+            clip: true;
+            HorizontalLayout {
+                alignment: stretch;
+                spacing: 10px;
+                padding-left: 10px;
+                padding-top: 7px;
+                padding-bottom: 7px;
                 Button {
                     text: @tr("选择作战关卡…");
-                    clicked => { select-map(); }
+                    primary: true;
+                    clicked => {
+                        select-map();
+                    }
+                    max-width: 130px;
+                }
+
+                if self.width > 400px: HorizontalLayout {
+                    alignment: start;
+                    spacing: 10px;
+                    for map in info.selected-maps: Rectangle {
+                        border-radius: self.height / 2;
+                        background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+                        HorizontalLayout {
+                            padding-left: 15px;
+                            padding-right: 15px;
+                            alignment: center;
+                            spacing: 10px;
+                            Text {
+                                text: map.code-name != "" ? map.code-name : "N/A";
+                                font-family: FontGlobals.closure-studio-logo;
+                                font-weight: 450;
+                                font-size: 15px;
+                                color: whitesmoke;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: map.display-name;
+                                font-family: FontGlobals.alphanumeric-text-sans;
+                                font-size: 14px;
+                                color: whitesmoke;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
                 }
             }
+
+            height: 48px;
+            vertical-stretch: 0;
         }
+
+    
 
         width: clamp(root.width - 20px, 300px, 1000px);
     }

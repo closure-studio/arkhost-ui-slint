@@ -6,7 +6,7 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
-use slint::{Model, ModelRc, SharedString, Timer, VecModel, Weak};
+use slint::{Model, ModelRc, Timer, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
 use tokio::sync::Notify;
 
@@ -245,17 +245,15 @@ impl AppState {
             let slot_info_list = ui.get_slot_info_list();
 
             for (i, mut slot_info) in slot_info_list.iter().enumerate() {
-                slot_info.view_state = if slot_info.uuid == id {
-                    if !toggle || (slot_info.view_state != SlotDetailsViewState::Expanded) {
-                        ui.set_selected_slot(SharedString::from(&id));
-                        SlotDetailsViewState::Expanded
-                    } else {
-                        ui.set_selected_slot(Default::default());
-                        SlotDetailsViewState::Collapsed
-                    }
-                } else {
-                    SlotDetailsViewState::Collapsed
-                };
+                if slot_info.uuid == id && slot_info.view_state != SlotDetailsViewState::Independent
+                {
+                    slot_info.view_state =
+                        if !toggle || (slot_info.view_state != SlotDetailsViewState::Expanded) {
+                            SlotDetailsViewState::Expanded
+                        } else {
+                            SlotDetailsViewState::Collapsed
+                        }
+                }
 
                 slot_info_list.set_row_data(i, slot_info);
             }

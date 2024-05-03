@@ -2,6 +2,7 @@ import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfo
 import { SlotUpdateDraft, SlotUpdateRequestState } from "slot-info.slint";
 
 export global Callbacks {
+    // Game Ops
     callback start-game(string);
     callback stop-game(string);
     callback restart-game(string);
@@ -13,19 +14,24 @@ export global Callbacks {
     callback set-map-selected(string, BattleMap, bool);
     callback reset-selected-maps(string);
     callback save-maps(string, BattleUpdateFields);
-
+    // User Ops
     callback refresh-user-info();
     callback refresh-slot-info();
     callback submit-sms-verify-code(string);
     callback fetch-qq-verify-code();
-
+    // Slot Ops
     callback slot-selected(string);
     callback expand-verify-slot();
     callback update-slot(string, SlotUpdateDraft);
     callback reset-slot-update-request-state(string);
-
+    // Navigation
     callback open-ext-link(string);
     callback return-to-login-page();
-
+    // App Ops
     callback download-update();
+    callback recalculate-data-disk-usage();
+    callback set-clean-data(bool);
+    callback set-data-saver-mode(bool);
+    // Site
+    callback confirm-gacha-records();
 }

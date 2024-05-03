@@ -1,0 +1,230 @@
+import { Palette, Spinner, Button } from "std-widgets.slint";
+import { GachaPull, GachaGroup } from "../gacha-info.slint";
+import { FontGlobals } from "../font-globals.slint";
+import { MockData } from "../mock-data.slint";
+
+component GachaPullItem inherits Rectangle {
+    in property <GachaPull> gacha-pull: {
+        rarity: "6★",
+        doc-name: "一二三四五六七八",
+        character-avatar: @image-url("../images/closure_logo_ferris.png")
+    };
+    private property <bool> avatar-loaded: gacha-pull.character-avatar.width > 0;
+    VerticalLayout {
+        alignment: start;
+        spacing: 2px;
+        HorizontalLayout {
+            padding-bottom: 3px;
+            alignment: center;
+            Rectangle {
+                width: 64px;
+                height: 64px;
+                Rectangle {
+                    border-radius: 24px;
+                    background: Palette.alternate-background.darker(5%);
+                    clip: true;
+                    Image {
+                        source: gacha-pull.character-avatar;
+                        width: 64px;
+                        height: 64px;
+                        z: 0;
+                    }
+
+                    if !avatar-loaded: Text {
+                        opacity: 0.2;
+                        text: "N/A";
+                        font-family: FontGlobals.closure-studio-logo;
+                        font-size: 12px;
+                        font-weight: 450;
+                    }
+                }
+
+                if gacha-pull.rarity != "": Rectangle {
+                    border-radius: 8px;
+                    background: @linear-gradient(15deg, #dd8800 0%, #ddb100 100%);
+                    clip: true;
+                    rarity-area := HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+                        alignment: end;
+                        Text {
+                            text: gacha-pull.rarity;
+                            color: whitesmoke;
+                            font-family: FontGlobals.closure-studio-logo;
+                            font-size: 12px;
+                            font-weight: 450;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    height: 16px;
+                    width: rarity-area.min-width;
+                    x: 64px + 2px - self.width;
+                    y: 64px + 5px - self.height;
+                    z: 1;
+                }
+            }
+
+            z: 1;
+        }
+
+        Text {
+            text: gacha-pull.doc-name;
+            font-family: FontGlobals.closure-studio-logo;
+            font-size: 13px;
+            font-weight: 450;
+            horizontal-alignment: center;
+            vertical-alignment: bottom;
+            overflow: elide;
+            z: 0;
+        }
+
+        Text {
+            opacity: 0.5;
+            text: "游戏 ID";
+            font-family: FontGlobals.alphanumeric-text-sans;
+            font-size: 9px;
+            horizontal-alignment: center;
+            vertical-alignment: top;
+            z: -1;
+        }
+    }
+}
+
+component GachaCarouselSegment inherits Rectangle {
+    in property <GachaGroup> gacha-group;
+    in property <length> layout-x;
+    in property <length> viewport-x;
+    in property <length> spacing: 10px;
+    in property <length> item-width: 10px;
+    border-radius: 12px;
+    background: Palette.control-background.transparentize(50%);
+    floating-label := Rectangle {
+        border-radius: 6px;
+        background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+        label-text := VerticalLayout {
+            padding-left: 15px;
+            padding-right: 15px;
+            alignment: center;
+            Text {
+                text: gacha-group.pool-name;
+                font-size: 13px;
+                font-weight: 450;
+                color: whitesmoke;
+                overflow: clip;
+                vertical-alignment: center;
+                height: parent.height;
+            }
+        }
+
+        x: clamp(viewport-x - layout-x, 0, root.width - self.min-width);
+        y: 0;
+        width: label-text.min-width;
+        height: 24px;
+    }
+
+    pull-list := HorizontalLayout {
+        alignment: start;
+        spacing: spacing;
+        x: 0px;
+        y: 30px;
+        for pull in gacha-group.pulls: GachaPullItem {
+            gacha-pull: pull;
+            width: item-width;
+        }
+    }
+
+    width: max(pull-list.min-width, floating-label.min-width);
+    height: 30px + pull-list.min-height + 10px;
+}
+
+export component GachaCarousel inherits Flickable {
+    in property <[GachaGroup]> gacha-groups: MockData.gacha-recrods;
+    in property <length> spacing: 10px;
+    in property <length> item-width: 90px;
+    in property <length> item-spacing: 5px;
+    in-out property <length> dead-zone: 2px;
+    in-out property <bool> repeat: single-turn > self.width;
+    out property <length> single-turn: orig-view.min-width;
+    out property <length> repeat-start-x: dead-zone + single-turn + spacing;
+    callback custom-flicked();
+    pure function next-repeating-x(x: length) -> length {
+        if (x < dead-zone) {
+            repeat-start-x;
+        } else if (x > repeat-start-x + single-turn - self.width) {
+            repeat-start-x - self.width;
+        } else {
+            x
+        }
+    }
+    orig-view := HorizontalLayout {
+        spacing: spacing;
+        for group in gacha-groups: GachaCarouselSegment {
+            gacha-group: group;
+            spacing: item-spacing;
+            item-width: item-width;
+            layout-x: dead-zone + self.x;
+            viewport-x: -root.viewport-x;
+        }
+        x: dead-zone;
+        y: 0;
+        width: self.min-height;
+        height: max(self.min-height, root.height);
+    }
+
+    if repeat: HorizontalLayout {
+        spacing: spacing;
+        for group in gacha-groups: GachaCarouselSegment {
+            gacha-group: group;
+            spacing: item-spacing;
+            item-width: item-width;
+            layout-x: self.x + repeat-start-x;
+            viewport-x: -root.viewport-x;
+        }
+        x: repeat-start-x;
+        y: 0;
+        width: self.min-height;
+        height: max(self.min-height, root.height);
+    }
+    flicked => {
+        if (repeat) {
+            self.viewport-x = -next-repeating-x(-self.viewport-x);
+        } else {
+            self.viewport-x = -clamp(-self.viewport-x, dead-zone, dead-zone + single-turn - self.width);
+        }
+        custom-flicked();
+    }
+    viewport-width: repeat ? dead-zone + single-turn + spacing + single-turn + dead-zone : dead-zone + single-turn;
+    min-height: orig-view.min-height;
+}
+
+export component GachaCarouselAutoScroll inherits GachaCarousel {
+    in property <length> auto-scroll-speed: 80px;
+    property <length> scroll-end-x: self.repeat ? -(self.dead-zone + self.single-turn + self.spacing) : -(self.dead-zone + self.viewport-width - self.width);
+    property <duration> moving-animate-duration: (-self.scroll-end-x - self.dead-zone) / auto-scroll-speed * 1s;
+    property <duration> animate-duration;
+    public function start(){
+        if scroll-end-x < -root.dead-zone {
+            animate-duration = moving-animate-duration;
+            self.viewport-x = scroll-end-x;
+        }
+    }
+    public function reverse-start(){
+        animate-duration = 0s;
+        self.viewport-x = scroll-end-x;
+        animate-duration = moving-animate-duration;
+        self.viewport-x = -self.dead-zone;
+    }
+    public function stop(){
+        animate-duration = 0s;
+    }
+    public function reset(){
+        animate-duration = 0s;
+        self.viewport-x = -root.dead-zone;
+    }
+    animate viewport-x { duration: animate-duration; }
+    custom-flicked => {
+        animate-duration = 0s;
+    }
+}

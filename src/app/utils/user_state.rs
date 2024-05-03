@@ -1,5 +1,4 @@
 use arkhost_api::clients::common::UserState;
-use polodb_core::bson::doc;
 use serde::{Deserialize, Serialize};
 
 use super::db;
@@ -19,32 +18,37 @@ impl UserStateDBStore {
         UserStateDBStore { jwt: None }
     }
 
-    pub fn load_from_db(&mut self) {
-        let collection = db::instance().collection::<Store>(db::consts::collection::USER_STATE);
-        if let Ok(Some(store)) = collection.find_one(None).map_err(|e| {
-            println!("[UserStateDBStore] Error loading user state from DB: {e}");
-        }) {
+    pub fn load_from_db(&mut self) -> heed::Result<()> {
+        let env = db::env();
+        let db = Self::db()?;
+        let rtxn = env.read_txn()?;
+        if let Some(store) = db.get(&rtxn, db::consts::user_state::DEFAULT_USER)? {
             self.jwt = Some(store.jwt);
         }
+        Ok(())
     }
 
-    pub fn save_to_db(&self) -> polodb_core::Result<()> {
+    pub fn save_to_db(&self) -> heed::Result<()> {
         let jwt = match self.jwt.as_ref() {
             Some(jwt) => jwt,
             None => return Ok(()),
         };
 
-        let collection = db::instance().collection::<Store>(db::consts::collection::USER_STATE);
-        let mut session = db::instance().start_session()?;
-        session.start_transaction(None)?;
-        collection.delete_one_with_session(doc! {}, &mut session)?;
-        collection.insert_one_with_session(
+        let env = db::env();
+        let db = Self::db()?;
+        let mut wtxn = env.write_txn()?;
+        db.put(
+            &mut wtxn,
+            db::consts::user_state::DEFAULT_USER,
             &Store {
                 jwt: jwt.to_owned(),
             },
-            &mut session,
         )?;
-        session.commit_transaction()
+        wtxn.commit()
+    }
+
+    fn db() -> heed::Result<heed::Database<heed::types::Str, heed::types::SerdeBincode<Store>>> {
+        db::database(Some(db::consts::db::USER_STATE))
     }
 }
 

@@ -481,7 +481,7 @@ component CardView inherits Rectangle {
 
             sync-state-sign := Image {
                 colorize: whitesmoke;
-                source: @image-url("../images/slot_icon_synchronizing.svg");
+                source: @image-url("../images/loading_circle.svg");
                 rotation-angle: Math.mod(animation-tick(), 2s) / 2s * 360deg;
 
                 width: 24px;
@@ -504,7 +504,7 @@ component CardView inherits Rectangle {
     }
 
     Image {
-        source: @image-url("../images/closure_drone_outline.png");
+        source: @image-url("../images/closure_drone_hollow.png");
         colorize: StyleMetrics.default-text-color.with-alpha(25%);
 
         width: 50px;
@@ -520,6 +520,7 @@ component CardView inherits Rectangle {
 
 export component SlotCard inherits Rectangle {
     in property <SlotInfo> info: MockData.slot-info;
+    in property <bool> animated-toggle: true;
     in-out property <bool> expanded: info.view-state == SlotDetailsViewState.Independent
         ? expanded-independent
         : expanded-overridden;
@@ -565,10 +566,21 @@ export component SlotCard inherits Rectangle {
                 }
             }
 
-            animate height { duration: 0.25s; easing: ease; }
-            height: expanded
-                ? operation-area.min-height
-                : 0;
+            states [
+                non-animated when !animated-toggle: {
+                    height: expanded
+                        ? operation-area.min-height
+                        : 0;
+                }
+                animated-expanded when animated-toggle && expanded: {
+                    height: operation-area.min-height;
+                    in { animate height { duration: 0.25s; easing: ease; } }
+                }
+                animated-collapsed when animated-toggle && !expanded: {
+                    height: 0;
+                    in { animate height { duration: 0.25s; easing: ease; } }
+                }
+            ]
         }
 
         HorizontalLayout {

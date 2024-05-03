@@ -73,6 +73,7 @@ pub fn show_crash_window(exit_status: &str, error_info: &str) {
             "- ExitStatus\t: {}\n",
             "\n",
             "如果发生反复崩溃无法使用、功能异常等问题，\n请截图控制台输出，反馈至可露希尔QQ群或QQ频道“PRTS接入 - APP讨论”板块。\n",
+            "重新启动客户端前，请关闭该控制台窗口……\n"
         ),
         error_info,
         app::utils::app_metadata::CARGO_PKG_VERSION.unwrap_or("not found"),

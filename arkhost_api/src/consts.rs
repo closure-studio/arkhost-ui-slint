@@ -60,22 +60,26 @@ pub mod quota {
 }
 
 pub mod asset {
-    pub const API_BASE_URL: &str = "https://assets.closure.setonink.com/";
+    pub const API_BASE_URL: &str = "https://assets.ltsc.vip/";
     pub const REFERER_URL: &str = "https://arknights.host";
 
     pub mod assets {
         pub fn avatar(avatar_type: &str, id: &str) -> String {
-            format!("dst/avatar/{avatar_type}/{id}")
+            format!("avatar/{avatar_type}/{id}")
         }
 
         pub fn charpack(file: &str) -> String {
-            format!("dst/charpack/{file}")
+            format!("charpack/{file}")
         }
 
         pub fn gamedata(file_path: &str) -> String {
             format!("gamedata/{file_path}")
         }
     }
+}
+
+pub mod screenshot {
+    pub const API_BASE_URL: &str = "https://screenshot.ltsc.vip";
 }
 
 pub mod error_code {

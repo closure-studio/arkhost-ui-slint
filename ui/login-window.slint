@@ -1,6 +1,8 @@
-import { VerticalBox, HorizontalBox , LineEdit, Button, StyleMetrics , Spinner} from "std-widgets.slint";
+import { VerticalBox, HorizontalBox , LineEdit, Button, StyleMetrics, Palette, Spinner, Switch } from "std-widgets.slint";
 import { ClosureStudioLogoStacked } from "./components/closure-studio-logo.slint";
-import { FontGlobals } from "./font-globals.slint";
+import { FontGlobals } from "font-globals.slint";
+import { Callbacks } from "callbacks.slint";
+import { StateGlobals } from "state-globals.slint";
 
 export enum LoginState {
     Unlogged,
@@ -122,6 +124,18 @@ export component LoginWindow {
                     }
                 }
             }
+
+            HorizontalBox {
+                alignment: center;
+
+                Switch {
+                    text: @tr("低数据模式（不加载图片资源）");
+                    checked: StateGlobals.data-saver-mode-enabled;
+                    toggled => {
+                        Callbacks.set-data-saver-mode(self.checked);
+                    }
+                }
+            }
     
             HorizontalBox {
                 alignment: center;
@@ -144,7 +158,9 @@ export component LoginWindow {
             
                         Text {
                             vertical-alignment: center;
-                            color: whitesmoke;
+                            color: login-state == LoginState.Errored
+                                ? whitesmoke
+                                : StyleMetrics.default-text-color;
                             font-size: 13px;
             
                             text: login-status-text;

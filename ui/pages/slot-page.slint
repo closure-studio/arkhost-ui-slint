@@ -7,8 +7,8 @@ import { SlotTierCard } from "slot-tier-card.slint";
 import { UserInfo, UserTier, UserProgress } from "../user-info.slint";
 import { SlotTierConsts } from "../slot-tier-consts.slint";
 import { UserCard } from "user-card.slint";
+import { SlotListItem } from "slot-list.slint";
 import { Callbacks } from "../callbacks.slint";
-import { SlotList } from "slot-list.slint";
 import { FontGlobals } from "../font-globals.slint";
 
 export component SlotPage {
@@ -17,26 +17,19 @@ export component SlotPage {
         MockData.slot-info,
         MockData.slot-info,
     ];
-    in property <string> selected-slot;
     in property <UserInfo> user-info: MockData.user-info;
-
     private property <bool> double-column-layout: self.width >= 1200px;
-    private property <bool> has-selected-slot: selected-slot != "";
-
     scroll-view := ScrollView {
         HorizontalLayout {
             alignment: center;
-            spacing: 10px; 
-            
+            spacing: 10px;
             page-layout := Rectangle {
                 private property <length> single-column-slots-start-y:
                     user-info-area.min-height;
-
                 user-info-area := VerticalLayout {
                     alignment: start;
                     padding-top: 10px;
                     spacing: 10px;
-
                     BannerNotification {
                         background-color: Palette.alternate-background;
                         accent-color: StyleMetrics.default-text-color;
@@ -46,11 +39,9 @@ export component SlotPage {
 
                     if user-info.progress == UserProgress.Initial && !user-card.sms-dialog-open: BannerNotification {
                         property <image> empty;
-
                         background-color: #0661d0;
                         accent-color: #ebf3ff;
                         text: @tr("🔰 你还没有添加第一个游戏账号，点这里开始上路 👉");
-    
                         has-action: true;
                         action-text: @tr("[Go]");
                         action-icon: empty;
@@ -59,18 +50,14 @@ export component SlotPage {
                             Callbacks.expand-verify-slot();
                         }
                     }
-
                     if user-info.progress == UserProgress.SmsVerified: BannerNotification {
-                        background-color: #0661d0;
-                        accent-color: #ebf3ff;
+                        background-color: Palette.alternate-background;
+                        accent-color: StyleMetrics.default-text-color;
                         text: @tr("✅ 归属认证已经完成，你可以继续添加更多托管账号了。");
-
                         has-action: false;
                     }
-                    
                     slot-tier-card := SlotTierCard {
                         data: SlotTierConsts.get-tier-card-data(user-info.tier);
-
                         on-upgrade-tier(next-tier) => {
                             if next-tier == UserTier.SmsVerified {
                                 if user-info.progress == UserProgress.Initial {
@@ -82,98 +69,121 @@ export component SlotPage {
                             }
                         }
                     }
-    
+
                     user-card := UserCard {
                         user-info: user-info;
                     }
 
-                    slot-list := SlotList {
-                        slot-info-list: slot-info-list;
-                        slot-selected(id) => { Callbacks.slot-selected(id); }
-                    }
-    
-                    animate width { duration: 0.25s; easing: ease; }
-
                     x: 0px;
                     y: 0px;
-                    width: double-column-layout
-                        ? 550px
-                        : 640px;
+                    width: double-column-layout ? 550px : min(640px, root.width - 20px);
                 }
-    
+
                 slot-info-area := Rectangle {
-                    // placeholder
-                    Rectangle {
-                        opacity: !has-selected-slot
-                            ? 1
-                            : 0;
-                        background: Palette.alternate-background;
-                        border-radius: 10px;
+                    slot-info-layout := VerticalLayout {
+                        alignment: start;
+                        padding-top: 10px;
+                        spacing: 10px;
+                        // placeholder
+                        for slot-info[idx] in slot-info-list: VerticalLayout {
+                            private property <bool> expanded: slot-info.view-state == SlotDetailsViewState.Expanded || slot-info.view-state == SlotDetailsViewState.Independent;
+                            spacing: expanded ? 10px : 0px;
+                            if slot-info.view-state != SlotDetailsViewState.Independent: SlotListItem {
+                                index: idx + 1;
+                                info: slot-info;
+                                slot-selected(id) => {
+                                    Callbacks.slot-selected(id);
+                                }
+                            }
+                            Rectangle {
+                                slot-card := SlotCard {
+                                    animated-toggle: false;
+                                    info: slot-info;
+                                    slot-saved(uuid, update-draft) => {
+                                        Callbacks.update-slot(uuid, update-draft);
+                                    }
+                                    reset-slot-update-request-state(uuid) => {
+                                        Callbacks.reset-slot-update-request-state(uuid);
+                                    }
+                                    x: 0px;
+                                    animate y {
+                                        duration: 0.25s;
+                                        easing: ease;
+                                    }
+                                    states [
+                                        show when expanded: {
+                                            y: 0;
+                                            opacity: 1;
+                                            in {
+                                                animate opacity {
+                                                    duration: 0.15s;
+                                                    easing: ease;
+                                                    delay: 0.15s;
+                                                }
+                                            }
+                                        }
+                                        hide when !expanded: {
+                                            y: -self.width - 1px;
+                                            opacity: 0;
+                                            in {
+                                                animate opacity {
+                                                    duration: 0.15s;
+                                                    easing: ease;
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
 
-                        Text {
-                            font-size: 18px;
-                            font-family: FontGlobals.alphanumeric-text-sans;
-                            color: StyleMetrics.default-text-color.transparentize(60%);
-                            text: @tr("/// 请在列表中选择一个账号栏位 ///");
+                                animate height {
+                                    duration: 0.25s;
+                                    easing: ease;
+                                }
+                                states [
+                                    show when expanded: {
+                                        height: slot-card.height;
+                                    }
+                                    hide when !expanded: {
+                                        height: 0;
+                                    }
+                                ]
+                            }
                         }
-
-                        y: 10px;
-                        height: user-info-area.min-height - 10px;
-
-                        animate opacity { duration: 0.15s; easing: ease; }
+                        width: parent.width;
                     }
 
-                    for slot-info in slot-info-list: SlotCard {
-                        info: slot-info;
-                        slot-saved(uuid, update-draft) => { 
-                            Callbacks.update-slot(uuid, update-draft); 
-                        }
-                        reset-slot-update-request-state(uuid) => { Callbacks.reset-slot-update-request-state(uuid); }
-
-                        x: 0px;
-
-                        animate y { duration: 0.25s; easing: ease; }
-                        animate opacity { duration: 0.25s; easing: ease; }
-
-                        states [
-                            hide when slot-info.view-state != SlotDetailsViewState.Expanded: {
-                                opacity: 0;
-                                y: - self.height - 1px;
-                            }
-                            show when slot-info.view-state == SlotDetailsViewState.Expanded: {
-                                opacity: 1;
-                                y: 10px;
-                            }
-                        ]
-                    }
-    
                     states [
                         single-column when !double-column-layout: {
                             x: 0px;
                             y: single-column-slots-start-y;
-
                             in {
-                                animate x { delay: 0.5s; duration: 0.25s; easing: ease; }
+                                animate x {
+                                    delay: 0.5s;
+                                    duration: 0.25s;
+                                    easing: ease;
+                                }
                             }
                         }
                         double-column when double-column-layout: {
                             x: user-info-area.width + 10px;
                             y: 0px;
-
                             in {
-                                animate y { delay: 0.5s; duration: 0.25s; easing: ease; }
+                                animate y {
+                                    delay: 0.5s;
+                                    duration: 0.25s;
+                                    easing: ease;
+                                }
                             }
                         }
                     ]
-                    
-                    width: min(root.width, 640px);
-                    height: max(700px, user-info-area.min-height + 10px);
-                    min-height: 1000px;
+                    width: min(640px, root.width - 20px);
+                    height: self.min-height;
+                    min-height: max(slot-info-layout.min-height, user-info-area.min-height) + 10px;
                 }
 
                 states [
                     single-column when !double-column-layout: {
-                        width: 640px;
+                        width: min(640px, root.width - 20px);
                         height: user-info-area.min-height + slot-info-area.min-height;
                     }
                     double-column when double-column-layout: {
