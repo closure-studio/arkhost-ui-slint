@@ -193,7 +193,7 @@ export component GameInfoPage {
                                 wrap: word-wrap;
                                 horizontal-stretch: 1;
                             }
-                            if !StateGlobals.is-site-under-maintenance: BannerNotification {
+                            if StateGlobals.is-site-under-maintenance: BannerNotification {
                                 background-color: #0000;
                                 accent-color: StyleMetrics.default-text-color;
                                 has-action: false;
