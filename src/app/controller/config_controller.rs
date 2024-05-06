@@ -76,6 +76,21 @@ impl ConfigController {
         self.update_config(|c| c.last_ssr_record_ts = val);
     }
 
+    pub fn get_cached_battle_screenshots(&self, game_id: &str) -> Option<Vec<url::Url>> {
+        self.config
+            .read()
+            .unwrap()
+            .cached_battle_screenshots
+            .get(game_id)
+            .cloned()
+    }
+
+    pub fn set_cached_battle_screenshots(&self, game_id: String, val: Vec<url::Url>) {
+        self.update_config(|c| {
+            c.cached_battle_screenshots.insert(game_id, val);
+        });
+    }
+
     #[allow(unused)]
     pub fn load_from_db(&self) -> heed::Result<()> {
         let env = db::env();
@@ -100,7 +115,9 @@ impl ConfigController {
         let config = self.config.read().unwrap();
         let data_saver_mode_enabled = config.data_saver_mode_enabled;
         self.app_state_controller.exec(move |x| {
-            x.state_globals(move |x| x.set_data_saver_mode_enabled(data_saver_mode_enabled))
+            x.state_globals(move |x| {
+                x.set_data_saver_mode_enabled(data_saver_mode_enabled);
+            })
         });
     }
 

@@ -137,6 +137,9 @@ export component GameInfoPage {
 
     ScrollView {
         HorizontalLayout {
+            // TODO: slint的下拉菜单会被窗口裁剪
+            padding-bottom: 500px;
+
             private property <bool> is-wide: root.width > 950px;
             alignment: space-around;
             VerticalBox {
@@ -291,6 +294,7 @@ export component GameInfoPage {
                         alignment: stretch;
                         spacing: 10px;
                         gacha-carousel := GachaCarouselAutoScroll {
+                            repeat: false;
                             gacha-groups: StateGlobals.gacha-record;
                             height: self.min-height;
                             horizontal-stretch: 10;

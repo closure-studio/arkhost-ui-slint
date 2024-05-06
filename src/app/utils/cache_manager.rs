@@ -25,7 +25,10 @@ impl DBCacheManager {
 
     /// Clears out the entire cache.
     pub async fn clear(&self) -> Result<()> {
-        Ok(())
+        let env = db::env();
+        let mut wtxn = env.write_txn().map_err(into_box_error)?;
+        self.db.clear(&mut wtxn).map_err(into_box_error)?;
+        wtxn.commit().map_err(into_box_error)
     }
 }
 

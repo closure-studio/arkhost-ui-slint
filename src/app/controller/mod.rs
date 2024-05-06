@@ -474,6 +474,18 @@ impl ControllerAdaptor {
 
         {
             let this = self.clone();
+            app.on_load_screenshots(move |id| {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller
+                        .load_battle_screenshots(id.as_str())
+                        .await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
             app.on_download_update(move || {
                 let this = this.clone();
                 tokio::spawn(async move {

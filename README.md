@@ -12,8 +12,7 @@
 - [ ] UI内错误提示
 - [X] 修改作战列表+作战关卡显示
 - [ ] 统计功能（理智，收益…）
-- [ ] 无人机加速房间设置
-- [ ] 查看作战截图
+- [X] 查看作战截图
 - [X] 增删账号/修改密码
 - [X] 验证手机/QQ/新注册账号使用指导
 - [X] 公告等平台信息
@@ -28,7 +27,7 @@
 ## Build
 
 ### Windows
-在构建Windows桌面端时需要通过 Feature Flag 选择一个渲染器：
+在构建 Windows 桌面端时需要通过 Feature Flag 选择一个渲染器：
 ```powershell
 # Skia（首选）
 cargo build -F "desktop-app,renderer-skia"
@@ -36,7 +35,7 @@ cargo build -F "desktop-app,renderer-skia"
 cargo build -F "desktop-app,renderer-femtovg"
 ```
 
-如果选择了Skia渲染器（`renderer-skia`），由于默认的 [skia-binaries](https://github.com/rust-skia/skia-binaries)
+如果选择了 Skia 渲染器（`renderer-skia`），由于默认的 [skia-binaries](https://github.com/rust-skia/skia-binaries)
 没有提供 `+crt-static` 的Skia预编译二进制文件，需要在构建时设置以下环境变量：
 ```powershell
 $env:SKIA_BINARIES_URL = "https://github.com/wg138940/skia-binaries/releases/download/{tag}/skia-binaries-{key}.tar.gz"

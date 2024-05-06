@@ -5,6 +5,61 @@ import { Callbacks } from "../callbacks.slint";
 import { FontGlobals } from "../font-globals.slint";
 import { StateGlobals } from "../state-globals.slint";
 
+component VerifyInfoBar inherits Rectangle {
+    in property <string> button-text;
+    in property <bool> button-enabled;
+    in property <string> verify-item-name;
+    in property <string> verify-item-value;
+    callback clicked <=> btn.clicked;
+    background: Palette.alternate-background.darker(5%);
+    border-radius: 10px;
+    clip: true;
+    HorizontalLayout {
+        alignment: start;
+        spacing: 10px;
+        padding-left: 10px;
+        padding-top: 7px;
+        padding-bottom: 7px;
+        btn := Button {
+            text: button-text;
+            enabled: button-enabled;
+            primary: button-enabled;
+            max-width: 130px;
+        }
+
+        if verify-item-value != "": Rectangle {
+            border-radius: self.height / 2;
+            background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+            verify-item-area := TouchArea {
+                HorizontalLayout {
+                    padding-left: 15px;
+                    padding-right: 15px;
+                    alignment: center;
+                    spacing: 10px;
+                    Text {
+                        text: verify-item-name;
+                        font-family: FontGlobals.closure-studio-logo;
+                        font-size: 14px;
+                        font-weight: 450;
+                        color: whitesmoke;
+                        vertical-alignment: center;
+                        width: 50px;
+                    }
+
+                    Text {
+                        text: verify-item-area.has-hover ? verify-item-value : "-----";
+                        font-family: FontGlobals.alphanumeric-text-sans;
+                        font-size: 16px;
+                        color: whitesmoke;
+                        vertical-alignment: center;
+                        min-width: 200px;
+                    }
+                }
+            }
+        }
+    }
+}
+
 component SmsVerifyArea inherits VerticalLayout {
     in property <UserInfo> user-info;
     in property <bool> requesting;
@@ -16,26 +71,24 @@ component SmsVerifyArea inherits VerticalLayout {
     }
     if UserInfoUtils.is-sms-verified(user-info) || !sms-dialog-open: GroupBox {
         title: @tr("游戏账号归属认证");
-        Button {
-            enabled: true;
-            // 初始值，会被states修改
-
+        VerifyInfoBar {
+            verify-item-name: @tr("手机号");
+            verify-item-value: UserInfoUtils.is-sms-verified(user-info) ? user-info.phone : "";
             clicked => {
                 open-dialog();
             }
-            width: 300px;
             states [
                 busy when requesting: {
-                    enabled: false;
-                    text: @tr("…");
+                    button-enabled: false;
+                    button-text: @tr("…");
                 }
                 sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
-                    enabled: true;
-                    text: @tr("进行认证");
+                    button-enabled: true;
+                    button-text: @tr("进行认证");
                 }
                 sms-verified when UserInfoUtils.is-sms-verified(user-info): {
-                    enabled: false;
-                    text: @tr("已绑定到：") + user-info.phone;
+                    button-enabled: false;
+                    button-text: @tr("已绑定");
                 }
             ]
         }
@@ -111,29 +164,28 @@ component QQVerifyArea inherits VerticalLayout {
     }
     if UserInfoUtils.is-qq-verified(user-info) || !qq-dialog-open: GroupBox {
         title: @tr("QQ认证");
-        open-dialog-btn := Button {
-            enabled: true;
-            // 初始值，会被states修改
-            width: 300px;
+        VerifyInfoBar {
+            verify-item-name: @tr("QQ");
+            verify-item-value: UserInfoUtils.is-qq-verified(user-info) ? user-info.qq : "";
             clicked => {
                 open-dialog();
             }
             states [
                 busy when requesting: {
-                    enabled: false;
-                    text: @tr("…");
+                    button-enabled: false;
+                    button-text: @tr("…");
                 }
                 sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
-                    enabled: false;
-                    text: @tr("请先完成归属手机号认证");
+                    button-enabled: false;
+                    button-text: @tr("请先完成归属手机号认证");
                 }
                 qq-unverified when !UserInfoUtils.is-qq-verified(user-info): {
-                    enabled: true;
-                    text: @tr("获取QQ验证代码");
+                    button-enabled: true;
+                    button-text: @tr("获取QQ验证代码");
                 }
                 verified when UserInfoUtils.is-qq-verified(user-info): {
-                    enabled: false;
-                    text: @tr("已绑定到：") + user-info.qq;
+                    button-enabled: false;
+                    button-text: @tr("已绑定");
                 }
             ]
         }
@@ -317,7 +369,7 @@ export component UserCard inherits Rectangle {
                     spacing-horizontal: 5px;
                     spacing-vertical: 5px;
                     Button {
-                        text: @tr("复制用户ID");
+                        text: @tr("复制用户 ID");
                         clicked => {
                             uuid-dummy.select-all();
                             uuid-dummy.copy();
@@ -373,7 +425,7 @@ export component UserCard inherits Rectangle {
                         }
 
                         Text {
-                            text: @tr("ℹ 低数据模式不加载图片资源，将加快启动并降低缓存空间占用，修改需重新登陆生效 ");
+                            text: @tr("ℹ 低数据模式不加载图片资源，将加快启动并降低缓存空间占用，重启 App 生效 ");
                             wrap: word-wrap;
                         }
 

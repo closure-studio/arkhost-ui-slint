@@ -2,7 +2,7 @@ use crate::app::{
     api_worker::RetrieveLogSpec,
     app_state::{
         mapping::{BattleMapMapping, GameInfoMapping},
-        model::{CharIllust, ImageData, ImageDataRaw, ImageDataRef},
+        model::{AssetPath, CharIllust, ImageData, ImageDataRaw, ImageDataRef},
     },
     asset_worker::AssetRef,
     controller::RefreshLogsCondition,
@@ -10,6 +10,7 @@ use crate::app::{
     rt_api_model,
     ui::*,
     utils::{
+        cache_manager::DBCacheManager,
         levenshtein_distance::{self, ResultEntry},
         notification,
     },
@@ -18,6 +19,7 @@ use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, GameStatus};
 use async_scoped::TokioScope;
 use futures_util::TryStreamExt;
+use http_cache::CacheManager;
 use serde::Deserialize;
 use slint::{Model, ModelRc, VecModel};
 use tokio::sync::{oneshot, RwLock};
@@ -55,6 +57,7 @@ pub struct GameController {
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
     refreshing: AtomicBool,
     current_last_gacha_record_ts: RwLock<chrono::DateTime<chrono::Utc>>,
+    db_cache_manager: DBCacheManager,
 
     rt_api_model: Arc<RtApiModel>,
     app_state_controller: Arc<AppStateController>,
@@ -82,6 +85,7 @@ impl GameController {
             char_pack_summaries: RwLock::new(None),
             refreshing: AtomicBool::new(false),
             current_last_gacha_record_ts: RwLock::new(chrono::DateTime::<chrono::Utc>::MIN_UTC),
+            db_cache_manager: DBCacheManager::new(),
 
             rt_api_model,
             app_state_controller,
@@ -115,7 +119,7 @@ impl GameController {
                 if self.rt_api_model.user.update_slot_sync_state().await {
                     self.slot_controller.submit_slot_model_to_ui().await;
                 };
-                self.process_game_details().await;
+                self.fetch_game_details().await;
                 self.process_game_list_changes(refresh_log_cond).await;
                 self.app_state_controller
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
@@ -160,7 +164,7 @@ impl GameController {
                                 if self.rt_api_model.user.update_slot_sync_state().await {
                                     self.slot_controller.submit_slot_model_to_ui().await;
                                 };
-                                self.process_game_details().await;
+                                self.fetch_game_details().await;
                                 self.process_game_list_changes(RefreshLogsCondition::Never).await;
 
                                 if is_initial {
@@ -218,7 +222,7 @@ impl GameController {
         Ok(())
     }
 
-    pub async fn process_game_details(&self) {
+    pub async fn fetch_game_details(&self) {
         let stage_data = self.stage_data.read().await;
         let mut games_to_fetch_details: Vec<String> = Vec::new();
         for game_ref in self.rt_api_model.game_map_read().await.values() {
@@ -271,7 +275,8 @@ impl GameController {
         let mut game_list: Vec<(i32, String, GameInfoMapping)> = Vec::new();
         let game_map = self.rt_api_model.game_map_read().await;
 
-        let mut load_images_task = vec![];
+        let mut load_image_tasks = vec![];
+        let mut load_cached_screenshots_tasks = vec![];
         for game_ref in game_map.values() {
             let game = game_ref.game.read().await;
             if game.info.status.code == GameStatus::Captcha {
@@ -293,12 +298,21 @@ impl GameController {
             ));
 
             if do_load_images {
-                load_images_task.push(async {
+                load_image_tasks.push(async {
                     let game = game_ref.game.read().await;
                     self.try_ensure_game_images(&game, game.info.status.account.clone())
                         .await;
                 });
             }
+
+            load_cached_screenshots_tasks.push(async {
+                let game = game_ref.game.read().await;
+                if let Some(details) = &game.details {
+                    let game_id = &game.info.status.account;
+                    self.load_battle_screenshots_conditional(game_id, details, false)
+                        .await;
+                }
+            });
         }
 
         game_list.sort_by_key(|(order, _, _)| *order);
@@ -314,25 +328,27 @@ impl GameController {
                     .await;
             }
         }
+        let refresh_log_tasks = game_ids
+            .iter()
+            .map(|x| self.refresh_logs_if_needed(x.clone(), refresh_log_cond.clone()))
+            .collect::<Vec<_>>();
 
         let _ = TokioScope::scope_and_block(|s| {
-            for task in load_images_task {
+            for task in load_image_tasks {
                 s.spawn(task);
             }
-        });
-        let mut refresh_log_tasks = vec![];
-        for id in game_ids {
-            refresh_log_tasks
-                .push(self.refresh_logs_if_needed(id.clone(), refresh_log_cond.clone()));
-            if do_load_images {
-                self.try_apply_game_images(id).await;
+            for task in load_cached_screenshots_tasks {
+                s.spawn(task);
             }
-        }
-        let _ = TokioScope::scope_and_block(|s| {
             for task in refresh_log_tasks {
                 s.spawn(task);
             }
         });
+        for id in game_ids {
+            if do_load_images {
+                self.try_apply_game_images(id).await;
+            }
+        }
     }
 
     pub async fn update_game_settings(&self, account: String, config_fields: GameConfigFields) {
@@ -837,6 +853,150 @@ impl GameController {
         })
     }
 
+    pub async fn load_battle_screenshots(&self, game_id: &str) {
+        let game_map = self.rt_api_model.game_map_read().await;
+        let game_ref = match game_map.get(game_id) {
+            Some(game) => game,
+            None => {
+                return println!(
+                "[Controller] load_battle_screenshots: unable to find game {game_id} in game map"
+            )
+            }
+        };
+
+        let game = game_ref.game.read().await;
+        let details = match &game.details {
+            Some(details) => details,
+            None => {
+                return println!(
+                    "[Controller] load_battle_screenshots: unable to read details of {game_id}"
+                )
+            }
+        };
+
+        self.load_battle_screenshots_conditional(game_id, details, true)
+            .await;
+    }
+
+    async fn load_battle_screenshots_conditional(
+        &self,
+        game_id: &str,
+        game: &api_arkhost::GameDetails,
+        user_requested: bool,
+    ) {
+        self.app_state_controller.exec({
+            let game_id = game_id.to_owned();
+            move |x| {
+                x.set_battle_screenshots_load_state(game_id, BattleScreenshotsLoadState::Loading)
+            }
+        });
+        self.load_battle_screenshots_conditional_inner(game_id, game, user_requested)
+            .await;
+        self.app_state_controller.exec({
+            let game_id = game_id.to_owned();
+            move |x| x.set_battle_screenshots_load_state(game_id, BattleScreenshotsLoadState::Idle)
+        });
+    }
+
+    async fn load_battle_screenshots_conditional_inner(
+        &self,
+        game_id: &str,
+        game: &api_arkhost::GameDetails,
+        user_requested: bool,
+    ) {
+        let urls = Self::battle_screenshot_urls(game);
+        if urls.is_empty() {
+            return;
+        }
+        let screenshots_hash = Self::url_list_hash(&urls);
+        let remote_screenshots_loaded = Arc::new(AtomicBool::new(false));
+        self.app_state_controller
+            .exec_wait({
+                let game_id = game_id.to_owned();
+                let remote_screenshots_loaded = remote_screenshots_loaded.clone();
+                move |x| {
+                    x.exec_with_game_by_id(game_id, move |game_info_list, i, mut game_info| {
+                        game_info.remote_battle_screenshot_series =
+                            screenshots_hash.to_string().into();
+                        remote_screenshots_loaded.store(
+                            game_info.remote_battle_screenshot_series
+                                == game_info.current_battle_screenshot_series,
+                            Ordering::Release,
+                        );
+                        game_info_list.set_row_data(i, game_info);
+                    })
+                }
+            })
+            .await;
+
+        if remote_screenshots_loaded.load(Ordering::Acquire) {
+            return;
+        }
+
+        let cached_urls = self
+            .config_controller
+            .get_cached_battle_screenshots(game_id);
+        let cache_valid = matches!(&cached_urls, Some(cached_urls)
+                if Self::url_list_hash(cached_urls) == screenshots_hash);
+        if !cache_valid {
+            if !user_requested {
+                return;
+            }
+
+            if let Some(cached_urls) = &cached_urls {
+                for cached_url in cached_urls {
+                    _ = self
+                        .db_cache_manager
+                        .delete(&format!("GET:{cached_url}"))
+                        .await
+                        .map_err(|e| {
+                            println!("[Controller] Failed to remove cached URL: {cached_url} {e}")
+                        });
+                }
+            }
+        }
+        println!("[Controller] Loading {} battle screenshots", urls.len());
+
+        let mut image_data_list = urls
+            .iter()
+            .map(|x| ImageData {
+                asset_path: AssetPath::External(x.to_owned()),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>();
+
+        _ = TokioScope::scope_and_block(|s| {
+            for image_data in &mut image_data_list {
+                s.spawn(self.image_controller.load_image_to_data(image_data))
+            }
+        });
+
+        if image_data_list
+            .iter()
+            .all(|x| matches!(x.loaded_image, ImageDataRaw::Empty))
+        {
+            return;
+        }
+
+        self.app_state_controller.exec({
+            let game_id = game_id.to_owned();
+            move |x| {
+                x.exec_with_game_by_id(game_id, move |game_info_list, i, mut game_info| {
+                    let images = image_data_list
+                        .into_iter()
+                        .filter_map(|x| x.to_slint_image())
+                        .collect::<Vec<_>>();
+                    game_info.battle_screenshots = ModelRc::new(VecModel::from(images));
+                    game_info.current_battle_screenshot_series =
+                        screenshots_hash.to_string().into();
+                    game_info_list.set_row_data(i, game_info);
+                })
+            }
+        });
+        self.config_controller
+            .set_cached_battle_screenshots(game_id.to_owned(), urls);
+    }
+
     async fn load_json_table<T>(&self, path: String, cache_key: Option<String>) -> Option<T>
     where
         T: 'static + Send + Sync + for<'de> Deserialize<'de>,
@@ -847,7 +1007,7 @@ impl GameController {
             .send_asset_request(
                 AssetCommand::LoadAsset {
                     cache_key,
-                    path: path.clone(),
+                    path: AssetPath::GameAsset(path.clone()),
                     resp,
                 },
                 &mut rx,
@@ -939,6 +1099,30 @@ impl GameController {
         }
 
         println!("[Controller] Inserted {entries} entries into stage search tree");
+    }
+
+    fn battle_screenshot_urls(game: &api_arkhost::GameDetails) -> Vec<url::Url> {
+        match game.screenshot.as_ref().and_then(|x| x.iter().next()) {
+            Some(screenshots) => screenshots
+                .file_name
+                .iter()
+                .filter_map(|f| {
+                    url::Url::parse(&screenshots.url)
+                        .and_then(|u| u.join(f))
+                        .ok()
+                })
+                .collect(),
+            None => vec![],
+        }
+    }
+
+    fn url_list_hash(urls: &[url::Url]) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for url in urls {
+            url.hash(&mut hasher);
+        }
+        hasher.finish()
     }
 }
 

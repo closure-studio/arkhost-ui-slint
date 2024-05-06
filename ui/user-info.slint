@@ -42,7 +42,8 @@ export struct UserInfo {
 export global UserInfoUtils {
     public pure function is-sms-verified(user-info: UserInfo) -> bool {
         user-info.phone != ""
-    }public pure function is-qq-verified(user-info: UserInfo) -> bool {
+    }
+    public pure function is-qq-verified(user-info: UserInfo) -> bool {
         user-info.qq != ""
     }
 }

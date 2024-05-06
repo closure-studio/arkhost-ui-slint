@@ -1,5 +1,5 @@
 use crate::app::{
-    app_state::model::{ImageData, ImageDataRaw, ImageDataRef},
+    app_state::model::{AssetPath, ImageData, ImageDataRaw, ImageDataRef},
     asset_worker::AssetRef,
     rt_api_model,
 };
@@ -56,8 +56,13 @@ impl ImageController {
                 let mut skin_id = details.status.sanitize_secretary_skin_id_for_url();
                 skin_id.push_str(".png");
                 let path: String = arkhost_api::consts::asset::assets::charpack(&skin_id);
-                self.load_image_to_ref(path, None, Some(ImageFormat::Png), image_ref)
-                    .await;
+                self.load_image_to_ref(
+                    AssetPath::GameAsset(path),
+                    None,
+                    Some(ImageFormat::Png),
+                    image_ref,
+                )
+                .await;
             }
         }
     }
@@ -68,18 +73,23 @@ impl ImageController {
             &avatar.sanitize_id_for_url(),
         );
         path.push_str(".png");
-        self.load_image_to_ref(path, None, Some(ImageFormat::Png), image_ref)
-            .await;
+        self.load_image_to_ref(
+            AssetPath::GameAsset(path),
+            None,
+            Some(ImageFormat::Png),
+            image_ref,
+        )
+        .await;
     }
 
     pub async fn load_image_to_ref(
         &self,
-        path: String,
+        path: AssetPath,
         cache_key: Option<String>,
         image_format: Option<ImageFormat>,
         image_ref: ImageDataRef,
     ) {
-        let mut image_ref = image_ref.write().await;
+        let mut image_ref: tokio::sync::RwLockWriteGuard<ImageData> = image_ref.write().await;
         image_ref.asset_path = path;
         image_ref.cache_key = cache_key;
         image_ref.format = image_format;
@@ -121,12 +131,12 @@ impl ImageController {
                     .errored_resource_urls
                     .read()
                     .await
-                    .contains(&image_data.asset_path)
+                    .contains(image_data.asset_path.inner_path())
                 {
                     self.errored_resource_urls
                         .write()
                         .await
-                        .insert(image_data.asset_path.clone());
+                        .insert(image_data.asset_path.inner_path().to_owned());
                     println!("[Controller] Error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_data, e);
                 }
             }

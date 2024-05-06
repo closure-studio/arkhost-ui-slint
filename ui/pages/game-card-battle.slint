@@ -1,15 +1,19 @@
 import { Palette, HorizontalBox, Button, GroupBox } from "std-widgets.slint";
-import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields } from "../game-info.slint";
+import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields, BattleScreenshotsLoadState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
+import { ImageSelector } from "../components/image-carousel.slint";
+import { Callbacks } from "../callbacks.slint";
 
 export component GameCardBattle inherits HorizontalLayout {
     in property <GameInfo> info;
+    private property <bool> has-screenshots: info.current-battle-screenshot-series != "";
+    private property <bool> has-pending-screenshots: 
+        info.current-battle-screenshot-series != info.remote-battle-screenshot-series;
     callback select-map();
     alignment: center;
     VerticalLayout {
         alignment: stretch;
         spacing: 10px;
-
         Rectangle {
             background: Palette.alternate-background.darker(5%);
             border-radius: 10px;
@@ -22,7 +26,6 @@ export component GameCardBattle inherits HorizontalLayout {
                 padding-bottom: 7px;
                 Button {
                     text: @tr("选择作战关卡…");
-                    primary: true;
                     clicked => {
                         select-map();
                     }
@@ -65,7 +68,74 @@ export component GameCardBattle inherits HorizontalLayout {
             vertical-stretch: 0;
         }
 
-    
+        HorizontalLayout {
+            alignment: stretch;
+            spacing: 10px;
+            private property <float> reference-image-width: info.battle-screenshots[0].width;
+            private property <float> reference-image-height: info.battle-screenshots[0].height;
+            private property <bool> is-wide: (root.width - 200px) / current-aspect-ratio > root.height - 50px;
+            private property <float> default-aspect-ratio: 16 / 9;
+            private property <float> current-aspect-ratio: 
+                (has-screenshots && reference-image-width > 0 && reference-image-height > 0) 
+                    ? reference-image-width / reference-image-height 
+                    : default-aspect-ratio;
+            if is-wide: Rectangle {
+                border-radius: 10px;
+                clip: true;
+                background: Palette.alternate-background.darker(5%);
+                if has-screenshots: Image {
+                    source: info.battle-screenshots[image-selector.current-index];
+                    image-fit: contain;
+                    image-rendering: smooth;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+
+                    width: parent.width;
+                    height: parent.height;
+                    x: 0;
+                    y: 0;
+                }
+                width: min(self.height * current-aspect-ratio, 750px);
+                horizontal-stretch: 0;
+            }
+            Rectangle {
+                border-radius: 10px;
+                clip: true;
+                background: Palette.alternate-background.darker(5%);
+                min-width: 180px;
+                max-width: is-wide ? 220px : 1000px;
+                VerticalLayout {
+                    padding: 5px;
+                    if has-pending-screenshots: Button {
+                        // initial value
+                        enabled: true;
+                        clicked => {
+                            Callbacks.load-screenshots(info.id);
+                        }
+
+                        states [
+                            busy when info.battle-screenshots-loading == BattleScreenshotsLoadState.Loading: {
+                                enabled: false;
+                                text: @tr("正在加载作战截图……");
+                            }
+                            not-loaded when !has-screenshots && has-pending-screenshots: {
+                                enabled: true;
+                                text: @tr("加载作战截图");
+                            }
+                            has-new when has-pending-screenshots: {
+                                enabled: true;
+                                text: @tr("加载新的作战截图");
+                            }
+                        ]
+                    }
+                    image-selector := ImageSelector {
+                        aspect-ratio: current-aspect-ratio;
+                        images: info.battle-screenshots;
+                        focus-zooming: is-wide ? 1.05 : 1;
+                    }
+                }
+            }
+        }
 
         width: clamp(root.width - 20px, 300px, 1000px);
     }

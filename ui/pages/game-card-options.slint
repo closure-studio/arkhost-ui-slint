@@ -1,5 +1,5 @@
-import { GridBox, Switch, ScrollView, VerticalBox, LineEdit, HorizontalBox, SpinBox, Button, Spinner, Slider, GroupBox} from "std-widgets.slint";
-import { GameOptions, GameInfo, GameOptionSaveState } from "../game-info.slint";
+import { GridBox, Switch, ScrollView, VerticalBox, LineEdit, HorizontalBox, SpinBox, Button, Spinner, Slider, GroupBox, ComboBox} from "std-widgets.slint";
+import { GameOptions, GameInfo, GameOptionSaveState, GameModels } from "../game-info.slint";
 
 component IntegerSlider inherits VerticalLayout {
     in property <bool> enabled;
@@ -52,11 +52,12 @@ export component GameCardOptions inherits ScrollView {
     private property <bool> saving;
     callback save-options(string, GameOptions);
     function reset-options(){
-        enable-building-arrange.checked = options.enable-building-arrange;
-        enable-auto-battle.checked = options.enable-auto-battle;
-        recruit-ignore-robot.checked = options.recruit-ignore-robot;
+        enable-building-arrange.checked = info.options.enable-building-arrange;
+        enable-auto-battle.checked = info.options.enable-auto-battle;
+        recruit-ignore-robot.checked = info.options.recruit-ignore-robot;
         ap-reserve.set-value(info.options.ap-reserve);
         recruit-reserve.set-value(info.options.recruit-reserve);
+        accelerate-slot-cn.current-value = info.options.accelerate-slot-cn;
     }
     init => {
         reset-options();
@@ -65,7 +66,7 @@ export component GameCardOptions inherits ScrollView {
         alignment: center;
         VerticalBox {
             alignment: space-between;
-            spacing: 10px;
+            spacing: 15px;
             VerticalBox {
                 alignment: start;
                 spacing: 10px;
@@ -115,6 +116,23 @@ export component GameCardOptions inherits ScrollView {
                         max-width: 400px;
                     }
                 }
+
+                VerticalLayout {
+                    alignment: start;
+                    spacing: 10px;
+                    Text {
+                        text: @tr("基建无人机加速房间");
+                        font-size: 12px;
+                    }
+
+                    HorizontalLayout {
+                        alignment: stretch;
+                        accelerate-slot-cn := ComboBox {
+                            model: GameModels.accelerate-slot-cn;
+                            max-width: 300px;
+                        }
+                    }
+                }
             }
 
             HorizontalLayout {
@@ -130,6 +148,7 @@ export component GameCardOptions inherits ScrollView {
                         options.recruit-ignore-robot = recruit-ignore-robot.checked;
                         options.ap-reserve = ap-reserve.value;
                         options.recruit-reserve = recruit-reserve.value;
+                        options.accelerate-slot-cn = accelerate-slot-cn.current-value;
                         save-options(info.id, options);
                     }
                     width: 100px;

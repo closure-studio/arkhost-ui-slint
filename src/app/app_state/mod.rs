@@ -118,6 +118,17 @@ impl AppState {
         })
     }
 
+    pub fn set_battle_screenshots_load_state(
+        &self,
+        id: String,
+        state: BattleScreenshotsLoadState,
+    ) -> AppStateAsyncOp {
+        self.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
+            game_info.battle_screenshots_loading = state;
+            game_info_list.set_row_data(i, game_info);
+        })
+    }
+
     pub fn set_user_id_api_request_state(&self, state: UserIdApiRequestState) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
             let mut user_info = ui.get_user_info();

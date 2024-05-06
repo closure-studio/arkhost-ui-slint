@@ -208,6 +208,7 @@ pub struct GameConfigFields {
     pub recruit_ignore_robot: Option<bool>,
     pub recruit_reserve: Option<i32>,
     pub enable_building_arrange: Option<bool>,
+    pub accelerate_slot_cn: Option<String>,
 }
 
 impl GameConfigFields {
@@ -221,6 +222,7 @@ impl GameConfigFields {
             recruit_ignore_robot: None,
             recruit_reserve: None,
             enable_building_arrange: None,
+            accelerate_slot_cn: None,
         }
     }
 }
