@@ -4,6 +4,32 @@ import { FontGlobals } from "../font-globals.slint";
 import { ImageSelector } from "../components/image-carousel.slint";
 import { Callbacks } from "../callbacks.slint";
 
+component NoScreenshotIndicator inherits Rectangle {
+    in property <string> text;
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../images/emoji_doc_relax.png");
+                image-fit: contain;
+                width: 100px;
+                height: 100px;
+            }
+        }    
+
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                opacity: 0.7;
+                text: text;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}
+
 export component GameCardBattle inherits HorizontalLayout {
     in property <GameInfo> info;
     private property <bool> has-screenshots: info.current-battle-screenshot-series != "";
@@ -73,16 +99,16 @@ export component GameCardBattle inherits HorizontalLayout {
             spacing: 10px;
             private property <float> reference-image-width: info.battle-screenshots[0].width;
             private property <float> reference-image-height: info.battle-screenshots[0].height;
-            private property <bool> is-wide: (root.width - 200px) / current-aspect-ratio > root.height - 50px;
+            private property <bool> is-wide:
+                root.width > 400px
+                && root.height > 300px
+                && (root.width - 200px) / current-aspect-ratio > root.height - 100px;
             private property <float> default-aspect-ratio: 16 / 9;
             private property <float> current-aspect-ratio: 
                 (has-screenshots && reference-image-width > 0 && reference-image-height > 0) 
                     ? reference-image-width / reference-image-height 
                     : default-aspect-ratio;
             if is-wide: Rectangle {
-                border-radius: 10px;
-                clip: true;
-                background: Palette.alternate-background.darker(5%);
                 if has-screenshots: Image {
                     source: info.battle-screenshots[image-selector.current-index];
                     image-fit: contain;
@@ -95,7 +121,20 @@ export component GameCardBattle inherits HorizontalLayout {
                     x: 0;
                     y: 0;
                 }
-                width: min(self.height * current-aspect-ratio, 750px);
+
+                if !has-screenshots: NoScreenshotIndicator {
+                    states [
+                        no-remote-screenshot when !has-screenshots && !has-pending-screenshots: {
+                            text: @tr("这里没有作战截图");
+                        }
+
+                        not-loaded when !has-screenshots: {
+                            text: @tr("还没有加载作战截图");
+                        }
+                    ]
+                }
+
+                preferred-width: self.height * current-aspect-ratio;
                 horizontal-stretch: 0;
             }
             Rectangle {
@@ -103,16 +142,17 @@ export component GameCardBattle inherits HorizontalLayout {
                 clip: true;
                 background: Palette.alternate-background.darker(5%);
                 min-width: 180px;
+                preferred-width: 200px;
                 max-width: is-wide ? 220px : 1000px;
                 VerticalLayout {
                     padding: 5px;
+                    spacing: 10px;
                     if has-pending-screenshots: Button {
                         // initial value
                         enabled: true;
                         clicked => {
                             Callbacks.load-screenshots(info.id);
                         }
-
                         states [
                             busy when info.battle-screenshots-loading == BattleScreenshotsLoadState.Loading: {
                                 enabled: false;
@@ -125,6 +165,17 @@ export component GameCardBattle inherits HorizontalLayout {
                             has-new when has-pending-screenshots: {
                                 enabled: true;
                                 text: @tr("加载新的作战截图");
+                            }
+                        ]
+                    }
+                    if !is-wide && !has-screenshots: NoScreenshotIndicator {
+                        states [
+                            no-remote-screenshot when !has-screenshots && !has-pending-screenshots: {
+                                text: @tr("这里没有作战截图");
+                            }
+    
+                            not-loaded when !has-screenshots: {
+                                text: @tr("还没有加载作战截图");
                             }
                         ]
                     }

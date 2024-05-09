@@ -75,7 +75,7 @@ impl SessionController {
 
     pub async fn auth(&self) {
         self.app_state_controller
-            .exec(|x| x.set_login_state(LoginState::LoggingIn, "自动登录中……".into()));
+            .exec(|x| x.set_login_state(LoginState::LoggingIn, " 自动登录中".into()));
         let (resp, mut rx) = oneshot::channel();
         match self
             .sender

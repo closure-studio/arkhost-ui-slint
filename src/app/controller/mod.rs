@@ -158,7 +158,7 @@ impl ControllerAdaptor {
             app.on_login_requested(move |account, password| {
                 let app = app_weak.clone().unwrap();
 
-                app.set_login_status_text("正在登录…… ".into());
+                app.set_login_status_text(" 正在登录".into());
                 app.set_login_state(LoginState::LoggingIn);
 
                 let this = this.clone();
