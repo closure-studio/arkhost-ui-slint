@@ -1,4 +1,4 @@
-import { StyleMetrics, ScrollView , VerticalBox, Spinner, Palette, Button } from "std-widgets.slint";
+import { ScrollView , VerticalBox, Spinner, Palette, Button } from "std-widgets.slint";
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "../game-info.slint";
 import { UserInfo, UserStatus, UserTier, UserProgress } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
@@ -38,7 +38,7 @@ component FetchGamesIndicator inherits Rectangle {
     }
     border-radius: 10px;
     background: loading ? Palette.alternate-background : #fff0;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme ? 0px : 5px;
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark ? 0px : 5px;
     clip: true;
     loading-placeholder := LoadingPlaceholder {
         loading: loading;
@@ -154,7 +154,7 @@ export component GameInfoPage {
                         StateGlobals.update-type == ReleaseUpdateType.FullDownload ? @tr("更新客户端") : @tr("增量更新")
                     }
                     background-color: Palette.alternate-background;
-                    accent-color: StyleMetrics.default-text-color;
+                    accent-color: Palette.foreground;
                     action => {
                         if StateGlobals.update-state == ReleaseUpdateState.Idle {
                             Callbacks.download-update();
@@ -190,7 +190,7 @@ export component GameInfoPage {
                             alignment: stretch;
                             if StateGlobals.site-announcement != "": BannerNotification {
                                 background-color: #0000;
-                                accent-color: StyleMetrics.default-text-color;
+                                accent-color: Palette.foreground;
                                 has-action: false;
                                 text: @tr("📢 ") + StateGlobals.site-announcement;
                                 wrap: word-wrap;
@@ -198,7 +198,7 @@ export component GameInfoPage {
                             }
                             if StateGlobals.is-site-under-maintenance: BannerNotification {
                                 background-color: #0000;
-                                accent-color: StyleMetrics.default-text-color;
+                                accent-color: Palette.foreground;
                                 has-action: false;
                                 text: @tr("🚧 可露希尔平台正在维护中");
                                 wrap: word-wrap;
@@ -240,7 +240,7 @@ export component GameInfoPage {
                                         Button {
                                             primary: true;
                                             text: @tr("工单系统… ");
-                                            icon: StyleMetrics.dark-color-scheme ? @image-url("../images/ext_link_light.svg") : @image-url("../images/ext_link.svg");
+                                            icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/ext_link_light.svg") : @image-url("../images/ext_link.svg");
                                             clicked => {
                                                 Callbacks.open-ext-link("https://closure.ltsc.vip/ticket")
                                             }

@@ -3,9 +3,12 @@ name = "arkhost-api"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+reqwest-rustls-tls = ["reqwest/rustls-tls"]
+
 [dependencies]
 anyhow = "1"
-bitflags = "2.4"
+bitflags = "2.5"
 chrono = "0.4"
 futures = "0.3"
 # TODO: 可选TLS

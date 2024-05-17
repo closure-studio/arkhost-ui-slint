@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , GroupBox, LineEdit, TextEdit, Palette, Switch } from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, GroupBox, LineEdit, TextEdit, Palette, Switch } from "std-widgets.slint";
 import { UserInfo, UserInfoUtils, UserIdApiRequestState } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
@@ -102,14 +102,14 @@ component SmsVerifyArea inherits VerticalLayout {
         Text {
             font-size: 16px;
             text: @tr("你正在进行【游戏账号归属认证】！") + "\n" + @tr("🤔 你可能需要花一点时间完整阅读下面的说明：");
-            color: StyleMetrics.default-text-color;
+            color: Palette.foreground;
             wrap: word-wrap;
         }
 
         Text {
             font-size: 14px;
             text: @tr("☎📩 请在第一个账号栏位添加【手机号】游戏账号，游戏登录成功后，可露希尔将向该号码发送验证短信，输入验证码完成游戏账号归属认证。\n（省流：☎📩=☎🎮）") + "\n" + "\n" + @tr("🔒 完成归属认证后该手机号及其游戏托管将被绑定至可露希尔账号，不支持换绑、解绑操作。🔑 请勿丢失你的可露希尔账号密码，以免无法再次添加托管该游戏账号。") + "\n" + "\n" + @tr("⛔ 如果在启动游戏后的24小时内未完成认证，游戏账号将中止托管。") + "\n" + "\n" + @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请先用你的手机号【在游戏内】注册【新游戏账号】用于归属认证，再继续添加常用账号至另一账号栏位。") + "\n" + "\n" + @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🆘 确认未收到、在归属认证中遇到其他特殊情况，请提交工单或联系管理员。");
-            color: StyleMetrics.default-text-color.transparentize(20%);
+            color: Palette.foreground.transparentize(20%);
             wrap: word-wrap;
         }
 
@@ -196,7 +196,7 @@ component QQVerifyArea inherits VerticalLayout {
         Text {
             font-size: 14px;
             text: @tr("请前去可露希尔官方QQ群粘贴并发送整条验证码至群内进行验证。");
-            color: StyleMetrics.default-text-color.transparentize(30%);
+            color: Palette.foreground.transparentize(30%);
             wrap: word-wrap;
         }
 
@@ -218,7 +218,7 @@ component QQVerifyArea inherits VerticalLayout {
             Text {
                 font-size: 14px;
                 text: @tr("QQ验证代码已经复制到你的剪切板。\n如果你的剪切板为空，请框选复制下方的验证码文本：");
-                color: StyleMetrics.default-text-color.transparentize(30%);
+                color: Palette.foreground.transparentize(30%);
                 wrap: word-wrap;
             }
 
@@ -238,7 +238,7 @@ component QQVerifyArea inherits VerticalLayout {
             alignment: space-between;
             Button {
                 text: @tr("获取加群链接…");
-                icon: StyleMetrics.dark-color-scheme ? @image-url("../images/ext_link.svg") : @image-url("../images/ext_link_light.svg");
+                icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/ext_link.svg") : @image-url("../images/ext_link_light.svg");
                 clicked => {
                     Callbacks.open-ext-link(@tr("https://closure.ltsc.vip"));
                 }
@@ -284,7 +284,7 @@ export component UserCard inherits Rectangle {
     }
     border-radius: 10px;
     background: Palette.alternate-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme ? 0px : 5px;
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark ? 0px : 5px;
     drop-shadow-color: darkgray;
     clip: true;
     layout := VerticalLayout {
@@ -313,7 +313,7 @@ export component UserCard inherits Rectangle {
                 Text {
                     font-size: 12px;
                     font-family: FontGlobals.closure-studio-logo;
-                    color: StyleMetrics.default-text-color.transparentize(30%);
+                    color: Palette.foreground.transparentize(30%);
                     text: "Doctor ID";
                     vertical-alignment: bottom;
                     height: 22px;
@@ -336,7 +336,7 @@ export component UserCard inherits Rectangle {
                 Button {
                     enabled: !requesting;
                     text: requesting ? @tr("刷新中") : @tr("刷新");
-                    icon: StyleMetrics.dark-color-scheme ? @image-url("../images/user_card_refresh.svg") : @image-url("../images/user_card_refresh_light.svg");
+                    icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/user_card_refresh.svg") : @image-url("../images/user_card_refresh_light.svg");
                     clicked => {
                         Callbacks.refresh-user-info();
                         if user-info.qq-verify-code-cached != "" {

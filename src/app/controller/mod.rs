@@ -61,7 +61,7 @@ where
     RespRecvError(#[from] oneshot::error::RecvError),
 }
 
-pub struct ControllerAdaptor {
+pub struct UIContext {
     pub rt_api_model: Arc<RtApiModel>,
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
@@ -75,7 +75,11 @@ pub struct ControllerAdaptor {
     pub ota_controller: Arc<OtaController>,
 }
 
-impl ControllerAdaptor {
+pub struct UIMainThreadContext {
+    pub refresh_game_timer: slint::Timer,
+}
+
+impl UIContext {
     pub fn new(
         app_state: AppState,
         rt_api_model: Arc<RtApiModel>,
@@ -145,7 +149,7 @@ impl ControllerAdaptor {
         }
     }
 
-    pub fn attach(self: Arc<Self>, app: &AppWindow) {
+    pub fn attach(self: Arc<Self>, app: &AppWindow) -> UIMainThreadContext {
         app.on_register_requested(|| {
             ext_link::open_ext_link("https://closure.ltsc.vip");
         });
@@ -409,7 +413,7 @@ impl ControllerAdaptor {
         {
             let this = self.clone();
             app.on_search_maps(move |id, term, fuzzy| {
-                let this: Arc<ControllerAdaptor> = this.clone();
+                let this: Arc<UIContext> = this.clone();
                 let term: String = term.trim().to_ascii_uppercase();
                 if term.is_empty() || term == "-" {
                     return;
@@ -528,7 +532,7 @@ impl ControllerAdaptor {
             })
         }
 
-        {
+        let refresh_game_timer = {
             let app_weak = app.as_weak();
             let this = self.clone();
             let timer = slint::Timer::default();
@@ -554,7 +558,9 @@ impl ControllerAdaptor {
                     .unwrap();
                 },
             );
-            self.app_state.lock().unwrap().refresh_game_timer = timer;
-        }
+            timer
+        };
+
+        UIMainThreadContext { refresh_game_timer }
     }
 }

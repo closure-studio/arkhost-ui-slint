@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics, Palette } from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, Palette } from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
 
@@ -93,8 +93,8 @@ export component GameStatusBadgeWide inherits GameStatusBadgeBase {
         Image {
             source: root.status-icon;
             colorize: root.enable-icon-blinking && root.status-icon-blinking
-                ? StyleMetrics.default-text-color.with-alpha(0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad)))
-                : StyleMetrics.default-text-color;
+                ? Palette.foreground.with-alpha(0.5 * (1 + sin(mod(animation-tick(), 2s) / 1s * 2rad)))
+                : Palette.foreground;
             width: 26px;
             height: 26px;
             horizontal-stretch: 0;

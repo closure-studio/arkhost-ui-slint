@@ -3,7 +3,6 @@ import {
     Button,
     HorizontalBox,
     VerticalBox,
-    StyleMetrics,
     Palette
 } from "std-widgets.slint";
 import { GameInfo, GameState, GameInfoViewType, GameLogLoadState, GameLogLoadRequestType, BattleMap } from "../game-info.slint";
@@ -59,9 +58,9 @@ component GameCardTabSwitch inherits Rectangle {
         height: root.height;
         width: 50px;
 
-        background: StyleMetrics.dark-color-scheme
+        background: Palette.color-scheme == ColorScheme.dark
             ? #3c3c3c
-            : StyleMetrics.window-background;
+            : Palette.background;
         border-radius: 6px;
 
         animate opacity { duration: 0.15s; }
@@ -152,7 +151,7 @@ export component GameCard inherits Rectangle {
     
     border-radius: 10px;
     background: Palette.alternate-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark
         ? 0px
         : 5px;
     drop-shadow-color: darkgray;

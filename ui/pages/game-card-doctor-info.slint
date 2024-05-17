@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, Palette } from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
 import { GameStatusBadgeWide } from "game-status-badge.slint";
@@ -27,7 +27,7 @@ component ItemDisplay {
                 source: icon;
                 width: icon.width * icon-scale * 1px;
                 height: icon.height * icon-scale * 1px;
-                colorize: StyleMetrics.default-text-color;
+                colorize: Palette.foreground;
     
                 horizontal-stretch: 0;
             }
@@ -99,7 +99,7 @@ export component GameCardDoctorInfo inherits Rectangle {
                     text: info.doctor-serial;
                     font-family: FontGlobals.alphanumeric-text-sans;
                     font-size: 16px;
-                    color: StyleMetrics.default-text-color.transparentize(60%);
+                    color: Palette.foreground.transparentize(60%);
     
                     vertical-alignment: top;
                     row: 2;
@@ -199,13 +199,13 @@ export component GameCardDoctorInfo inherits Rectangle {
 
         Rectangle {
             width: 1px;
-            // background: StyleMetrics.default-text-color.transparentize(50%);
+            // background: Palette.foreground.transparentize(50%);
         }
 
         Rectangle {
             clip: true;
 
-            // border-color: StyleMetrics.default-text-color.transparentize(80%);
+            // border-color: Palette.foreground.transparentize(80%);
             // border-width: 1px;
         }
     }

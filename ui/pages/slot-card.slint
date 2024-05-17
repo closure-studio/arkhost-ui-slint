@@ -3,7 +3,6 @@ import {
     Button, 
     HorizontalBox, 
     VerticalBox, 
-    StyleMetrics, 
     GroupBox, 
     LineEdit, 
     ComboBox, 
@@ -48,7 +47,7 @@ component SlotRequirementItem inherits Rectangle {
                         alignment: center;
         
                         Image {
-                            colorize: StyleMetrics.default-text-color;
+                            colorize: Palette.foreground;
             
                             height: requirement-text.min-height + 2px;
                             width: self.height;
@@ -67,7 +66,7 @@ component SlotRequirementItem inherits Rectangle {
         
                     requirement-text := Text {
                         font-size: 13px;
-                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        color: Palette.foreground.transparentize(20%);
                         text: requirement.description;
                         horizontal-alignment: center;
                         vertical-alignment: center;
@@ -85,7 +84,7 @@ component SlotRequirementItem inherits Rectangle {
             spacing: 5px;
             Text {
                 font-size: 13px;
-                color: StyleMetrics.default-text-color.transparentize(20%);
+                color: Palette.foreground.transparentize(20%);
                 text: "- " + requirement.status-text;
                 wrap: word-wrap;
                 horizontal-alignment: left;
@@ -383,10 +382,10 @@ component CardView inherits Rectangle {
     private property <bool> has-account: info.state != SlotState.Empty;
     
     border-radius: 10px;
-    background: StyleMetrics.dark-color-scheme
+    background: Palette.color-scheme == ColorScheme.dark
         ? #242424
         : whitesmoke;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark
         ? 0px
         : 5px;
     drop-shadow-color: darkgray;
@@ -431,7 +430,7 @@ component CardView inherits Rectangle {
     }
 
     Rectangle {
-        background: StyleMetrics.dark-color-scheme
+        background: Palette.color-scheme == ColorScheme.dark
             ? #18181855
             : #bbbbbb33;
 
@@ -505,7 +504,7 @@ component CardView inherits Rectangle {
 
     Image {
         source: @image-url("../images/closure_drone_hollow.png");
-        colorize: StyleMetrics.default-text-color.with-alpha(25%);
+        colorize: Palette.foreground.with-alpha(25%);
 
         width: 50px;
         height: 50px;
@@ -533,7 +532,7 @@ export component SlotCard inherits Rectangle {
     callback reset-slot-update-request-state <=>
         slot-update-area.reset-slot-update-request-state;
     
-    background: StyleMetrics.dark-color-scheme
+    background: Palette.color-scheme == ColorScheme.dark
         ? #2b2b2b
         : Palette.alternate-background.darker(5%);
     border-radius: 10px;
@@ -611,7 +610,7 @@ export component SlotCard inherits Rectangle {
                     spacing: 10px;
 
                     sync-state-sign := Image {
-                        colorize: StyleMetrics.default-text-color;
+                        colorize: Palette.foreground;
                         source: @image-url("../images/slot_icon_synchronized.svg");
     
                         width: 24px;
@@ -640,7 +639,7 @@ export component SlotCard inherits Rectangle {
                         spacing: 10px;
             
                         toggle-menu-sign := Image {
-                            colorize: StyleMetrics.default-text-color;
+                            colorize: Palette.foreground;
         
                             width: 24px;
                             height: 24px;
@@ -672,7 +671,7 @@ export component SlotCard inherits Rectangle {
                 }
 
                 Rectangle {
-                    background: StyleMetrics.dark-color-scheme
+                    background: Palette.color-scheme == ColorScheme.dark
                     ? #3c3c3c
                     : whitesmoke.darker(10%);
 

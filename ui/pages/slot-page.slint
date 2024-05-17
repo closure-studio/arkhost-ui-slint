@@ -1,4 +1,4 @@
-import { ScrollView, VerticalBox, StyleMetrics, Palette } from "std-widgets.slint";
+import { ScrollView, VerticalBox, Palette } from "std-widgets.slint";
 import { MockData } from "../mock-data.slint";
 import { SlotInfo, SlotState, SlotDetailsViewState } from "../slot-info.slint";
 import { BannerNotification } from "../components/banner-notification.slint";
@@ -32,7 +32,7 @@ export component SlotPage {
                     spacing: 10px;
                     BannerNotification {
                         background-color: Palette.alternate-background;
-                        accent-color: StyleMetrics.default-text-color;
+                        accent-color: Palette.foreground;
                         has-action: false;
                         text: @tr("👀 该页会显示手机号/帐密等敏感信息，截图时请注意遮挡。");
                     }
@@ -52,7 +52,7 @@ export component SlotPage {
                     }
                     if user-info.progress == UserProgress.SmsVerified: BannerNotification {
                         background-color: Palette.alternate-background;
-                        accent-color: StyleMetrics.default-text-color;
+                        accent-color: Palette.foreground;
                         text: @tr("✅ 归属认证已经完成，你可以继续添加更多托管账号了。");
                         has-action: false;
                     }

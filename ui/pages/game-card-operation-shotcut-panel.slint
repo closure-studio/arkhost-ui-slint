@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , Spinner} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, Spinner, Palette } from "std-widgets.slint";
 import { GameInfo, GameState, GameOperationRequestState } from "../game-info.slint";
 
 enum ButtonType {
@@ -46,7 +46,7 @@ component StartGameButton inherits GameOperationShortcutButton {
 
     type: ButtonType.StartGame;
     primary: true;
-    icon: StyleMetrics.dark-color-scheme // primary Button 的文字颜色与默认文字颜色相反
+    icon: Palette.color-scheme == ColorScheme.dark  // primary Button 的文字颜色与默认文字颜色相反
         ? @image-url("../images/game_card_shortcut_start_light.svg")
         : @image-url("../images/game_card_shortcut_start.svg");
     text: !compact 
@@ -58,7 +58,7 @@ component StopGameButton inherits GameOperationShortcutButton {
     in property <bool> compact: false;
 
     type: ButtonType.StopGame;
-    icon: StyleMetrics.dark-color-scheme 
+    icon: Palette.color-scheme == ColorScheme.dark 
         ? @image-url("../images/game_card_shortcut_stop.svg")
         : @image-url("../images/game_card_shortcut_stop_light.svg");
     text: !compact 
@@ -70,7 +70,7 @@ component StopGameButton inherits GameOperationShortcutButton {
 //     in property <bool> compact: false;
 //    
 //     type: ButtonType.RestartGame;
-//     icon: StyleMetrics.dark-color-scheme 
+//     icon: Palette.color-scheme == ColorScheme.dark
 //         ? @image-url("../images/game_card_shortcut_restart.svg")
 //         : @image-url("../images/game_card_shortcut_restart_light.svg");
 //     text: !compact 

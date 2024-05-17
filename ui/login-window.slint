@@ -1,4 +1,4 @@
-import { VerticalBox, HorizontalBox , LineEdit, Button, StyleMetrics, Palette, Spinner, Switch, ScrollView } from "std-widgets.slint";
+import { VerticalBox, HorizontalBox , LineEdit, Button, Palette, Spinner, Switch, ScrollView } from "std-widgets.slint";
 import { ClosureStudioLogoStacked } from "./components/closure-studio-logo.slint";
 import { FontGlobals } from "font-globals.slint";
 import { Callbacks } from "callbacks.slint";
@@ -45,7 +45,7 @@ export component LoginWindow {
                 alignment: start;
                 register := Button {
                     text: @tr("注册…");
-                    icon: StyleMetrics.dark-color-scheme 
+                    icon: Palette.color-scheme == ColorScheme.dark 
                         ? @image-url("images/ext_link.svg") 
                         : @image-url("images/ext_link_light.svg");
                 }
@@ -147,7 +147,7 @@ export component LoginWindow {
                                 horizontal-alignment: center;
                                 color: login-state == LoginState.Errored 
                                     ? whitesmoke 
-                                    : StyleMetrics.default-text-color;
+                                    : Palette.foreground;
                                 font-size: 13px;
                                 text: login-status-text;
                                 wrap: word-wrap;

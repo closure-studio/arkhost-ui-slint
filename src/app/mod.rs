@@ -34,7 +34,7 @@ pub mod webview;
 
 use self::{
     app_state::AppState,
-    controller::{rt_api_model::RtApiModel, ControllerAdaptor},
+    controller::{rt_api_model::RtApiModel, UIContext},
 };
 use api_worker::Worker as ApiWorker;
 use arkhost_api::clients::{
@@ -103,18 +103,18 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     });
 
     let ui = AppWindow::new()?;
-    let adaptor = Arc::new(ControllerAdaptor::new(
+    let ui_context = Arc::new(UIContext::new(
         AppState::new(ui.as_weak()),
         Arc::new(RtApiModel::new()),
         tx_api_command.clone(),
         tx_auth_command.clone(),
         tx_asset_command.clone(),
     ));
-    adaptor.clone().attach(&ui);
-    adaptor.config_controller.sync_to_ui();
+    let _ui_main_thread_context = ui_context.clone().attach(&ui);
+    ui_context.config_controller.sync_to_ui();
 
     #[cfg(target_os = "windows")]
-    let default_webview_installation_found = {
+    let default_webview_installation_found: bool = {
         let ver = utils::webview2::test_installation_ver();
         println!("[WebView2] installation found: {ver:?}");
         ver.is_some()
@@ -123,7 +123,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     // TODO: detect webview installation on other OS
     let default_webview_installation_found = true;
 
-    adaptor.app_state_controller.exec(move |x| {
+    ui_context.app_state_controller.exec(move |x| {
         x.state_globals(move |s| {
             #[cfg(target_os = "windows")]
             s.set_default_webview_installation_type(ui::WebViewType::MicrosoftEdgeWebView2);
@@ -159,13 +159,13 @@ pub async fn run() -> Result<(), slint::PlatformError> {
                 false
             }
         };
-        adaptor.app_state_controller.exec(move |x| {
+        ui_context.app_state_controller.exec(move |x| {
             x.state_globals(move |s| s.set_has_webview_launch_failure(!webview_launch_success))
         });
     }
 
     if let Some(state) = user_state_data_or_null {
-        let app_state = adaptor.app_state.lock().unwrap();
+        let app_state = ui_context.app_state.lock().unwrap();
         if state.is_expired() {
             app_state
                 .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into())
@@ -173,8 +173,8 @@ pub async fn run() -> Result<(), slint::PlatformError> {
             app_state.set_use_auth(String::new(), false).exec();
         } else {
             app_state.set_use_auth(state.account, true).exec();
-            let adaptor = adaptor.clone();
-            tokio::spawn(async move { adaptor.session_controller.auth().await });
+            let ui_context = ui_context.clone();
+            tokio::spawn(async move { ui_context.session_controller.auth().await });
         }
     }
     ui.run()

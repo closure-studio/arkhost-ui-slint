@@ -3,7 +3,7 @@ members = ["arkhost_api", "arkhost_ota", "publish_tool"]
 
 [package]
 name = "arkhost-ui-slint"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["WG <wg138940@outlook.com>"]
 edition = "2021"
 build = "build.rs"
@@ -25,10 +25,10 @@ renderer-skia = ["slint/renderer-skia"]
 renderer-femtovg = ["slint/renderer-femtovg"]
 
 [dependencies]
-arkhost-api = { path = "arkhost_api" }
+arkhost-api = { path = "arkhost_api", features = ["reqwest-rustls-tls"] }
 arkhost-ota = { path = "arkhost_ota" }
 
-slint = { version = "1.5", features = [
+slint = { version = "1.6", features = [
     "std",
     "compat-1-2",
 ], default-features = false }
@@ -90,7 +90,7 @@ windows-sys = { version = "0.52", features = [
 ] }
 
 [build-dependencies]
-slint-build = "1.5"
+slint-build = "1.6"
 embed-resource = "2.4"
 semver = "1.0.22"
 
@@ -110,3 +110,7 @@ opt-level = 's'
 strip = true
 lto = true
 panic = 'abort'
+
+# https://github.com/slint-ui/slint/issues/3747
+[profile.dev.package.i-slint-renderer-skia]
+debug-assertions = false

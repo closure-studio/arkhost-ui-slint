@@ -200,22 +200,28 @@ impl EventSourceClient {
             }
         }
 
-        let conn = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_webpki_roots()
-            .https_or_http()
-            .enable_http1()
-            .build();
+        let builder = builder.reconnect(
+            es::ReconnectOptions::reconnect(true)
+                .retry_initial(true)
+                .delay(Duration::from_secs(1))
+                .backoff_factor(2)
+                .delay_max(Duration::from_secs(30))
+                .build(),
+        );
 
-        let client = builder
-            .reconnect(
-                es::ReconnectOptions::reconnect(true)
-                    .retry_initial(true)
-                    .delay(Duration::from_secs(1))
-                    .backoff_factor(2)
-                    .delay_max(Duration::from_secs(30))
-                    .build(),
-            )
-            .build_with_conn(conn);
+        #[cfg(feature = "reqwest-rustls-tls")]
+        let client = {
+            let conn = hyper_rustls::HttpsConnectorBuilder::new()
+                .with_webpki_roots() // Android端使用native证书报错
+                .https_or_http()
+                .enable_http1()
+                .build();
+
+            builder.build_with_conn(conn)
+        };
+
+        #[cfg(not(feature = "reqwest-rustls-tls"))]
+        let client = builder.build_http();
 
         Ok(client)
     }

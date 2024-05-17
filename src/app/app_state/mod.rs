@@ -6,13 +6,12 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
-use slint::{Model, ModelRc, Timer, VecModel, Weak};
+use slint::{Model, ModelRc, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
 use tokio::sync::Notify;
 
 pub struct AppState {
     pub ui: Weak<AppWindow>,
-    pub refresh_game_timer: Timer,
 }
 
 pub struct AppStateAsyncOp {
@@ -59,10 +58,7 @@ impl AppStateAsyncOp {
 
 impl AppState {
     pub fn new(ui: Weak<AppWindow>) -> Self {
-        Self {
-            ui,
-            refresh_game_timer: Timer::default(),
-        }
+        Self { ui }
     }
 
     pub fn set_login_state(&self, state: LoginState, mut status_text: String) -> AppStateAsyncOp {

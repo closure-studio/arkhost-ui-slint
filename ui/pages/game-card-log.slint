@@ -1,5 +1,5 @@
 import { GameOptions, GameInfo, GameLogLoadRequestType, GameLogLoadState } from "../game-info.slint";
-import { ListView , HorizontalBox, StyleMetrics , Button, ScrollView, VerticalBox, Spinner} from "std-widgets.slint";
+import { ListView , HorizontalBox, Button, ScrollView, VerticalBox, Spinner, Palette } from "std-widgets.slint";
 import { FontGlobals } from "../font-globals.slint";
 
 component GameCardLogEntryHeader inherits HorizontalLayout {
@@ -14,7 +14,7 @@ component GameCardLogEntryHeader inherits HorizontalLayout {
         min-width: 104px;
         font-size: 14px;
         font-family: FontGlobals.alphanumeric-text-sans;
-        color: StyleMetrics.default-text-color.transparentize(50%);
+        color: Palette.foreground.transparentize(50%);
         horizontal-alignment: left;
     }
 

@@ -1,5 +1,4 @@
 import { 
-    StyleMetrics, 
     GridBox, 
     Switch, 
     ScrollView, 
@@ -72,7 +71,7 @@ component MapList inherits ListView {
                     Image {
                         private property <float> alpha;
                         source: op-type == MapOperationType.Add ? @image-url("../images/game_card_battle_add.svg") : @image-url("../images/game_card_battle_remove.svg");
-                        colorize: StyleMetrics.default-text-color.with-alpha(alpha);
+                        colorize: Palette.foreground.with-alpha(alpha);
                         animate alpha { duration: 0.25s; }
                         animate width {
                             easing: ease;
