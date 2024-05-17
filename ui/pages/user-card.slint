@@ -1,74 +1,115 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , GroupBox, LineEdit, TextEdit, StandardButton} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, GroupBox, LineEdit, TextEdit, Palette, Switch } from "std-widgets.slint";
 import { UserInfo, UserInfoUtils, UserIdApiRequestState } from "../user-info.slint";
 import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { FontGlobals } from "../font-globals.slint";
+import { StateGlobals } from "../state-globals.slint";
+
+component VerifyInfoBar inherits Rectangle {
+    in property <string> button-text;
+    in property <bool> button-enabled;
+    in property <string> verify-item-name;
+    in property <string> verify-item-value;
+    callback clicked <=> btn.clicked;
+    background: Palette.alternate-background.darker(5%);
+    border-radius: 10px;
+    clip: true;
+    HorizontalLayout {
+        alignment: start;
+        spacing: 10px;
+        padding-left: 10px;
+        padding-top: 7px;
+        padding-bottom: 7px;
+        btn := Button {
+            text: button-text;
+            enabled: button-enabled;
+            primary: button-enabled;
+            max-width: 130px;
+        }
+
+        if verify-item-value != "": Rectangle {
+            border-radius: self.height / 2;
+            background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+            verify-item-area := TouchArea {
+                HorizontalLayout {
+                    padding-left: 15px;
+                    padding-right: 15px;
+                    alignment: center;
+                    spacing: 10px;
+                    Text {
+                        text: verify-item-name;
+                        font-family: FontGlobals.closure-studio-logo;
+                        font-size: 14px;
+                        font-weight: 450;
+                        color: whitesmoke;
+                        vertical-alignment: center;
+                        width: 50px;
+                    }
+
+                    Text {
+                        text: verify-item-area.has-hover ? verify-item-value : "-----";
+                        font-family: FontGlobals.alphanumeric-text-sans;
+                        font-size: 16px;
+                        color: whitesmoke;
+                        vertical-alignment: center;
+                        min-width: 200px;
+                    }
+                }
+            }
+        }
+    }
+}
 
 component SmsVerifyArea inherits VerticalLayout {
     in property <UserInfo> user-info;
     in property <bool> requesting;
     out property <bool> sms-dialog-open: false;
-
-    public function open-dialog() {
+    public function open-dialog(){
         if !UserInfoUtils.is-sms-verified(user-info) && !sms-dialog-open {
             sms-dialog-open = true;
         }
     }
-    
-    if UserInfoUtils.is-sms-verified(user-info) || !sms-dialog-open : GroupBox {
+    if UserInfoUtils.is-sms-verified(user-info) || !sms-dialog-open: GroupBox {
         title: @tr("游戏账号归属认证");
-        
-        Button {
-            enabled: true; // 初始值，会被states修改
-
-            clicked => { open-dialog(); }
-            width: 300px;
-
+        VerifyInfoBar {
+            verify-item-name: @tr("手机号");
+            verify-item-value: UserInfoUtils.is-sms-verified(user-info) ? user-info.phone : "";
+            clicked => {
+                open-dialog();
+            }
             states [
                 busy when requesting: {
-                    enabled: false;
-                    text: @tr("…");
+                    button-enabled: false;
+                    button-text: @tr("…");
                 }
-                sms-unverified when !UserInfoUtils.is-sms-verified(user-info) : {
-                    enabled: true;
-                    text: @tr("进行认证");
+                sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
+                    button-enabled: true;
+                    button-text: @tr("进行认证");
                 }
-                sms-verified when UserInfoUtils.is-sms-verified(user-info) : {
-                    enabled: false;
-                    text: @tr("已绑定到：") + user-info.phone;
+                sms-verified when UserInfoUtils.is-sms-verified(user-info): {
+                    button-enabled: false;
+                    button-text: @tr("已绑定");
                 }
             ]
         }
     }
-
     if !UserInfoUtils.is-sms-verified(user-info) && sms-dialog-open: VerticalLayout {
-        function submit-sms-verify-code() {
+        function submit-sms-verify-code(){
             Callbacks.submit-sms-verify-code(sms-verify-code-input.text);
         }
-
         padding-top: 20px;
         spacing: 15px;
-
         Text {
             font-size: 16px;
-            text: @tr("你正在进行【游戏账号归属认证】！")
-                + "\n" + @tr("🤔 你可能需要花一点时间完整阅读下面的说明：");
-            color: StyleMetrics.default-text-color;
+            text: @tr("你正在进行【游戏账号归属认证】！") + "\n" + @tr("🤔 你可能需要花一点时间完整阅读下面的说明：");
+            color: Palette.foreground;
             wrap: word-wrap;
-        }   
+        }
 
         Text {
             font-size: 14px;
-            text: @tr("☎📩 请在第一个账号栏位添加【手机号】游戏账号，游戏登录成功后，可露希尔将向该号码发送验证短信，输入验证码完成游戏账号归属认证。\n（省流：☎📩=☎🎮）") 
-                + "\n"
-                + "\n" + @tr("🔒 完成归属认证后该手机号及其游戏托管将被绑定至可露希尔账号，不支持换绑、解绑操作。🔑 请勿丢失你的可露希尔账号密码，以免无法再次添加托管该游戏账号。")
-                + "\n"
-                + "\n" + @tr("⛔ 如果在启动游戏后的24小时内未完成认证，游戏账号将中止托管。")
-                + "\n"
-                + "\n" + @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请先用你的手机号【在游戏内】注册【新游戏账号】用于归属认证，再继续添加常用账号至另一账号栏位。")
-                + "\n"
-                + "\n" + @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🆘 确认未收到、在归属认证中遇到其他特殊情况，请联系可露希尔平台管理员。");
-            color: StyleMetrics.default-text-color.transparentize(20%);
+            text: @tr("☎📩 请在第一个账号栏位添加【手机号】游戏账号，游戏登录成功后，可露希尔将向该号码发送验证短信，输入验证码完成游戏账号归属认证。\n（省流：☎📩=☎🎮）") + "\n" + "\n" + @tr("🔒 完成归属认证后该手机号及其游戏托管将被绑定至可露希尔账号，不支持换绑、解绑操作。🔑 请勿丢失你的可露希尔账号密码，以免无法再次添加托管该游戏账号。") + "\n" + "\n" + @tr("⛔ 如果在启动游戏后的24小时内未完成认证，游戏账号将中止托管。") + "\n" + "\n" + @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请先用你的手机号【在游戏内】注册【新游戏账号】用于归属认证，再继续添加常用账号至另一账号栏位。") + "\n" + "\n" + @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🆘 确认未收到、在归属认证中遇到其他特殊情况，请提交工单或联系管理员。");
+            color: Palette.foreground.transparentize(20%);
             wrap: word-wrap;
         }
 
@@ -78,7 +119,7 @@ component SmsVerifyArea inherits VerticalLayout {
             horizontal-alignment: center;
             input-type: number;
             placeholder-text: @tr("请输入发送到【归属认证手机号】的验证码");
-            accepted => { 
+            accepted => {
                 if self.text != "" {
                     submit-sms-verify-code();
                 }
@@ -88,13 +129,12 @@ component SmsVerifyArea inherits VerticalLayout {
         HorizontalLayout {
             alignment: end;
             spacing: 10px;
-
             Button {
                 enabled: !requesting;
                 text: @tr("返回");
-                clicked => { 
+                clicked => {
                     sms-verify-code-input.text = "";
-                    sms-dialog-open = false; 
+                    sms-dialog-open = false;
                 }
             }
 
@@ -102,7 +142,9 @@ component SmsVerifyArea inherits VerticalLayout {
                 enabled: !requesting && sms-verify-code-input.text != "";
                 text: @tr("提交");
                 primary: true;
-                clicked => { submit-sms-verify-code(); }
+                clicked => {
+                    submit-sms-verify-code();
+                }
             }
         }
     }
@@ -112,69 +154,58 @@ component QQVerifyArea inherits VerticalLayout {
     in property <UserInfo> user-info;
     in property <bool> requesting;
     out property <bool> qq-dialog-open: false;
-
     private property <bool> qq-verify-code-copied: false;
-
-    public function open-dialog() {
+    public function open-dialog(){
         if !UserInfoUtils.is-qq-verified(user-info) && !qq-dialog-open {
             Callbacks.fetch-qq-verify-code();
             qq-verify-code-copied = false;
             qq-dialog-open = true;
         }
     }
-
-    if UserInfoUtils.is-qq-verified(user-info) || !qq-dialog-open : GroupBox {
+    if UserInfoUtils.is-qq-verified(user-info) || !qq-dialog-open: GroupBox {
         title: @tr("QQ认证");
-
-        open-dialog-btn := Button {
-            enabled: true; // 初始值，会被states修改
-            width: 300px;
+        VerifyInfoBar {
+            verify-item-name: @tr("QQ");
+            verify-item-value: UserInfoUtils.is-qq-verified(user-info) ? user-info.qq : "";
             clicked => {
                 open-dialog();
             }
-
             states [
                 busy when requesting: {
-                    enabled: false;
-                    text: @tr("…");
+                    button-enabled: false;
+                    button-text: @tr("…");
                 }
                 sms-unverified when !UserInfoUtils.is-sms-verified(user-info): {
-                    enabled: false;
-                    text: @tr("请先完成归属手机号认证");
+                    button-enabled: false;
+                    button-text: @tr("请先完成归属手机号认证");
                 }
                 qq-unverified when !UserInfoUtils.is-qq-verified(user-info): {
-                    enabled: true;
-                    text: @tr("获取QQ验证代码");
+                    button-enabled: true;
+                    button-text: @tr("获取QQ验证代码");
                 }
                 verified when UserInfoUtils.is-qq-verified(user-info): {
-                    enabled: false;
-                    text: @tr("已绑定到：") + user-info.qq;
+                    button-enabled: false;
+                    button-text: @tr("已绑定");
                 }
             ]
         }
     }
-
-    if !UserInfoUtils.is-qq-verified(user-info) 
-        && qq-dialog-open 
-        && user-info.qq-verify-code-cached != "" : VerticalLayout {
+    if !UserInfoUtils.is-qq-verified(user-info) && qq-dialog-open && user-info.qq-verify-code-cached != "": VerticalLayout {
         padding-top: 20px;
         spacing: 15px;
-
         Text {
             font-size: 14px;
             text: @tr("请前去可露希尔官方QQ群粘贴并发送整条验证码至群内进行验证。");
-            color: StyleMetrics.default-text-color.transparentize(30%);
+            color: Palette.foreground.transparentize(30%);
             wrap: word-wrap;
         }
 
         Button {
             padding: 30px;
             enabled: !requesting;
-
             text: @tr("复制QQ验证代码");
             primary: !qq-verify-code-copied;
-
-            clicked => { 
+            clicked => {
                 qq-verify-code-text.select-all();
                 qq-verify-code-text.copy();
                 qq-verify-code-copied = true;
@@ -184,11 +215,10 @@ component QQVerifyArea inherits VerticalLayout {
         VerticalLayout {
             alignment: start;
             spacing: 15px;
-
             Text {
                 font-size: 14px;
                 text: @tr("QQ验证代码已经复制到你的剪切板。\n如果你的剪切板为空，请框选复制下方的验证码文本：");
-                color: StyleMetrics.default-text-color.transparentize(30%);
+                color: Palette.foreground.transparentize(30%);
                 wrap: word-wrap;
             }
 
@@ -200,41 +230,37 @@ component QQVerifyArea inherits VerticalLayout {
             }
 
             visible: qq-verify-code-copied;
-            height: !qq-verify-code-copied 
-                ? 0px
-                : 75px;
+            height: !qq-verify-code-copied ? 0px : 75px;
         }
 
         HorizontalLayout {
             padding-top: 10px;
-
             alignment: space-between;
-
             Button {
                 text: @tr("获取加群链接…");
-                icon: StyleMetrics.dark-color-scheme
-                    ? @image-url("../images/ext_link.svg")
-                    : @image-url("../images/ext_link_light.svg");
-
-                clicked => { Callbacks.open-ext-link(@tr("https://closure.ltsc.vip")); }
+                icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/ext_link.svg") : @image-url("../images/ext_link_light.svg");
+                clicked => {
+                    Callbacks.open-ext-link(@tr("https://closure.ltsc.vip"));
+                }
             }
 
             HorizontalLayout {
                 alignment: end;
                 spacing: 10px;
-
                 Button {
                     enabled: !requesting;
                     text: @tr("返回");
-                    clicked => { qq-dialog-open = false; }
+                    clicked => {
+                        qq-dialog-open = false;
+                    }
                 }
 
                 Button {
                     enabled: !requesting;
                     text: @tr("刷新QQ验证状态");
                     primary: qq-verify-code-copied;
-                    clicked => { 
-                        Callbacks.refresh-user-info(); 
+                    clicked => {
+                        Callbacks.refresh-user-info();
                         if user-info.qq-verify-code-cached != "" {
                             Callbacks.fetch-qq-verify-code();
                         }
@@ -250,39 +276,27 @@ export component UserCard inherits Rectangle {
     out property <bool> sms-dialog-open: sms-verify-area.sms-dialog-open;
     out property <bool> qq-dialog-open: qq-verify-area.qq-dialog-open;
     private property <bool> requesting: user-info.id-api-request-state == UserIdApiRequestState.Requesting;
-
-    public function open-qq-verify-dialog() {
+    public function open-qq-verify-dialog(){
         qq-verify-area.open-dialog();
     }
-
-    public function open-sms-verify-dialog() {
+    public function open-sms-verify-dialog(){
         sms-verify-area.open-dialog();
     }
-
     border-radius: 10px;
-    background: StyleMetrics.dark-color-scheme
-        ? #242424
-        : StyleMetrics.window-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
-        ? 0px
-        : 5px;
+    background: Palette.alternate-background;
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark ? 0px : 5px;
     drop-shadow-color: darkgray;
     clip: true;
-
     layout := VerticalLayout {
         alignment: start;
         padding: 20px;
-
         GridLayout {
             spacing: 10px;
-
             Rectangle {
                 width: 64px;
                 height: 64px;
-    
                 border-radius: 24px;
                 clip: true;
-    
                 Image {
                     // 博士头像
                     source: @image-url("../images/closure_logo.png");
@@ -296,14 +310,12 @@ export component UserCard inherits Rectangle {
 
             VerticalLayout {
                 spacing: 2px;
-
                 Text {
                     font-size: 12px;
                     font-family: FontGlobals.closure-studio-logo;
-                    color: StyleMetrics.default-text-color.transparentize(30%);
+                    color: Palette.foreground.transparentize(30%);
                     text: "Doctor ID";
                     vertical-alignment: bottom;
-
                     height: 22px;
                 }
 
@@ -321,24 +333,16 @@ export component UserCard inherits Rectangle {
 
             VerticalLayout {
                 alignment: center;
-
                 Button {
                     enabled: !requesting;
-                    text: requesting
-                        ? @tr("刷新中")
-                        : @tr("刷新");
-                    
-                    icon: StyleMetrics.dark-color-scheme
-                        ? @image-url("../images/user_card_refresh.svg")
-                        : @image-url("../images/user_card_refresh_light.svg");
-
+                    text: requesting ? @tr("刷新中") : @tr("刷新");
+                    icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/user_card_refresh.svg") : @image-url("../images/user_card_refresh_light.svg");
                     clicked => {
-                        Callbacks.refresh-user-info(); 
+                        Callbacks.refresh-user-info();
                         if user-info.qq-verify-code-cached != "" {
                             Callbacks.fetch-qq-verify-code();
                         }
                     }
-    
                     width: 90px;
                     height: 30px;
                 }
@@ -360,31 +364,76 @@ export component UserCard inherits Rectangle {
 
         GroupBox {
             title: @tr("其他");
-
             Rectangle {
-                HorizontalLayout {
-                    spacing: 10px;
-
+                misc-menu := GridLayout {
+                    spacing-horizontal: 5px;
+                    spacing-vertical: 5px;
                     Button {
-                        text: @tr("复制用户ID");
-            
+                        text: @tr("复制用户 ID");
                         clicked => {
                             uuid-dummy.select-all();
                             uuid-dummy.copy();
                             uuid-dummy.clear-selection();
                         }
+                        row: 0;
+                        col: 0;
                     }
 
                     Button {
                         text: @tr("回到登录界面");
-            
                         clicked => {
                             Callbacks.return-to-login-page();
                         }
+                        row: 0;
+                        col: 1;
                     }
 
-                    width: 300px;
-                    height: 30px;
+                    Button {
+                        property <bool> calculated: StateGlobals.data-disk-usage != "" && StateGlobals.cache-disk-usage != "";
+                        clicked => {
+                            if !calculated {
+                                Callbacks.recalculate-data-disk-usage();
+                            } else {
+                                Callbacks.set-clean-data(!StateGlobals.clean-data-requested);
+                            }
+                        }
+                        states [
+                            not-calculated when !calculated: {
+                                text: @tr("计算 App 数据占用空间");
+                            }
+                            normal when !StateGlobals.clean-data-requested: {
+                                text: @tr("清除 App 数据 [总占用：{} 资源缓存：{}]", StateGlobals.data-disk-usage, StateGlobals.cache-disk-usage);
+                            }
+                            clean-requested when StateGlobals.clean-data-requested: {
+                                text: @tr("取消清除数据（App 关闭时将清除）");
+                            }
+                        ]
+                        row: 1;
+                        col: 0;
+                        colspan: 2;
+                    }
+
+                    HorizontalBox {
+                        alignment: stretch;
+                        Switch {
+                            text: @tr("低数据模式");
+                            checked: StateGlobals.data-saver-mode-enabled;
+                            toggled => {
+                                Callbacks.set-data-saver-mode(self.checked);
+                            }
+                            width: 140px;
+                        }
+
+                        Text {
+                            text: @tr("ℹ 低数据模式不加载图片资源，将加快启动并降低缓存空间占用，重启 App 生效 ");
+                            wrap: word-wrap;
+                        }
+
+                        row: 2;
+                        col: 0;
+                        colspan: 2;
+                    }
+
                     x: 0;
                     y: 0;
                 }
@@ -397,11 +446,15 @@ export component UserCard inherits Rectangle {
                     width: 0;
                     height: 0;
                 }
+
+                height: misc-menu.min-height;
             }
         }
     }
 
     height: layout.min-height;
-    animate height { duration: 0.25s; easing: ease; }
+    animate height {
+        duration: 0.25s;
+        easing: ease;
+    }
 }
-

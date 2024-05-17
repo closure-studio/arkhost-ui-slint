@@ -26,23 +26,46 @@ impl AssetClient {
         client_builder.default_headers(headers)
     }
 
+    pub async fn head_url_content(
+        &self,
+        url: Url,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<Response> {
+        let request = build_request(self.client.head(url));
+        Ok(request.send().await?)
+    }
+
+    pub async fn get_url_content_response(
+        &self,
+        url: Url,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<Response> {
+        let request = build_request(self.client.get(url));
+        Ok(request.send().await?)
+    }
+
+    pub async fn get_url_content(
+        &self,
+        url: Url,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<bytes::Bytes> {
+        let bytes = self
+            .get_url_content_response(url, build_request)
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?;
+
+        Ok(bytes)
+    }
+
     pub async fn head_content(
         &self,
         path: &str,
         build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
     ) -> anyhow::Result<Response> {
-        let request = build_request(self.client.head(self.base_url.join(path)?));
-        Ok(request.send().await?)
-    }
-
-    pub async fn get_content(
-        &self,
-        path: &str,
-        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
-    ) -> anyhow::Result<bytes::Bytes> {
-        let request = build_request(self.client.get(self.base_url.join(path)?));
-        let bytes = request.send().await?.error_for_status()?.bytes().await?;
-        Ok(bytes)
+        self.head_url_content(self.base_url.join(path)?, build_request)
+            .await
     }
 
     pub async fn get_content_response(
@@ -50,7 +73,16 @@ impl AssetClient {
         path: &str,
         build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
     ) -> anyhow::Result<Response> {
-        let request = build_request(self.client.get(self.base_url.join(path)?));
-        Ok(request.send().await?)
+        self.get_url_content_response(self.base_url.join(path)?, build_request)
+            .await
+    }
+
+    pub async fn get_content(
+        &self,
+        path: &str,
+        build_request: impl FnOnce(RequestBuilder) -> RequestBuilder,
+    ) -> anyhow::Result<bytes::Bytes> {
+        self.get_url_content(self.base_url.join(path)?, build_request)
+            .await
     }
 }

@@ -1,4 +1,4 @@
-import { StyleMetrics } from "std-widgets.slint";
+import { Palette } from "std-widgets.slint";
 import { MockData } from "../mock-data.slint";
 import { 
     SlotInfo,
@@ -13,14 +13,12 @@ import { FontGlobals } from "../font-globals.slint";
 export component SlotListItem inherits Rectangle {
     in property <int> index: 1;
     in property <SlotInfo> info: MockData.slot-info;
-    in property <brush> accent-color: StyleMetrics.dark-color-scheme
+    in property <brush> accent-color: Palette.color-scheme == ColorScheme.dark
         ? #34ccef
         : #1978e3;
 
     callback slot-selected(string);
-    private property <brush> plain-background: StyleMetrics.dark-color-scheme
-        ? #242424
-        : StyleMetrics.window-background;
+    private property <brush> plain-background: Palette.alternate-background;
 
     border-radius: 10px;
     clip: true;
@@ -57,7 +55,7 @@ export component SlotListItem inherits Rectangle {
             width: 60px;
             states [
                 unselected when info.view-state != SlotDetailsViewState.Expanded: {
-                    current-accent-color: StyleMetrics.default-text-color.transparentize(30%);
+                    current-accent-color: Palette.foreground.transparentize(30%);
                 }
                 selected when info.view-state == SlotDetailsViewState.Expanded: {
                     current-accent-color: accent-color;
@@ -92,29 +90,10 @@ export component SlotListItem inherits Rectangle {
             background: plain-background;
         }
         hover when touch-area.has-hover && !touch-area.pressed: {
-            background: plain-background.mix(StyleMetrics.default-text-color, 90%);
+            background: plain-background.mix(Palette.foreground, 90%);
         }
         down when touch-area.pressed: {
-            background: plain-background.mix(StyleMetrics.default-text-color, 70%);
+            background: plain-background.mix(Palette.foreground, 70%);
         }
     ]
-}
-
-export component SlotList inherits VerticalLayout {
-    in property <[SlotInfo]> slot-info-list: [
-        MockData.slot-info,
-        MockData.slot-info,
-        MockData.slot-info,
-    ];
-    
-    callback slot-selected(string);
-
-    alignment: start;
-    spacing: 10px;
-
-    for slot-info[idx] in slot-info-list: SlotListItem {
-        index: idx + 1;
-        info: slot-info;
-        slot-selected(id) => { slot-selected(id); }
-    }
 }

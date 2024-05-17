@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox, TabWidget, StyleMetrics } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, TabWidget } from "std-widgets.slint";
 import { GameInfo } from "game-info.slint";
 import { SlotInfo } from "slot-info.slint";
 import { UserInfo } from "user-info.slint";
@@ -21,7 +21,6 @@ export component AppWindow inherits Window {
     in property <SseConnectState> sse-connect-state;
     in property <[SlotInfo]> slot-info-list;
     in property <UserInfo> user-info;
-    in property <string> selected-slot;
     in-out property <LoginState> login-state;
     in-out property <string> login-status-text;
 
@@ -40,6 +39,7 @@ export component AppWindow inherits Window {
     callback set-map-selected <=> Callbacks.set-map-selected;
     callback reset-selected-maps <=> Callbacks.reset-selected-maps;
     callback save-maps <=> Callbacks.save-maps;
+    callback load-screenshots <=> Callbacks.load-screenshots;
 
     callback refresh-user-info <=> Callbacks.refresh-user-info;
     callback refresh-slot-info <=> Callbacks.refresh-slot-info;
@@ -56,6 +56,12 @@ export component AppWindow inherits Window {
 
     callback download-update <=> Callbacks.download-update;
 
+    callback recalculate-data-disk-usage <=> Callbacks.recalculate-data-disk-usage;
+    callback set-clean-data <=> Callbacks.set-clean-data;
+    callback set-data-saver-mode <=> Callbacks.set-data-saver-mode;
+
+    callback confirm-gacha-records <=> Callbacks.confirm-gacha-records;
+
     public function set-use-auth(account: string, use-auth-val: bool) {
         login-window.set-use-auth(account, use-auth-val);
     }
@@ -66,12 +72,8 @@ export component AppWindow inherits Window {
     }
 
     preferred-width: 1280px;
-    preferred-height: 800px;
+    preferred-height: 830px;
     default-font-weight: 350;
-
-    background: StyleMetrics.dark-color-scheme
-        ? StyleMetrics.window-background
-        : StyleMetrics.window-background.darker(5%);
 
     VerticalLayout {
         visible: login-state == LoginState.Logged;
@@ -98,7 +100,6 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     slot-page := SlotPage {
                         slot-info-list: slot-info-list;
-                        selected-slot: selected-slot;
                         user-info: user-info;
                     }
                 }
@@ -127,7 +128,7 @@ export component AppWindow inherits Window {
         background: #0661d0;
 
         Text {
-            text: "Sudo mode";
+            text: "Privileged";
             font-size: 16px;
             color: #ebf3ff;
         }

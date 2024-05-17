@@ -1,4 +1,13 @@
+#![allow(dead_code)]
 use std::sync::OnceLock;
+
+pub fn data_dir() -> Option<&'static str> {
+    static DATA_DIR: OnceLock<Option<String>> = OnceLock::new();
+    DATA_DIR
+        .get_or_init(|| std::env::var(consts::DATA_DIR).ok())
+        .as_ref()
+        .map(|x| x.as_str())
+}
 
 pub fn attach_console() -> bool {
     static ATTACH_CONSOLE: OnceLock<bool> = OnceLock::new();
@@ -19,6 +28,7 @@ pub fn override_asset_server() -> Option<&'static str> {
 }
 
 pub mod consts {
+    pub const DATA_DIR: &str = "ARKHOST_APP_DATA_DIR";
     pub const ATTACH_CONSOLE: &str = "ARKHOST_APP_ATTACH_CONSOLE";
     pub const FORCE_UPDATE: &str = "ARKHOST_APP_FORCE_UPDATE";
     pub const OVERRIDE_ASSET_SERVER: &str = "ARKHOST_APP_OVERRIDE_ASSET_SERVER";

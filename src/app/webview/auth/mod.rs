@@ -9,6 +9,8 @@ use std::{collections::HashMap, rc::Rc, sync::RwLock};
 use thiserror::Error;
 use wry::{http::HeaderMap, PageLoadEvent, WebView, WebViewBuilder};
 
+use crate::app::auth::{AuthAction, AuthResult};
+
 #[derive(Error, Debug)]
 pub enum AuthenticatorError {
     #[error("webview is not assigned to this authenticator")]
@@ -22,33 +24,6 @@ pub trait AuthListener {
 #[serde(rename_all = "camelCase")]
 pub enum AuthParams {
     ArkHostAuth { user: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum AuthAction {
-    ArkHostRestrictedActionBackground {
-        id: String,
-        action: String,
-    },
-    ArkHostRestrictedActionCaptcha {
-        id: String,
-        action: String,
-    },
-    GeeTestAuth {
-        id: String,
-        gt: String,
-        challenge: String,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum AuthResult {
-    Failed { id: String, err: String },
-    ArkHostCaptchaTokenReCaptcha { id: String, token: String },
-    ArkHostCaptchaTokenGeeTest { id: String, token: String },
-    GeeTestAuth { id: String, token: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

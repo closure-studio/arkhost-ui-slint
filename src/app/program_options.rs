@@ -1,6 +1,6 @@
 use argh::FromArgs;
 
-#[derive(Debug, Clone, FromArgs)]
+#[derive(FromArgs)]
 /// 程序参数
 pub struct LaunchArgs {
     #[argh(switch)]
@@ -14,27 +14,27 @@ pub struct LaunchArgs {
     pub force_update: Option<bool>,
 
     #[argh(option)]
-    /// 指定localhost端口作为资源服务器，等同于设置环境变量
-    /// ARKHOST_APP_OVERRIDE_ASSET_SERVER='http://localhost:port'
-    pub local_asset_server_port: Option<u16>,
+    /// 指定资源服务器，等同于设置环境变量
+    /// ARKHOST_APP_OVERRIDE_ASSET_SERVER=<asset_server>
+    pub asset_server: Option<String>,
 
     #[argh(subcommand)]
     pub launch_spec: Option<LaunchSpec>,
 }
 
-#[derive(Debug, Clone, FromArgs)]
+#[derive(FromArgs)]
 #[argh(subcommand)]
 pub enum LaunchSpec {
     AppWindow(LaunchAppWindowArgs),
     WebView(LaunchWebViewArgs),
 }
 
-#[derive(Debug, Clone, FromArgs)]
+#[derive(FromArgs)]
 #[argh(subcommand, name = "app")]
 /// 启动 AppWindow
 pub struct LaunchAppWindowArgs {}
 
-#[derive(Debug, Clone, FromArgs)]
+#[derive(FromArgs)]
 #[argh(subcommand, name = "webview")]
 
 /// 启动 WebView

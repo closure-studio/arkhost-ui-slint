@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics , Spinner} from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, Spinner, Palette } from "std-widgets.slint";
 import { GameInfo, GameState, GameOperationRequestState } from "../game-info.slint";
 
 enum ButtonType {
@@ -7,42 +7,38 @@ enum ButtonType {
     RestartGame
 }
 
+global GameOperationUtil {
+    public pure function is-busy(info: GameInfo) -> bool {
+        info.request-state == GameOperationRequestState.Requesting
+            || info.game-state == GameState.Logging
+            || info.game-state == GameState.Captcha
+    }
+
+    public pure function can-login(info: GameInfo) -> bool {
+        if is-busy(info) {
+            return false;
+        }
+
+        info.game-state == GameState.Faulted || info.game-state == GameState.Stopped
+    }
+
+    public pure function can-interrupt(info: GameInfo) -> bool {
+        if is-busy(info) {
+            return false;
+        }
+
+        info.game-state == GameState.Running
+    }
+}
+
 component GameOperationShortcutButton inherits Button {
     in property <ButtonType> type;
     in property <GameInfo> info;
 
-    private property <bool> can-start;
-    private property <bool> can-stop;
-    private property <bool> can-restart;
-
     enabled: 
-        (type == ButtonType.StartGame && can-start)
-        || (type == ButtonType.StopGame && can-stop)
-        || (type == ButtonType.RestartGame && can-restart);
-
-    states [
-        busy when 
-            info.request-state == GameOperationRequestState.Requesting
-            || info.game-state == GameState.Logging
-            || info.game-state == GameState.Captcha: {
-            can-start: false;
-            can-stop: false;
-            can-restart: false;
-        }
-        can-login when 
-            info.game-state == GameState.Faulted
-            || info.game-state == GameState.Stopped: {
-            can-start: true;
-            can-stop: false;
-            can-restart: false;
-        }
-        can-interrupt when 
-            info.game-state == GameState.Running: {
-            can-start: false;
-            can-stop: true;
-            can-restart: true;
-        }
-    ]
+        (type == ButtonType.StartGame && GameOperationUtil.can-login(info))
+        || (type == ButtonType.StopGame && GameOperationUtil.can-interrupt(info))
+        || (type == ButtonType.RestartGame && GameOperationUtil.can-interrupt(info));
 }
 
 component StartGameButton inherits GameOperationShortcutButton {
@@ -50,8 +46,7 @@ component StartGameButton inherits GameOperationShortcutButton {
 
     type: ButtonType.StartGame;
     primary: true;
-    // primary=true时在dark-color-theme且enabled=true时字体为深色（在fluent主题下测试）
-    icon: StyleMetrics.dark-color-scheme && self.enabled 
+    icon: Palette.color-scheme == ColorScheme.dark  // primary Button 的文字颜色与默认文字颜色相反
         ? @image-url("../images/game_card_shortcut_start_light.svg")
         : @image-url("../images/game_card_shortcut_start.svg");
     text: !compact 
@@ -63,7 +58,7 @@ component StopGameButton inherits GameOperationShortcutButton {
     in property <bool> compact: false;
 
     type: ButtonType.StopGame;
-    icon: StyleMetrics.dark-color-scheme 
+    icon: Palette.color-scheme == ColorScheme.dark 
         ? @image-url("../images/game_card_shortcut_stop.svg")
         : @image-url("../images/game_card_shortcut_stop_light.svg");
     text: !compact 
@@ -75,7 +70,7 @@ component StopGameButton inherits GameOperationShortcutButton {
 //     in property <bool> compact: false;
 //    
 //     type: ButtonType.RestartGame;
-//     icon: StyleMetrics.dark-color-scheme 
+//     icon: Palette.color-scheme == ColorScheme.dark
 //         ? @image-url("../images/game_card_shortcut_restart.svg")
 //         : @image-url("../images/game_card_shortcut_restart_light.svg");
 //     text: !compact 
@@ -131,13 +126,13 @@ export component GameCardOperationShortcutPanelVertical inherits VerticalLayout 
     spacing: 10px;
     alignment: start;
 
-    StartGameButton {
+    if GameOperationUtil.can-login(info): StartGameButton {
         info: info;
         compact: compact;
         clicked => { start-game(info.id); }
     }
 
-    StopGameButton {
+    if GameOperationUtil.can-interrupt(info): StopGameButton {
         info: info;
         compact: compact;
         clicked => { stop-game(info.id); }

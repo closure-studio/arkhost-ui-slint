@@ -1,4 +1,5 @@
 use crate::app::ui::*;
+use async_scoped::TokioScope;
 use tokio::sync::oneshot;
 use tokio_util::sync::{CancellationToken, DropGuard};
 
@@ -74,7 +75,7 @@ impl SessionController {
 
     pub async fn auth(&self) {
         self.app_state_controller
-            .exec(|x| x.set_login_state(LoginState::LoggingIn, "自动登录中……".into()));
+            .exec(|x| x.set_login_state(LoginState::LoggingIn, " 自动登录中".into()));
         let (resp, mut rx) = oneshot::channel();
         match self
             .sender
@@ -151,12 +152,12 @@ impl SessionController {
     async fn on_login(&self) {
         self.rt_api_model.user.clear().await;
         self.game_controller.try_ensure_resources().await;
-        tokio::join!(
-            self.fetch_site_config(),
-            self.slot_controller.refresh_slots(),
-            self.spawn_sse_event_loop(),
-            self.ota_controller.check_release_update()
-        );
+        let _ = TokioScope::scope_and_block(|s| {
+            s.spawn(self.fetch_site_config());
+            s.spawn(self.slot_controller.refresh_slots());
+            s.spawn(self.spawn_sse_event_loop());
+            s.spawn(self.ota_controller.check_release_update());
+        });
     }
 
     async fn on_post_login(&self) {

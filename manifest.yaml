@@ -1,0 +1,18 @@
+# xbuild manifest file
+
+icon: "resource/android/icon.png"
+
+android:
+  manifest:
+    package: "com.closurestudio.arkhostapp"
+    uses_permission:
+      -
+        name: "android.permission.INTERNET"
+      -
+        name: "android.permission.POST_NOTIFICATIONS"
+    application:
+      label: "Closure Studio"
+      activities:
+        -
+          launch_mode: "singleTop"
+          orientation: "portrait"

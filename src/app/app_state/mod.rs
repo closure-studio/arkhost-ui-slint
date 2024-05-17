@@ -6,13 +6,12 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
-use slint::{Model, ModelRc, SharedString, Timer, VecModel, Weak};
+use slint::{Model, ModelRc, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
 use tokio::sync::Notify;
 
 pub struct AppState {
     pub ui: Weak<AppWindow>,
-    pub refresh_game_timer: Timer,
 }
 
 pub struct AppStateAsyncOp {
@@ -59,10 +58,7 @@ impl AppStateAsyncOp {
 
 impl AppState {
     pub fn new(ui: Weak<AppWindow>) -> Self {
-        Self {
-            ui,
-            refresh_game_timer: Timer::default(),
-        }
+        Self { ui }
     }
 
     pub fn set_login_state(&self, state: LoginState, mut status_text: String) -> AppStateAsyncOp {
@@ -114,6 +110,17 @@ impl AppState {
     pub fn set_log_load_state(&self, id: String, state: GameLogLoadState) -> AppStateAsyncOp {
         self.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
             game_info.log_loaded = state;
+            game_info_list.set_row_data(i, game_info);
+        })
+    }
+
+    pub fn set_battle_screenshots_load_state(
+        &self,
+        id: String,
+        state: BattleScreenshotsLoadState,
+    ) -> AppStateAsyncOp {
+        self.exec_with_game_by_id(id, move |game_info_list, i, mut game_info| {
+            game_info.battle_screenshots_loading = state;
             game_info_list.set_row_data(i, game_info);
         })
     }
@@ -245,17 +252,15 @@ impl AppState {
             let slot_info_list = ui.get_slot_info_list();
 
             for (i, mut slot_info) in slot_info_list.iter().enumerate() {
-                slot_info.view_state = if slot_info.uuid == id {
-                    if !toggle || (slot_info.view_state != SlotDetailsViewState::Expanded) {
-                        ui.set_selected_slot(SharedString::from(&id));
-                        SlotDetailsViewState::Expanded
-                    } else {
-                        ui.set_selected_slot(Default::default());
-                        SlotDetailsViewState::Collapsed
-                    }
-                } else {
-                    SlotDetailsViewState::Collapsed
-                };
+                if slot_info.uuid == id && slot_info.view_state != SlotDetailsViewState::Independent
+                {
+                    slot_info.view_state =
+                        if !toggle || (slot_info.view_state != SlotDetailsViewState::Expanded) {
+                            SlotDetailsViewState::Expanded
+                        } else {
+                            SlotDetailsViewState::Collapsed
+                        }
+                }
 
                 slot_info_list.set_row_data(i, slot_info);
             }

@@ -1,15 +1,19 @@
 #[cfg(feature = "desktop-app")]
 pub mod ipc;
 
+#[cfg(feature = "android-app")]
+pub mod geetest_sdk;
+
 use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
-use super::webview::auth::AuthResult;
+use super::auth::AuthResult;
 
 #[derive(Debug, Error)]
+#[allow(unused)]
 pub enum AuthError {
     #[error("authentication failed: {0:?}")]
     Auth(AuthResult),
@@ -26,6 +30,7 @@ pub struct AuthContext {
     pub stop: CancellationToken,
 }
 
+#[allow(unused)]
 pub enum Command {
     LaunchAuthenticator {
         resp: oneshot::Sender<Result<(), AuthError>>,

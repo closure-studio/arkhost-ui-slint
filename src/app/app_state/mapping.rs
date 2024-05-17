@@ -168,6 +168,7 @@ impl GameOptionsMapping {
                 enable_building_arrange: Some(options.enable_building_arrange),
                 recruit_ignore_robot: Some(options.recruit_ignore_robot),
                 recruit_reserve: Some(options.recruit_reserve),
+                accelerate_slot_cn: Some(options.accelerate_slot_cn.to_string()),
                 is_stopped: None,
                 map_id: None,
             },
@@ -193,6 +194,12 @@ impl GameOptionsMapping {
         game_options.enable_building_arrange = self.options.enable_building_arrange.unwrap_or(true);
         game_options.recruit_ignore_robot = self.options.recruit_ignore_robot.unwrap_or(false);
         game_options.recruit_reserve = self.options.recruit_reserve.unwrap_or(0);
+        game_options.accelerate_slot_cn = self
+            .options
+            .accelerate_slot_cn
+            .as_deref()
+            .unwrap_or("中层左")
+            .into();
     }
 }
 
@@ -267,7 +274,10 @@ impl SlotInfoMapping {
     }
 
     pub fn create_slot_info(&self) -> SlotInfo {
-        let mut slot_info: SlotInfo = Default::default();
+        let mut slot_info = SlotInfo {
+            view_state: SlotDetailsViewState::Collapsed,
+            ..Default::default()
+        };
         self.mutate(&mut slot_info);
         slot_info
     }

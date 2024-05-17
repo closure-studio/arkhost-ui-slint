@@ -1,3 +1,5 @@
+import { GachaGroup } from "gacha-info.slint";
+
 export enum WebViewType {
     MicrosoftEdgeWebView2
 }
@@ -14,13 +16,19 @@ export enum ReleaseUpdateState {
 }
 
 export global StateGlobals {
+    // WebView installation detection
     in-out property <WebViewType> default-webview-installation-type;
     in-out property <bool> has-default-webview-installation;
     in-out property <bool> has-webview-launch-failure;
-
-    in-out property <string> site-announcement: "";
+    // Site announcement
+    in-out property <string> site-announcement: "暂时没有公告~";
     in-out property <bool> is-site-under-maintenance: false;
-
+    // Site gacha stat
+    in-out property <bool> show-gacha-records;
+    in-out property <string> gacha-record-time: "一段时间";
+    in-out property <int> gacha-record-count: 0;
+    in-out property <[GachaGroup]> gacha-record;
+    // App update
     in-out property <string> update-version;
     in-out property <ReleaseUpdateType> update-type;
     in-out property <string> update-size;
@@ -28,4 +36,10 @@ export global StateGlobals {
     in-out property <float> update-progress;
     in-out property <bool> update-indeterminate;
     in-out property <ReleaseUpdateState> update-state;
+    // App cache
+    in-out property <bool> clean-data-requested;
+    in-out property <string> data-disk-usage: "";
+    in-out property <string> cache-disk-usage: "";
+    // App data saver mode
+    in-out property <bool> data-saver-mode-enabled;
 }

@@ -1,6 +1,7 @@
 use std::env;
 use std::ffi::OsStr;
 use std::ops::DerefMut;
+use std::process::ExitStatus;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,18 +9,16 @@ use super::AuthContext;
 use super::AuthError;
 use super::AuthWorker;
 use super::Command;
+use crate::app::auth::{AuthAction, AuthResult};
 use crate::app::ipc_auth_comm::AuthenticatorCommError;
 use crate::app::ipc_auth_comm::AuthenticatorServerSideChannel;
 use crate::app::ipc_auth_comm::{AuthenticatorConnection, AuthenticatorMessage};
-use crate::app::webview::auth::{AuthAction, AuthResult};
 use async_trait::async_trait;
 use futures_util::future::BoxFuture;
 use futures_util::future::Fuse;
 use futures_util::future::FusedFuture;
 use futures_util::FutureExt;
 use ipc_channel::ipc::IpcOneShotServer;
-use subprocess::ExitStatus;
-use tokio::sync::Notify;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
 
@@ -226,7 +225,6 @@ impl IpcAuthWorker {
         let mut process = crate::app::utils::subprocess::spawn_executable(
             current_exe.as_os_str(),
             &[
-                current_exe.as_os_str(),
                 OsStr::new("webview"),
                 OsStr::new("--account"),
                 OsStr::new("UNUSED"),
@@ -243,26 +241,15 @@ impl IpcAuthWorker {
             Ok(connection) => Ok(Arc::new(Mutex::new(AuthProcess {
                 connection,
                 poller: async move {
-                    let notify = Arc::new(Notify::new());
-                    let thread = std::thread::spawn({
-                        let notify = notify.clone();
-                        move || {
-                            let exit_status = process.wait().ok();
-                            println!(
-                                "[IpcAuthWorker] Auth process exited with status {exit_status:?}"
-                            );
-                            notify.notify_one();
-                            exit_status
-                        }
-                    });
-                    notify.notified().await;
-                    thread.join().unwrap_or(None)
+                    let exit_status = process.wait().await.ok();
+                    println!("[IpcAuthWorker] Auth process exited with status {exit_status:?}");
+                    exit_status
                 }
                 .boxed()
                 .fuse(),
             }))),
             Err(e) => {
-                _ = process.terminate();
+                _ = process.start_kill();
                 Err(e)
             }
         }

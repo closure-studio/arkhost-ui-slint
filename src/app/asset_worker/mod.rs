@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use arkhost_ota::{Release, ReleaseIndexV1};
 
-use super::utils::app_metadata;
+use super::{app_state::model::AssetPath, utils::app_metadata};
 
 pub type CommandResult<T> = anyhow::Result<T>;
 pub type Responder<T> = oneshot::Sender<CommandResult<T>>;
@@ -37,12 +37,12 @@ pub enum ReleaseUpdateType {
 pub enum Command {
     LoadAsset {
         cache_key: Option<String>,
-        path: String,
+        path: AssetPath,
         resp: Responder<AssetRef>,
     },
     LoadImageRgba8 {
         cache_key: Option<String>,
-        path: String,
+        path: AssetPath,
         src_format: Option<image::ImageFormat>,
         resp: Responder<AssetRef>,
     },
@@ -116,13 +116,20 @@ impl AssetWorker {
     pub async fn load_asset(
         &self,
         cache_key: Option<String>,
-        path: &str,
+        path: &AssetPath,
     ) -> CommandResult<AssetRef> {
         if let Some(asset) = self.read_cache_by_key(&cache_key).await {
             return Ok(asset);
         }
 
-        let bytes = self.asset_client.get_content(path, |x| x).await?;
+        let bytes = match path {
+            AssetPath::GameAsset(path) => self.asset_client.get_content(path, |x| x).await?,
+            AssetPath::External(url) => {
+                self.asset_client
+                    .get_url_content(url.to_owned(), |x| x)
+                    .await?
+            }
+        };
         let asset = AssetRef::Bytes(bytes);
         self.write_cache_by_key(cache_key, &asset).await;
         Ok(asset)
@@ -131,14 +138,21 @@ impl AssetWorker {
     pub async fn load_image_rgba8(
         &self,
         cache_key: Option<String>,
-        path: &str,
+        path: &AssetPath,
         src_format: Option<image::ImageFormat>,
     ) -> CommandResult<AssetRef> {
         if let Some(bytes) = self.read_cache_by_key(&cache_key).await {
             return Ok(bytes);
         }
 
-        let src_bytes = self.asset_client.get_content(path, |x| x).await?;
+        let src_bytes = match path {
+            AssetPath::GameAsset(path) => self.asset_client.get_content(path, |x| x).await?,
+            AssetPath::External(url) => {
+                self.asset_client
+                    .get_url_content(url.to_owned(), |x| x)
+                    .await?
+            }
+        };
         let image = match src_format {
             Some(fmt) => image::load_from_memory_with_format(&src_bytes, fmt)?,
             None => image::load_from_memory(&src_bytes)?,

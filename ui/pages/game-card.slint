@@ -1,4 +1,10 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
+import { 
+    GridBox,
+    Button,
+    HorizontalBox,
+    VerticalBox,
+    Palette
+} from "std-widgets.slint";
 import { GameInfo, GameState, GameInfoViewType, GameLogLoadState, GameLogLoadRequestType, BattleMap } from "../game-info.slint";
 import { GameCardDoctorInfo } from "game-card-doctor-info.slint";
 import { GameCardOptions } from "game-card-options.slint";
@@ -52,9 +58,9 @@ component GameCardTabSwitch inherits Rectangle {
         height: root.height;
         width: 50px;
 
-        background: StyleMetrics.dark-color-scheme
+        background: Palette.color-scheme == ColorScheme.dark
             ? #3c3c3c
-            : StyleMetrics.window-background;
+            : Palette.background;
         border-radius: 6px;
 
         animate opacity { duration: 0.15s; }
@@ -83,13 +89,10 @@ component GameCardTabSwitch inherits Rectangle {
                 width: root.width * 0.75;
                 height: root.width * 0.75;
                 colorize: selected
-                    ? StyleMetrics.default-text-color
-                    : StyleMetrics.default-text-color.transparentize(60%);
+                    ? Palette.control-foreground
+                    : Palette.control-foreground.transparentize(60%);
         
-                animate colorize {
-                    duration: 0.25s;
-                    easing: ease;
-                }
+                animate colorize { duration: 0.25s; }
 
                 states [
                     rotate when selected && enable-special-fx && touch-area.pressed: {
@@ -106,6 +109,7 @@ component GameCardTabSwitch inherits Rectangle {
             Text {
                 font-size: 11px;
                 text: name;
+                color: Palette.control-foreground;
 
                 vertical-alignment: top;
                 horizontal-alignment: center;
@@ -130,8 +134,7 @@ component GameCardTabSwitch inherits Rectangle {
 
     animate height { duration: 0.25s; }
 
-    touch-area := TouchArea {
-    }
+    touch-area := TouchArea { }
 }
 
 export component GameCard inherits Rectangle {
@@ -144,16 +147,11 @@ export component GameCard inherits Rectangle {
     callback save-options <=> options.save-options;
     callback load-logs <=> logs.load-logs;
     callback view-changed(string, GameInfoViewType);
-    callback search-maps <=> battle.search-maps;
-    callback set-map-selected <=> battle.set-map-selected;
-    callback reset-selected-maps <=> battle.reset-selected-maps;
-    callback save-maps <=> battle.save-maps;
+    callback select-map <=> battle.select-map;
     
     border-radius: 10px;
-    background: StyleMetrics.dark-color-scheme
-        ? #242424
-        : StyleMetrics.window-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
+    background: Palette.alternate-background;
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark
         ? 0px
         : 5px;
     drop-shadow-color: darkgray;
@@ -285,9 +283,7 @@ export component GameCard inherits Rectangle {
         }
 
         Rectangle {
-            background: StyleMetrics.dark-color-scheme
-                ? StyleMetrics.window-background.darker(80%).transparentize(50%)
-                : StyleMetrics.window-background.darker(20%).transparentize(50%);
+            background: Palette.control-background;
             border-radius: 10px;
 
             VerticalLayout {
@@ -349,23 +345,23 @@ export component GameCard inherits Rectangle {
                     spacing: 10px;
                     alignment: end;
     
-                    GameCardOperationShortcutPanelVertical {
-                        start-game(id) => { start-game(id); }
-                        stop-game(id) => { stop-game(id); }
-                        restart-game(id) => { restart-game(id); }
+                    // GameCardOperationShortcutPanelVertical {
+                    //     start-game(id) => { start-game(id); }
+                    //     stop-game(id) => { stop-game(id); }
+                    //     restart-game(id) => { restart-game(id); }
 
-                        info: info;
-                        compact: true;
+                    //     info: info;
+                    //     compact: true;
     
-                        opacity: current-active-tab != 0
-                            ? 100%
-                            : 0%;
+                    //     opacity: current-active-tab != 0
+                    //         ? 100%
+                    //         : 0%;
                     
-                        animate opacity {
-                            easing: ease;
-                            duration: 0.125s;
-                        }
-                    }
+                    //     animate opacity {
+                    //         easing: ease;
+                    //         duration: 0.125s;
+                    //     }
+                    // }
     
                     GameStatusBadge {
                         info: info;

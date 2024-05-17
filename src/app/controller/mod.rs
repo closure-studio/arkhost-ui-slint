@@ -1,4 +1,5 @@
 pub mod app_state_controller;
+pub mod config_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
@@ -10,6 +11,7 @@ pub mod slot_controller;
 pub mod user_controller;
 extern crate alloc;
 
+use self::config_controller::ConfigController;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
@@ -37,7 +39,7 @@ type AuthCommand = super::auth_worker::Command;
 type AssetCommand = super::asset_worker::Command;
 
 type ApiResult<T> = arkhost_api::clients::common::ApiResult<T>;
-type AuthResult = super::webview::auth::AuthResult;
+type AuthResult = super::auth::AuthResult;
 type AssetResult<T> = anyhow::Result<T>;
 
 #[derive(Debug, Clone)]
@@ -59,10 +61,11 @@ where
     RespRecvError(#[from] oneshot::error::RecvError),
 }
 
-pub struct ControllerAdaptor {
+pub struct UIContext {
     pub rt_api_model: Arc<RtApiModel>,
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
+    pub config_controller: Arc<ConfigController>,
     pub image_controller: Arc<ImageController>,
     pub session_controller: Arc<SessionController>,
     pub game_controller: Arc<GameController>,
@@ -72,7 +75,11 @@ pub struct ControllerAdaptor {
     pub ota_controller: Arc<OtaController>,
 }
 
-impl ControllerAdaptor {
+pub struct UIMainThreadContext {
+    pub refresh_game_timer: slint::Timer,
+}
+
+impl UIContext {
     pub fn new(
         app_state: AppState,
         rt_api_model: Arc<RtApiModel>,
@@ -84,6 +91,7 @@ impl ControllerAdaptor {
         let app_state_controller = Arc::new(AppStateController {
             app_state: app_state.clone(),
         });
+        let config_controller = Arc::new(ConfigController::new(app_state_controller.clone()));
         let sender = Arc::new(Sender {
             rt_api_model: rt_api_model.clone(),
             tx_api_worker,
@@ -103,6 +111,7 @@ impl ControllerAdaptor {
         let game_controller = Arc::new(GameController::new(
             rt_api_model.clone(),
             app_state_controller.clone(),
+            config_controller.clone(),
             sender.clone(),
             image_controller.clone(),
             slot_controller.clone(),
@@ -130,6 +139,7 @@ impl ControllerAdaptor {
             app_state,
             app_state_controller,
             image_controller,
+            config_controller,
             session_controller,
             game_controller,
             slot_controller,
@@ -139,7 +149,7 @@ impl ControllerAdaptor {
         }
     }
 
-    pub fn attach(self: Arc<Self>, app: &AppWindow) {
+    pub fn attach(self: Arc<Self>, app: &AppWindow) -> UIMainThreadContext {
         app.on_register_requested(|| {
             ext_link::open_ext_link("https://closure.ltsc.vip");
         });
@@ -152,7 +162,7 @@ impl ControllerAdaptor {
             app.on_login_requested(move |account, password| {
                 let app = app_weak.clone().unwrap();
 
-                app.set_login_status_text("正在登录…… ".into());
+                app.set_login_status_text(" 正在登录".into());
                 app.set_login_state(LoginState::LoggingIn);
 
                 let this = this.clone();
@@ -403,7 +413,7 @@ impl ControllerAdaptor {
         {
             let this = self.clone();
             app.on_search_maps(move |id, term, fuzzy| {
-                let this: Arc<ControllerAdaptor> = this.clone();
+                let this: Arc<UIContext> = this.clone();
                 let term: String = term.trim().to_ascii_uppercase();
                 if term.is_empty() || term == "-" {
                     return;
@@ -468,6 +478,18 @@ impl ControllerAdaptor {
 
         {
             let this = self.clone();
+            app.on_load_screenshots(move |id| {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller
+                        .load_battle_screenshots(id.as_str())
+                        .await;
+                });
+            });
+        }
+
+        {
+            let this = self.clone();
             app.on_download_update(move || {
                 let this = this.clone();
                 tokio::spawn(async move {
@@ -477,6 +499,40 @@ impl ControllerAdaptor {
         }
 
         {
+            let this = self.clone();
+            app.on_set_data_saver_mode(move |val| {
+                this.config_controller.set_data_saver_mode_enabled(val);
+            });
+        }
+
+        {
+            let this = self.clone();
+            app.on_set_clean_data(move |val| {
+                _ = this
+                    .config_controller
+                    .set_clean_data(val)
+                    .map_err(|e| println!("[Controller] error cleaning cache: {e}"));
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_recalculate_data_disk_usage(move || {
+                this.config_controller.recalculate_disk_usage();
+            })
+        }
+
+        {
+            let this = self.clone();
+            app.on_confirm_gacha_records(move || {
+                let this = this.clone();
+                tokio::spawn(async move {
+                    this.game_controller.confirm_gacha_records().await;
+                });
+            })
+        }
+
+        let refresh_game_timer = {
             let app_weak = app.as_weak();
             let this = self.clone();
             let timer = slint::Timer::default();
@@ -502,7 +558,9 @@ impl ControllerAdaptor {
                     .unwrap();
                 },
             );
-            self.app_state.lock().unwrap().refresh_game_timer = timer;
-        }
+            timer
+        };
+
+        UIMainThreadContext { refresh_game_timer }
     }
 }

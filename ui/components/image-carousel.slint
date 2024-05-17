@@ -1,0 +1,111 @@
+import { Palette } from "std-widgets.slint";
+import { FontGlobals } from "../font-globals.slint";
+
+component ImageThumbnail inherits Rectangle {
+    in property <bool> focused;
+    in property <string> label;
+    in property <float> aspect-ratio;
+    in property <image> image;
+    in property <float> focus-zooming: 1.05;
+    private property <float> scale: focused ? focus-zooming : 1;
+    callback selected <=> touch-area.clicked;
+    height: self.width / aspect-ratio;
+    touch-area := TouchArea {
+        HorizontalLayout {
+            padding: 5px;
+            Image {
+                source: image;
+                image-fit: contain;
+            }
+
+            width: parent.width * scale;
+            height: parent.height * scale;
+            animate width {
+                easing: ease;
+                duration: 0.1s;
+            }
+            animate height {
+                easing: ease;
+                duration: 0.1s;
+            }
+        }
+
+        width: parent.width;
+        height: parent.height;
+    }
+
+    // label
+    if label != "": Rectangle {
+        border-radius: 4px;
+        background: Palette.alternate-background;
+        opacity: 0.8;
+        label-area := HorizontalLayout {
+            alignment: start;
+            padding-top: 3px;
+            padding-bottom: 3px;
+            padding-left: 8px;
+            padding-right: 8px;
+            Text {
+                text: label;
+                font-family: FontGlobals.closure-studio-logo;
+                font-weight: 450;
+                font-size: 12px;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+
+        height: 20px;
+        width: label-area.min-width;
+        x: 5px;
+        y: parent.height - self.height - 5px;
+    }
+}
+
+export component ImageSelector inherits Rectangle {
+    in property <float> aspect-ratio: 16 / 9;
+    in property <[image]> images;
+    in property <[string]> labels;
+    in property <length> item-spacing: 10px;
+    in property <float> focus-zooming: 1.05;
+    out property <int> current-index: clamp(floor(-scroll.viewport-y / item-height + 0.5), 0, images.length - 1);
+    private property <int> last-index: -1;
+    private property <length> deadzone-height: max(0px, (self.height - item-height - item-spacing) / 2);
+    private property <length> item-height: self.width / aspect-ratio + item-spacing;
+    private property <duration> scroll-animate-duration;
+    callback image-selected(int);
+    public function set-current-image(index: int){
+        scroll-animate-duration = 0.2s;
+        scroll.viewport-y = -(index * item-height);
+    }
+    scroll := Flickable {
+        viewport-width: self.width;
+        viewport-height: deadzone-height * 2 + images.length * item-height;
+        for img[i] in images: ImageThumbnail {
+            label: labels.length > 0 ? labels[i] : @tr("{}/{}", i + 1, images.length);
+            focused: i == current-index;
+            focus-zooming: focus-zooming;
+            aspect-ratio: aspect-ratio;
+            image: img;
+            selected => {
+                if (current-index != i) {
+                    set-current-image(i);
+                }
+                image-selected(i);
+            }
+            x: 0;
+            y: deadzone-height + i * item-height;
+        }
+        animate viewport-y {
+            duration: scroll-animate-duration;
+            easing: ease-out-sine;
+        }
+        flicked => {
+            scroll-animate-duration = 0;
+            if (last-index != current-index) {
+                last-index = current-index;
+                image-selected(last-index);
+            }
+        }
+    }
+}

@@ -1,2 +1,2 @@
-#![allow(unused_imports)]
+#![allow(unused)]
 slint::include_modules!();

@@ -1,34 +1,16 @@
 use http_cache::{CacheManager, HttpResponse, Result};
 
-use http_cache_semantics::CachePolicy;
-use polodb_core::bson::doc;
-use polodb_core::IndexModel;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use url::Url;
-
 use super::db;
+use http_cache_semantics::CachePolicy;
+use serde::{Deserialize, Serialize};
 
 pub struct DBCacheManager {
-    collection: polodb_core::Collection<Store>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(remote = "HttpResponse")]
-struct HttpResponseDef {
-    #[serde(with = "serde_bytes")] // 防止body被序列化成数组
-    pub body: Vec<u8>,
-    pub headers: HashMap<String, String>,
-    pub status: u16,
-    pub url: Url,
-    pub version: http_cache::HttpVersion,
+    db: heed::Database<heed::types::Str, heed::types::SerdeBincode<Store>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Store {
-    _id: Option<polodb_core::bson::oid::ObjectId>,
     cache_key: String,
-    #[serde(with = "HttpResponseDef")]
     response: HttpResponse,
     policy: CachePolicy,
 }
@@ -36,31 +18,29 @@ struct Store {
 #[allow(dead_code)]
 impl DBCacheManager {
     pub fn new() -> Self {
-        let col = db::instance().collection::<Store>(db::consts::collection::HTTP_CACHE);
-        col.create_index(IndexModel {
-            keys: doc! {
-                "cache_key": 1
-            },
-            options: None,
-        })
-        .expect("Unable to create index on cache collection");
-        Self { collection: col }
+        let db = db::database(Some(db::consts::db::HTTP_CACHE))
+            .expect("Unable to create index on cache collection");
+        Self { db }
     }
 
     /// Clears out the entire cache.
     pub async fn clear(&self) -> Result<()> {
-        Ok(())
+        let env = db::env();
+        let mut wtxn = env.write_txn().map_err(into_box_error)?;
+        self.db.clear(&mut wtxn).map_err(into_box_error)?;
+        wtxn.commit().map_err(into_box_error)
     }
 }
 
 #[async_trait::async_trait]
 impl CacheManager for DBCacheManager {
     async fn get(&self, cache_key: &str) -> Result<Option<(HttpResponse, CachePolicy)>> {
-        if let Some(store) = self.collection.find_one(doc! { "cache_key": cache_key })? {
-            Ok(Some((store.response, store.policy)))
-        } else {
-            Ok(None)
-        }
+        let env = db::env();
+        let rtxn = env.read_txn().map_err(into_box_error)?;
+        self.db
+            .get(&rtxn, cache_key)
+            .map(|x| x.map(|x| (x.response, x.policy)))
+            .map_err(into_box_error)
     }
 
     async fn put(
@@ -70,41 +50,30 @@ impl CacheManager for DBCacheManager {
         policy: CachePolicy,
     ) -> Result<HttpResponse> {
         let store = Store {
-            _id: None,
             cache_key: cache_key.to_owned(),
             response,
             policy,
         };
 
-        let mut session = db::instance().start_session()?;
-        session.start_transaction(Some(polodb_core::TransactionType::Write))?;
-        if let Some(Store {
-            _id: Some(ref oid), ..
-        }) = self
-            .collection
-            .find_one_with_session(doc! { "cache_key": { "$eq": &cache_key } }, &mut session)?
-        {
-            let mut update = polodb_core::bson::to_document(&store)?;
-            update.remove("_id");
-            update.remove("cache_key");
-            self.collection.update_one_with_session(
-                doc! { "_id": oid },
-                doc! {
-                    "$set": update,
-                },
-                &mut session,
-            )?;
-        } else {
-            self.collection
-                .insert_one_with_session(&store, &mut session)?;
-        };
-        session.commit_transaction()?;
+        let env = db::env();
+        let mut wtxn = env.write_txn().map_err(into_box_error)?;
+        self.db
+            .put(&mut wtxn, &cache_key, &store)
+            .map_err(into_box_error)?;
+        wtxn.commit().map_err(into_box_error)?;
         Ok(store.response)
     }
 
     async fn delete(&self, cache_key: &str) -> Result<()> {
-        self.collection
-            .delete_many(doc! { "cache_key": cache_key })?;
-        Ok(())
+        let env = db::env();
+        let mut wtxn = env.write_txn().map_err(into_box_error)?;
+        self.db
+            .delete(&mut wtxn, cache_key)
+            .map_err(into_box_error)?;
+        wtxn.commit().map_err(into_box_error)
     }
+}
+
+fn into_box_error(e: heed::Error) -> http_cache::BoxError {
+    anyhow::anyhow!(e.to_string()).into()
 }

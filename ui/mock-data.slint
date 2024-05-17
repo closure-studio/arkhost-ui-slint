@@ -1,6 +1,7 @@
 import { GameInfo, GameState, GameLogLoadState, GameLogLoadRequestType, GameInfoViewType, GameOptions } from "game-info.slint";
 import { SlotInfo, SlotState, SlotUpdateRequestState, SlotUpdateDraftType, SlotPlatform, SlotDetailsViewState } from "slot-info.slint";
 import { UserInfo, UserStatus, UserTier, UserProgress} from "user-info.slint";
+import { GachaGroup } from "gacha-info.slint";
 
 export global MockData {
     out property <GameInfo> game-info: {
@@ -38,6 +39,10 @@ export global MockData {
             secretary: "澄闪",
             social-point: "300"
         },
+        selected-maps: [
+            { code-name: "1-7", display-name: "暴君" },
+            { code-name: "", display-name: "main_01-07" },
+        ],
         map-search-results: [
             { code-name: "1-7", display-name: "暴君" },
             { code-name: "HS-114514", display-name: "海猫公子种地（危机磨难险境突袭剿灭紧急作战）" }
@@ -73,7 +78,7 @@ export global MockData {
             game-account: "18877776666",
             platform: SlotPlatform.Bilibili,
             password: "secret"
-        }
+        },
     };
 
     out property <UserInfo> user-info: {
@@ -85,4 +90,25 @@ export global MockData {
         qq: "67890",
         qq-verify-code-cached: "verifyCode:kfc-crazy-thursday-v-me-50"
     };
+
+    out property <[GachaGroup]> gacha-recrods: [
+        {
+            pool-name: "限定卡池“何以为我”每日一抽",
+            pulls: [
+                { doc-name: "Actor", rarity: "6★", character-avatar: @image-url("images/D32_Steel.png") },
+                { doc-name: "Boctor", rarity: "5★", character-avatar: @image-url("images/icon_ap.png") },
+                { doc-name: "Coctor", rarity: "4★", character-avatar: @image-url("images/closure_logo_ferris.png") },
+                { doc-name: "Doctor", rarity: "6★" },
+                { doc-name: "一二三四五六七八", rarity: "限定", character-avatar: @image-url("images/closure_drone.png") },
+                { doc-name: "一二三四五六七八九", rarity: "2★" },
+            ]
+        }, {
+            pool-name: "公开招募",
+            pulls: [
+                { doc-name: "Closure", rarity: "42★", character-avatar: @image-url("images/D32_Steel.png") },
+                { doc-name: "Closure", rarity: "42★", character-avatar: @image-url("images/D32_Steel.png") },
+                { doc-name: "Closure", rarity: "42★", character-avatar: @image-url("images/D32_Steel.png") },
+            ]
+        }
+    ];
 }

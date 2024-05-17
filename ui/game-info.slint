@@ -22,6 +22,11 @@ export enum GameLogLoadRequestType {
     Former
 }
 
+export enum BattleScreenshotsLoadState {
+    Idle,
+    Loading
+}
+
 export struct GameLogEntry {
     timestamp: string,
     attributes: string,
@@ -40,6 +45,7 @@ export struct GameOptions {
     ap-reserve: int,
     recruit-ignore-robot: bool,
     recruit-reserve: int,
+    accelerate-slot-cn: string,
 }
 
 export enum GameInfoViewType {
@@ -52,8 +58,7 @@ export enum GameInfoViewType {
 
 export struct AvatarInfo {
     loaded: bool,
-    avatar-image: image
-}
+    avatar-image: image}
 
 export struct IllustInfo {
     loaded: bool,
@@ -65,7 +70,7 @@ export struct IllustInfo {
     scale-x: float,
     scale-y: float,
     size-x: float,
-    size-y: float
+    size-y: float,
 }
 
 export struct BattleMap {
@@ -75,7 +80,7 @@ export struct BattleMap {
 }
 
 export struct BattleUpdateFields {
-    maps: [BattleMap]
+    maps: [BattleMap],
 }
 
 export struct GameDetails {  
@@ -90,7 +95,7 @@ export struct GameDetails {
     max-ap: string,
     recruit-license: string,
     secretary: string,
-    social-point: string
+    social-point: string,
 }
 
 export struct GameInfo {
@@ -110,5 +115,23 @@ export struct GameInfo {
     active-view: GameInfoViewType,
     details: GameDetails,
     map-search-results: [BattleMap],
-    selected-maps: [BattleMap]
+    selected-maps: [BattleMap],
+    battle-screenshots: [image],
+    current-battle-screenshot-series: string,
+    remote-battle-screenshot-series: string,
+    battle-screenshots-loading: BattleScreenshotsLoadState,
+}
+
+export global GameModels {
+    out property <[string]> accelerate-slot-cn: [
+        "顶层左",
+        "顶层中",
+        "顶层右",
+        "中层左",
+        "中层中",
+        "中层右",
+        "底层左",
+        "底层中",
+        "底层右",
+    ];
 }

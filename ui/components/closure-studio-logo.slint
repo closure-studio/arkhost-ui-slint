@@ -1,4 +1,4 @@
-import { StyleMetrics, HorizontalBox } from "std-widgets.slint";
+import { Palette, HorizontalBox } from "std-widgets.slint";
 import { FontGlobals } from "../font-globals.slint";
 
 export component ClosureStudioLogoSingleRow inherits HorizontalBox {
@@ -93,7 +93,7 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
                     Text {
                         font-size: 15px;
                         font-family: FontGlobals.closure-studio-logo;
-                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        color: Palette.foreground.transparentize(20%);
                         text: "D32 ";
                         vertical-alignment: center;
                     }
@@ -117,15 +117,13 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
                     Text {
                         font-size: 15px;
                         font-family: FontGlobals.closure-studio-logo;
-                        color: StyleMetrics.default-text-color.transparentize(20%);
+                        color: Palette.foreground.transparentize(20%);
                         text: " EDITION";
                         vertical-alignment: center;
                     }
                 }
 
-                background: StyleMetrics.dark-color-scheme
-                    ? #303030
-                    : StyleMetrics.window-background;
+                background: Palette.alternate-background;
             }
         }
     }

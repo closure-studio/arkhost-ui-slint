@@ -1,4 +1,4 @@
-import { GridBox , Button, HorizontalBox, VerticalBox, StyleMetrics } from "std-widgets.slint";
+import { GridBox , Button, HorizontalBox, VerticalBox, Palette } from "std-widgets.slint";
 import { UserTier } from "../user-info.slint";
 import { FontGlobals } from "../font-globals.slint";
 
@@ -20,17 +20,17 @@ export component SlotTierCard inherits Rectangle {
         ? root.width - 170px
         : root.width - 50px;
 
-    private property <brush> accent-color: StyleMetrics.dark-color-scheme
+    private property <brush> accent-color: Palette.color-scheme == ColorScheme.dark
         ? data.background-fill.brighter(100%)
         : data.background-fill.brighter(50%);
 
     callback on-upgrade-tier(UserTier);
     
     border-radius: 10px;
-    background: StyleMetrics.dark-color-scheme
+    background: Palette.color-scheme == ColorScheme.dark
         ? #242424
-        : StyleMetrics.window-background;
-    drop-shadow-blur: StyleMetrics.dark-color-scheme
+        : Palette.background;
+    drop-shadow-blur: Palette.color-scheme == ColorScheme.dark
         ? 0px
         : 5px;
     drop-shadow-color: darkgray;
@@ -132,7 +132,7 @@ export component SlotTierCard inherits Rectangle {
         }
 
         Rectangle {
-            background: StyleMetrics.window-background;
+            background: Palette.background;
             opacity: 0.8;
 
             width: root.width - 30px;

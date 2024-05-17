@@ -1,13 +1,36 @@
-use std::sync::Arc;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
+use url::Url;
 
 use crate::app::game_data;
+
+#[derive(Debug, Clone)]
+pub enum AssetPath {
+    GameAsset(String),
+    External(Url),
+}
+
+impl AssetPath {
+    pub fn inner_path(&self) -> &str {
+        match self {
+            Self::GameAsset(path) => path,
+            Self::External(url) => url.as_str(),
+        }
+    }
+}
+
+impl Default for AssetPath {
+    fn default() -> Self {
+        Self::GameAsset(String::new())
+    }
+}
 
 #[derive(Default, Debug, Clone)]
 pub enum ImageDataRaw {
     #[default]
     Empty,
-    Pending,
     Rgba8 {
         raw: bytes::Bytes,
         width: u32,
@@ -17,7 +40,7 @@ pub enum ImageDataRaw {
 
 #[derive(Default, Debug, Clone)]
 pub struct ImageData {
-    pub asset_path: String,
+    pub asset_path: AssetPath,
     pub cache_key: Option<String>,
     pub format: Option<image::ImageFormat>,
     pub loaded_image: ImageDataRaw,
@@ -40,4 +63,15 @@ pub type ImageDataRef = Arc<RwLock<ImageData>>;
 pub struct CharIllust {
     pub image: ImageData,
     pub positions: game_data::CharPack,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct UserConfig {
+    #[serde(default)]
+    pub data_saver_mode_enabled: bool,
+    #[serde(default)]
+    pub last_ssr_record_ts: DateTime<Utc>,
+    #[serde(default)]
+    /// 缓存的作战截图URL
+    pub cached_battle_screenshots: HashMap<String, Vec<url::Url>>,
 }
