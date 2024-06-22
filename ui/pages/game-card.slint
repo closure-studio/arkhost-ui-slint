@@ -14,6 +14,7 @@ import { GameStatusBadge } from "game-status-badge.slint";
 import { MockData } from "../mock-data.slint";
 import { CharIllust } from "../components/char-illust.slint";
 import { GameCardBattle } from "game-card-battle.slint";
+import { Theme } from "../theme.slint";
 
 component GameCardTab inherits Rectangle {
     in property <length> design-height;
@@ -283,9 +284,7 @@ export component GameCard inherits Rectangle {
         }
 
         Rectangle {
-            background: Palette.color-scheme == ColorScheme.light
-                ? Palette.control-background.with-alpha(0.35)
-                : Palette.control-background;
+            background: Theme.control-group-background;
             border-radius: 10px;
 
             VerticalLayout {

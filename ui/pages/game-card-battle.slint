@@ -3,6 +3,7 @@ import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields, BattleScr
 import { FontGlobals } from "../font-globals.slint";
 import { ImageSelector } from "../components/image-carousel.slint";
 import { Callbacks } from "../callbacks.slint";
+import { Theme } from "../theme.slint";
 
 component NoScreenshotIndicator inherits Rectangle {
     in property <string> text;
@@ -41,7 +42,7 @@ export component GameCardBattle inherits HorizontalLayout {
         alignment: stretch;
         spacing: 10px;
         Rectangle {
-            background: Palette.alternate-background.darker(5%);
+            background: Theme.control-group-background;
             border-radius: 10px;
             clip: true;
             HorizontalLayout {
@@ -140,7 +141,7 @@ export component GameCardBattle inherits HorizontalLayout {
             Rectangle {
                 border-radius: 10px;
                 clip: true;
-                background: Palette.alternate-background.darker(5%);
+                background: Theme.control-group-background;
                 min-width: 180px;
                 preferred-width: 200px;
                 max-width: is-wide ? 220px : 1000px;

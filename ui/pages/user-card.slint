@@ -4,6 +4,7 @@ import { MockData } from "../mock-data.slint";
 import { Callbacks } from "../callbacks.slint";
 import { FontGlobals } from "../font-globals.slint";
 import { StateGlobals } from "../state-globals.slint";
+import { Theme } from "../theme.slint";
 
 component VerifyInfoBar inherits Rectangle {
     in property <string> button-text;
@@ -11,7 +12,7 @@ component VerifyInfoBar inherits Rectangle {
     in property <string> verify-item-name;
     in property <string> verify-item-value;
     callback clicked <=> btn.clicked;
-    background: Palette.alternate-background.darker(5%);
+    background: Theme.control-group-background;
     border-radius: 10px;
     clip: true;
     HorizontalLayout {

@@ -1,0 +1,7 @@
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    out property <brush> control-group-background: Palette.color-scheme == ColorScheme.light
+        ? Palette.control-background.with-alpha(35%)
+        : Palette.alternate-background.darker(40%);
+}

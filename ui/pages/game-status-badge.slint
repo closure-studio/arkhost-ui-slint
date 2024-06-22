@@ -1,6 +1,7 @@
 import { GridBox , Button, HorizontalBox, VerticalBox, Palette } from "std-widgets.slint";
 import { GameInfo, GameState } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
+import { Theme } from "../theme.slint";
 
 component GameStatusBadgeBase inherits Rectangle {
     in property <GameInfo> info;
@@ -13,25 +14,25 @@ component GameStatusBadgeBase inherits Rectangle {
 
     states [
         logging when info.game-state == GameState.Logging: {
-            status-color: @linear-gradient(15deg, #3299d4 0%, #1299be 100%);
+            status-color: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
             status-text: @tr("登录中");
             status-icon: @image-url("../images/game_status_logging.svg");
             status-icon-blinking: true;
         }
         running when info.game-state == GameState.Running: {
-            status-color: @linear-gradient(15deg, #28a508 0%, #28b25f 100%);
+            status-color: @linear-gradient(15deg, #419c5b 0%, #2f9c3f 100%);
             status-text: @tr("运行中");
             status-icon: @image-url("../images/game_status_running.svg");
             status-icon-blinking: false;
         }
         faulted when info.game-state == GameState.Faulted: {
-            status-color: @linear-gradient(15deg, #dd4f24 0%, #db4321 100%);
+            status-color: @linear-gradient(15deg, #b5451f 0%, #af341b 100%);
             status-text: info.status-text;
             status-icon: @image-url("../images/game_status_faulted.svg");
             status-icon-blinking: false;
         }
         stopped when info.game-state == GameState.Stopped: {
-            status-color: #494949;
+            status-color: @linear-gradient(15deg, #88939e 0%, #959ba0 100%);
             status-text: @tr("已停止");
             status-icon: @image-url("../images/game_status_stopped.svg");
             status-icon-blinking: false;
@@ -52,7 +53,7 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
         : 15px;
 
     border-radius: self.height * 0.25;
-    border-color: self.status-color;
+    background: self.status-color.with-alpha(0.9);
 
     animate background { duration: 200ms; }
 
@@ -81,9 +82,7 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
 
 export component GameStatusBadgeWide inherits GameStatusBadgeBase {
     border-radius: 4px;
-    background: Palette.color-scheme == ColorScheme.light
-        ? Palette.control-background.with-alpha(0.35)
-        : Palette.control-background;
+    background: Theme.control-group-background;
 
     clip: true;
 
