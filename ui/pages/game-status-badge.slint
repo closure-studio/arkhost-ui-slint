@@ -52,7 +52,7 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
         : 15px;
 
     border-radius: self.height * 0.25;
-    background: self.status-color;
+    border-color: self.status-color;
 
     animate background { duration: 200ms; }
 
@@ -81,7 +81,9 @@ export component GameStatusBadge inherits GameStatusBadgeBase {
 
 export component GameStatusBadgeWide inherits GameStatusBadgeBase {
     border-radius: 4px;
-    background: Palette.control-background;
+    background: Palette.color-scheme == ColorScheme.light
+        ? Palette.control-background.with-alpha(0.35)
+        : Palette.control-background;
 
     clip: true;
 

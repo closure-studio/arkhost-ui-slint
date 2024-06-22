@@ -283,7 +283,9 @@ export component GameCard inherits Rectangle {
         }
 
         Rectangle {
-            background: Palette.control-background;
+            background: Palette.color-scheme == ColorScheme.light
+                ? Palette.control-background.with-alpha(0.35)
+                : Palette.control-background;
             border-radius: 10px;
 
             VerticalLayout {
