@@ -6,7 +6,7 @@ use serde_with::{serde_as, TimestampSeconds};
 
 use super::common::NullableData;
 
-#[derive(Default, PartialEq, Deserialize_repr, Clone, Debug)]
+#[derive(Default, PartialEq, Deserialize_repr, Clone, Copy, Debug)]
 #[repr(i32)]
 pub enum GameStatus {
     LoginFailed = -1,
@@ -21,7 +21,7 @@ pub enum GameStatus {
     Captcha = 999,
 }
 
-#[derive(Default, PartialEq, Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[derive(Default, PartialEq, Serialize_repr, Deserialize_repr, Clone, Copy, Debug)]
 #[repr(i32)]
 pub enum GamePlatform {
     #[default]
@@ -29,7 +29,7 @@ pub enum GamePlatform {
     Bilibili = 2,
 }
 
-#[derive(Default, Deserialize, Clone, Debug)]
+#[derive(Default, Deserialize, Clone, Copy, Debug)]
 pub struct LogLevel(u32);
 bitflags! {
     impl LogLevel: u32 {

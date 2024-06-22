@@ -240,7 +240,11 @@ impl GameController {
                 game.stage_name = Some(stage_name);
             }
 
-            if game.info.status.code == api_arkhost::GameStatus::Running {
+            let game_details_initialized = (game.info.status.code as i32) >= 2;
+            let need_refresh_game_details =
+                !matches!(game.info.status.code, GameStatus::Error if game.details.is_some());
+
+            if game_details_initialized && need_refresh_game_details {
                 games_to_fetch_details.push(game.info.status.account.clone());
             }
         }

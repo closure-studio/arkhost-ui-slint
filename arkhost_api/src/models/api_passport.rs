@@ -7,7 +7,7 @@ use std::fmt::Debug;
 
 use super::common::NullableData;
 
-#[derive(Default, Deserialize_repr, Clone, Debug, PartialEq)]
+#[derive(Default, Deserialize_repr, Clone, Copy, Debug, PartialEq)]
 #[repr(i32)]
 pub enum UserStatus {
     SmsUnverified = -1,
@@ -19,7 +19,7 @@ pub enum UserStatus {
     UnsupportedStatus = i32::MIN,
 }
 
-#[derive(Default, Deserialize, Clone, Debug)]
+#[derive(Default, Deserialize, Clone, Copy, Debug)]
 pub struct UserPermissions(u64);
 
 bitflags! {
