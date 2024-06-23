@@ -107,13 +107,14 @@ pub async fn update_client_if_exist() -> anyhow::Result<()> {
     use sha2::Digest;
     use tokio::io::AsyncBufReadExt;
 
-    let pending_update = match app::ota::pending_update()
+    let pending_update = app::ota::pending_update()
         .map_err(|e| {
             println!("[update_client_if_exist] Error reading pending update record from DB: {e}");
         })
         .ok()
-        .flatten()
-    {
+        .flatten();
+
+    let pending_update = match pending_update {
         Some(pending_update) => pending_update,
         None => return Ok(()),
     };

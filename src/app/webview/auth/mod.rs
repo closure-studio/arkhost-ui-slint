@@ -150,16 +150,13 @@ impl Authenticator {
         }
     }
 
-    pub fn build_webview<'a>(
-        &self,
-        builder: WebViewBuilder<'a>,
-    ) -> Result<WebViewBuilder<'a>, wry::Error> {
+    pub fn build_webview<'a>(&self, builder: WebViewBuilder<'a>) -> WebViewBuilder<'a> {
         let mut builder = builder;
 
         match self.auth_params {
             AuthParams::ArkHostAuth { .. } => {
                 builder = builder
-                    .with_url_and_headers(consts::ARKHOST_VERIFY_URL, Self::request_headers())?;
+                    .with_url_and_headers(consts::ARKHOST_VERIFY_URL, Self::request_headers());
             }
         }
         {
@@ -167,6 +164,7 @@ impl Authenticator {
             let auth_resolver_ref = self.auth_resolver.clone();
 
             builder = builder.with_ipc_handler(move |message| {
+            let message = message.into_body();
             let de_result = serde_json::de::from_str::<AuthPageMessage>(&message);
             match de_result {
                 Ok(msg) => match msg {
@@ -203,12 +201,13 @@ impl Authenticator {
             });
         }
 
-        Ok(builder)
+        builder
     }
 
     pub fn reload(&self) -> anyhow::Result<()> {
         let webview = self.webview.read().unwrap().webview()?;
-        webview.load_url_with_headers(consts::ARKHOST_VERIFY_URL, Authenticator::request_headers());
+        webview
+            .load_url_with_headers(consts::ARKHOST_VERIFY_URL, Authenticator::request_headers())?;
         Ok(())
     }
 

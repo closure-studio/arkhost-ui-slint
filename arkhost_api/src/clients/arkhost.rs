@@ -122,9 +122,10 @@ impl Client {
             .await?;
 
         let status_code = resp.status();
-        let json: ResponseWrapperNested<()> = try_response_json(resp).await?;
+        let json: ResponseWrapperNested<NullableData<()>> = try_response_json(resp).await?;
+        try_response_data(status_code, json)?;
 
-        Ok(try_response_data(status_code, json)?)
+        Ok(())
     }
 
     pub async fn get_site_config(&self) -> ApiResult<SiteConfig> {

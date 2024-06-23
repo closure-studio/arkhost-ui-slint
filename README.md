@@ -8,6 +8,7 @@
 ![slot info page](repo_assets/images/screenshot_slot_page.png)
 
 ## Features
+- [X] 抽卡出货公告
 - [X] SSE长连接
 - [ ] UI内错误提示
 - [X] 修改作战列表+作战关卡显示
