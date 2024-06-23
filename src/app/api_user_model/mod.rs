@@ -101,7 +101,7 @@ impl SlotEntry {
 }
 
 #[derive(Debug)]
-pub struct RtUserModel {
+pub struct ApiUser {
     pub games: GameMapSync,
     pub slots: SlotMapSync,
     initial_games_fetched: AtomicBool,
@@ -113,7 +113,7 @@ trait OrderedMapEntry<T> {
     async fn update(&self, new_val: T) -> ();
 }
 
-impl RtUserModel {
+impl ApiUser {
     pub fn new() -> Self {
         Self {
             games: RwLock::new(HashMap::new()),

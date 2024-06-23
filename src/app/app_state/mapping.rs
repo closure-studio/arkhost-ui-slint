@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use crate::app::rt_api_model::GameEntry;
-use crate::app::rt_api_model::{SlotEntry, SlotSyncState};
+use crate::app::api_user_model::GameEntry;
+use crate::app::api_user_model::{SlotEntry, SlotSyncState};
 use crate::app::ui::*;
 use arkhost_api::models::api_arkhost::{self, GameConfigFields, GamePlatform};
 use arkhost_api::models::api_passport;

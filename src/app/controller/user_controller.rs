@@ -5,25 +5,25 @@ use tokio::sync::oneshot;
 use crate::app::utils::notification;
 
 use super::{
-    app_state_controller::AppStateController, rt_api_model::RtApiModel, sender::Sender,
+    api_user_model::ApiUserModel, app_state_controller::AppStateController, sender::Sender,
     ApiOperation,
 };
 
 pub struct UserController {
     #[allow(unused)] // reserved
-    rt_api_model: Arc<RtApiModel>,
+    api_user_model: Arc<ApiUserModel>,
     app_state_controller: Arc<AppStateController>,
     sender: Arc<Sender>,
 }
 
 impl UserController {
     pub fn new(
-        rt_api_model: Arc<RtApiModel>,
+        api_user_model: Arc<ApiUserModel>,
         app_state_controller: Arc<AppStateController>,
         sender: Arc<Sender>,
     ) -> Self {
         Self {
-            rt_api_model,
+            api_user_model,
             app_state_controller,
             sender,
         }

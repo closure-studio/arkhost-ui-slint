@@ -2,16 +2,16 @@ use std::sync::Arc;
 
 use tokio::sync::RwLockReadGuard;
 
-use crate::app::rt_api_model::{GameMap, RtUserModel, SlotMap};
+use crate::app::api_user_model::{ApiUser, GameMap, SlotMap};
 
-pub struct RtApiModel {
-    pub user: Arc<RtUserModel>,
+pub struct ApiUserModel {
+    pub user: Arc<ApiUser>,
 }
 
-impl RtApiModel {
+impl ApiUserModel {
     pub fn new() -> Self {
         Self {
-            user: Arc::new(RtUserModel::new()),
+            user: Arc::new(ApiUser::new()),
         }
     }
 

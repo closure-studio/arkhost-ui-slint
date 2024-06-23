@@ -1,4 +1,5 @@
 use crate::app::{
+    api_user_model,
     api_worker::RetrieveLogSpec,
     app_state::{
         mapping::{BattleMapMapping, GameInfoMapping},
@@ -7,7 +8,6 @@ use crate::app::{
     asset_worker::AssetRef,
     controller::RefreshLogsCondition,
     game_data::{CharPack, CharPackSummaryTable, Stage, StageDropType, StageTable, StageType},
-    rt_api_model,
     ui::*,
     utils::{
         cache_manager::DBCacheManager,
@@ -36,10 +36,10 @@ use std::{
 };
 
 use super::{
-    app_state_controller::AppStateController, config_controller::ConfigController,
-    game_operation_controller::GameOperationController, image_controller::ImageController,
-    rt_api_model::RtApiModel, sender::Sender, slot_controller::SlotController, ApiOperation,
-    AssetCommand,
+    api_user_model::ApiUserModel, app_state_controller::AppStateController,
+    config_controller::ConfigController, game_operation_controller::GameOperationController,
+    image_controller::ImageController, sender::Sender, slot_controller::SlotController,
+    ApiOperation, AssetCommand,
 };
 
 #[derive(Default, Debug)]
@@ -59,7 +59,7 @@ pub struct GameController {
     current_last_gacha_record_ts: RwLock<chrono::DateTime<chrono::Utc>>,
     db_cache_manager: DBCacheManager,
 
-    rt_api_model: Arc<RtApiModel>,
+    api_user_model: Arc<ApiUserModel>,
     app_state_controller: Arc<AppStateController>,
     config_controller: Arc<ConfigController>,
     sender: Arc<Sender>,
@@ -70,7 +70,7 @@ pub struct GameController {
 
 impl GameController {
     pub fn new(
-        rt_api_model: Arc<RtApiModel>,
+        api_user_model: Arc<ApiUserModel>,
         app_state_controller: Arc<AppStateController>,
         config_controller: Arc<ConfigController>,
         sender: Arc<Sender>,
@@ -87,7 +87,7 @@ impl GameController {
             current_last_gacha_record_ts: RwLock::new(chrono::DateTime::<chrono::Utc>::MIN_UTC),
             db_cache_manager: DBCacheManager::new(),
 
-            rt_api_model,
+            api_user_model,
             app_state_controller,
             config_controller,
             sender,
@@ -116,7 +116,7 @@ impl GameController {
             .await
         {
             Ok(_) => {
-                if self.rt_api_model.user.update_slot_sync_state().await {
+                if self.api_user_model.user.update_slot_sync_state().await {
                     self.slot_controller.submit_slot_model_to_ui().await;
                 };
                 self.fetch_game_details().await;
@@ -160,8 +160,8 @@ impl GameController {
                             GameSseEvent::Game(games) => {
                                 println!("[Controller] Games SSE connection received {} games", games.len());
 
-                                self.rt_api_model.user.handle_retrieve_games_result(games).await;
-                                if self.rt_api_model.user.update_slot_sync_state().await {
+                                self.api_user_model.user.handle_retrieve_games_result(games).await;
+                                if self.api_user_model.user.update_slot_sync_state().await {
                                     self.slot_controller.submit_slot_model_to_ui().await;
                                 };
                                 self.fetch_game_details().await;
@@ -225,7 +225,7 @@ impl GameController {
     pub async fn fetch_game_details(&self) {
         let stage_data = self.stage_data.read().await;
         let mut games_to_fetch_details: Vec<String> = Vec::new();
-        for game_ref in self.rt_api_model.game_map_read().await.values() {
+        for game_ref in self.api_user_model.game_map_read().await.values() {
             let mut game = game_ref.game.write().await;
             if let Some(stage) = stage_data.as_ref().and_then(|t| {
                 game.info
@@ -277,7 +277,7 @@ impl GameController {
     pub async fn process_game_list_changes(&self, refresh_log_cond: super::RefreshLogsCondition) {
         let do_load_images = !self.config_controller.data_saver_mode_enabled();
         let mut game_list: Vec<(i32, String, GameInfoMapping)> = Vec::new();
-        let game_map = self.rt_api_model.game_map_read().await;
+        let game_map = self.api_user_model.game_map_read().await;
 
         let mut load_image_tasks = vec![];
         let mut load_cached_screenshots_tasks = vec![];
@@ -552,7 +552,7 @@ impl GameController {
     }
 
     pub async fn reset_selected_maps(&self, id: String) {
-        let game_map = self.rt_api_model.game_map_read().await;
+        let game_map = self.api_user_model.game_map_read().await;
         let game_ref = game_map.get(&id);
         if let Some(game_ref) = game_ref {
             let game_entry = game_ref.game.read().await;
@@ -606,7 +606,7 @@ impl GameController {
         });
     }
 
-    pub async fn try_ensure_game_images(&self, game: &rt_api_model::GameEntry, id: String) {
+    pub async fn try_ensure_game_images(&self, game: &api_user_model::GameEntry, id: String) {
         let game_resource_entry;
         {
             let mut game_resource_map = self.game_resource_map.write().await;
@@ -858,7 +858,7 @@ impl GameController {
     }
 
     pub async fn load_battle_screenshots(&self, game_id: &str) {
-        let game_map = self.rt_api_model.game_map_read().await;
+        let game_map = self.api_user_model.game_map_read().await;
         let game_ref = match game_map.get(game_id) {
             Some(game) => game,
             None => {

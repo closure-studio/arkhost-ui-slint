@@ -1,3 +1,5 @@
+/// API用户模型
+pub mod api_user_model;
 /// API请求处理器，用于接收API命令
 pub mod api_worker;
 /// AppState，管理UI中状态及其数据映射（Mapping）
@@ -21,8 +23,6 @@ pub mod ipc_auth_comm;
 pub mod ota;
 /// 启动参数
 pub mod program_options;
-/// 运行时API数据模型
-pub mod rt_api_model;
 /// Slint codegen
 #[allow(clippy::all)]
 pub mod ui;
@@ -34,7 +34,7 @@ pub mod webview;
 
 use self::{
     app_state::AppState,
-    controller::{rt_api_model::RtApiModel, UIContext},
+    controller::{api_user_model::ApiUserModel, UIContext},
 };
 use api_worker::Worker as ApiWorker;
 use arkhost_api::clients::{
@@ -105,7 +105,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
     let ui_context = Arc::new(UIContext::new(
         AppState::new(ui.as_weak()),
-        Arc::new(RtApiModel::new()),
+        Arc::new(ApiUserModel::new()),
         tx_api_command.clone(),
         tx_auth_command.clone(),
         tx_asset_command.clone(),

@@ -17,31 +17,31 @@ use crate::app::utils::notification;
 
 use super::AuthResult;
 use super::{
-    app_state_controller::AppStateController, rt_api_model::RtApiModel, sender::Sender,
+    api_user_model::ApiUserModel, app_state_controller::AppStateController, sender::Sender,
     ApiOperation,
 };
 
 pub struct SlotController {
-    rt_api_model: Arc<RtApiModel>,
+    api_user_model: Arc<ApiUserModel>,
     app_state_controller: Arc<AppStateController>,
     sender: Arc<Sender>,
 }
 
 impl SlotController {
     pub fn new(
-        rt_api_model: Arc<RtApiModel>,
+        api_user_model: Arc<ApiUserModel>,
         app_state_controller: Arc<AppStateController>,
         sender: Arc<Sender>,
     ) -> Self {
         Self {
-            rt_api_model,
+            api_user_model,
             app_state_controller,
             sender,
         }
     }
 
     pub async fn submit_slot_model_to_ui(&self) {
-        let slot_map = self.rt_api_model.user.slots.read().await;
+        let slot_map = self.api_user_model.user.slots.read().await;
         let mut slot_list = vec![];
         for (uuid, slot_ref) in slot_map.iter() {
             let order = slot_ref.order.load(Ordering::Acquire);
@@ -88,11 +88,11 @@ impl SlotController {
 
                     self.app_state_controller
                         .exec(move |x| x.update_user_info(user_info_mapping));
-                    self.rt_api_model
+                    self.api_user_model
                         .user
                         .handle_retrieve_slots_result(user.slots)
                         .await;
-                    self.rt_api_model.user.update_slot_sync_state().await;
+                    self.api_user_model.user.update_slot_sync_state().await;
                     self.submit_slot_model_to_ui().await;
                 }
                 Err(e) => {
@@ -167,7 +167,7 @@ impl SlotController {
                 if let Some(validation_result) = result.data {
                     available = Some(validation_result.available);
                     let slot_ref = self
-                        .rt_api_model
+                        .api_user_model
                         .user
                         .record_slot_verify_result(&id, update_request, validation_result)
                         .await;

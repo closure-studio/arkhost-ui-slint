@@ -1,7 +1,7 @@
 use crate::app::{
+    api_user_model,
     app_state::model::{AssetPath, ImageData, ImageDataRaw, ImageDataRef},
     asset_worker::AssetRef,
-    rt_api_model,
 };
 
 use arkhost_api::models::api_arkhost::Avatar;
@@ -28,7 +28,7 @@ impl ImageController {
 
     pub async fn load_game_avatar_if_empty(
         &self,
-        game: &rt_api_model::GameEntry,
+        game: &api_user_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {
@@ -43,7 +43,7 @@ impl ImageController {
 
     pub async fn load_game_char_illust_if_empty(
         &self,
-        game: &rt_api_model::GameEntry,
+        game: &api_user_model::GameEntry,
         image_ref: ImageDataRef,
     ) {
         match image_ref.read().await.loaded_image {

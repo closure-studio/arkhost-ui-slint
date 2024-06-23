@@ -1,22 +1,22 @@
+pub mod api_user_model;
 pub mod app_state_controller;
 pub mod config_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
 pub mod ota_controller;
-pub mod rt_api_model;
 pub mod sender;
 pub mod session_controller;
 pub mod slot_controller;
 pub mod user_controller;
 extern crate alloc;
 
+use self::api_user_model::ApiUserModel;
 use self::config_controller::ConfigController;
 use self::game_controller::GameController;
 use self::game_operation_controller::GameOperationController;
 use self::image_controller::ImageController;
 use self::ota_controller::OtaController;
-use self::rt_api_model::RtApiModel;
 use self::sender::Sender;
 use self::slot_controller::SlotController;
 use self::user_controller::UserController;
@@ -62,7 +62,7 @@ where
 }
 
 pub struct UIContext {
-    pub rt_api_model: Arc<RtApiModel>,
+    pub api_user_model: Arc<ApiUserModel>,
     pub app_state: Arc<Mutex<AppState>>,
     pub app_state_controller: Arc<AppStateController>,
     pub config_controller: Arc<ConfigController>,
@@ -82,7 +82,7 @@ pub struct UIMainThreadContext {
 impl UIContext {
     pub fn new(
         app_state: AppState,
-        rt_api_model: Arc<RtApiModel>,
+        api_user_model: Arc<ApiUserModel>,
         tx_api_worker: mpsc::Sender<ApiCommand>,
         tx_auth_worker: mpsc::Sender<AuthContext>,
         tx_asset_worker: mpsc::Sender<AssetCommand>,
@@ -93,7 +93,7 @@ impl UIContext {
         });
         let config_controller = Arc::new(ConfigController::new(app_state_controller.clone()));
         let sender = Arc::new(Sender {
-            rt_api_model: rt_api_model.clone(),
+            api_user_model: api_user_model.clone(),
             tx_api_worker,
             tx_auth_worker,
             tx_asset_worker,
@@ -104,12 +104,12 @@ impl UIContext {
             sender.clone(),
         ));
         let slot_controller = Arc::new(SlotController::new(
-            rt_api_model.clone(),
+            api_user_model.clone(),
             app_state_controller.clone(),
             sender.clone(),
         ));
         let game_controller = Arc::new(GameController::new(
-            rt_api_model.clone(),
+            api_user_model.clone(),
             app_state_controller.clone(),
             config_controller.clone(),
             sender.clone(),
@@ -122,7 +122,7 @@ impl UIContext {
             sender.clone(),
         ));
         let session_controller = Arc::new(SessionController::new(
-            rt_api_model.clone(),
+            api_user_model.clone(),
             app_state_controller.clone(),
             sender.clone(),
             game_controller.clone(),
@@ -130,12 +130,12 @@ impl UIContext {
             ota_controller.clone(),
         ));
         let user_controller = Arc::new(UserController::new(
-            rt_api_model.clone(),
+            api_user_model.clone(),
             app_state_controller.clone(),
             sender.clone(),
         ));
         Self {
-            rt_api_model,
+            api_user_model,
             app_state,
             app_state_controller,
             image_controller,
@@ -351,7 +351,7 @@ impl UIContext {
                 let this = this.clone();
 
                 tokio::spawn(async move {
-                    for (id, slot_ref) in this.rt_api_model.slot_map_read().await.iter() {
+                    for (id, slot_ref) in this.api_user_model.slot_map_read().await.iter() {
                         let availability_rank = slot_ref
                             .slot
                             .read()

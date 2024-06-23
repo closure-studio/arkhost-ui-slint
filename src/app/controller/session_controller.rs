@@ -6,13 +6,13 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    app_state_controller::AppStateController, game_controller::GameController,
-    ota_controller::OtaController, rt_api_model::RtApiModel, sender::Sender,
+    api_user_model::ApiUserModel, app_state_controller::AppStateController,
+    game_controller::GameController, ota_controller::OtaController, sender::Sender,
     slot_controller::SlotController, ApiOperation,
 };
 
 pub struct SessionController {
-    pub rt_api_model: Arc<RtApiModel>,
+    pub api_user_model: Arc<ApiUserModel>,
     pub app_state_controller: Arc<AppStateController>,
     pub sender: Arc<Sender>,
     pub game_controller: Arc<GameController>,
@@ -24,7 +24,7 @@ pub struct SessionController {
 
 impl SessionController {
     pub fn new(
-        rt_api_model: Arc<RtApiModel>,
+        api_user_model: Arc<ApiUserModel>,
         app_state_controller: Arc<AppStateController>,
         sender: Arc<Sender>,
         game_controller: Arc<GameController>,
@@ -32,7 +32,7 @@ impl SessionController {
         ota_controller: Arc<OtaController>,
     ) -> Self {
         Self {
-            rt_api_model,
+            api_user_model,
             app_state_controller,
             sender,
             game_controller,
@@ -150,7 +150,7 @@ impl SessionController {
     }
 
     async fn on_login(&self) {
-        self.rt_api_model.user.clear().await;
+        self.api_user_model.user.clear().await;
         self.game_controller.try_ensure_resources().await;
         let _ = TokioScope::scope_and_block(|s| {
             s.spawn(self.fetch_site_config());

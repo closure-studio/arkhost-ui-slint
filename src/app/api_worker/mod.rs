@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use super::rt_api_model::{GameRef, RtUserModel};
+use super::api_user_model::{ApiUser, GameRef};
 
 #[derive(Debug)]
 pub enum RetrieveLogSpec {
@@ -51,7 +51,7 @@ pub enum Operation {
         resp: Responder<()>,
     },
     RetrieveGames {
-        resp: Responder<Arc<RtUserModel>>,
+        resp: Responder<Arc<ApiUser>>,
     },
     RetrieveGameDetails {
         account: String,
@@ -105,7 +105,7 @@ pub enum Operation {
 
 #[derive(Debug)]
 pub struct Command {
-    pub user: Arc<RtUserModel>,
+    pub user: Arc<ApiUser>,
     pub op: Operation,
 }
 
@@ -177,10 +177,7 @@ impl Worker {
         Ok(())
     }
 
-    pub async fn retrieve_games(
-        &self,
-        user_model: Arc<RtUserModel>,
-    ) -> CommandResult<Arc<RtUserModel>> {
+    pub async fn retrieve_games(&self, user_model: Arc<ApiUser>) -> CommandResult<Arc<ApiUser>> {
         let games = self.arkhost_client.get_games().await?;
         user_model.handle_retrieve_games_result(games).await;
         Ok(user_model)
@@ -188,7 +185,7 @@ impl Worker {
 
     pub async fn retrieve_game_details(
         &self,
-        user_model: Arc<RtUserModel>,
+        user_model: Arc<ApiUser>,
         account: String,
     ) -> CommandResult<GameRef> {
         let game_details = self.arkhost_client.get_game(&account).await?;
@@ -199,7 +196,7 @@ impl Worker {
 
     pub async fn retrieve_log(
         &self,
-        user_model: Arc<RtUserModel>,
+        user_model: Arc<ApiUser>,
         account: String,
         spec: RetrieveLogSpec,
     ) -> CommandResult<GameRef> {
