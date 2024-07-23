@@ -94,10 +94,21 @@ pub fn on_duplicated_instance() {
     #[cfg(target_os = "windows")]
     unsafe {
         // TODO: 根据进程查找
-        use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            FindWindowW, GetWindowPlacement, SetForegroundWindow, ShowWindow, SHOW_WINDOW_CMD,
+            SW_NORMAL, SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, WINDOWPLACEMENT,
+        };
         let window_name: Vec<u16> = consts::WINDOWS_TITLE.encode_utf16().chain([0]).collect();
         let hwnd = FindWindowW(std::ptr::null(), window_name.as_ptr());
         if hwnd != 0 {
+            let mut place: WINDOWPLACEMENT = core::mem::zeroed();
+            GetWindowPlacement(hwnd, &mut place);
+            let show_cmd: SHOW_WINDOW_CMD = match place.showCmd as i32 {
+                SW_SHOWMAXIMIZED => SW_SHOWMAXIMIZED,
+                SW_SHOWMINIMIZED => SW_RESTORE,
+                _ => SW_NORMAL,
+            };
+            ShowWindow(hwnd, show_cmd);
             SetForegroundWindow(hwnd);
         }
     }
