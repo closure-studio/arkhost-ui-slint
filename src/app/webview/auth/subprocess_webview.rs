@@ -65,7 +65,7 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
             .with_enabled_buttons(WindowButtons::MINIMIZE | WindowButtons::CLOSE)
             .with_window_level(WindowLevel::AlwaysOnTop)
             .with_inner_size(LogicalSize {
-                width: 360,
+                width: 540,
                 height: 480,
             });
 
@@ -100,11 +100,8 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
         event: WindowEvent,
     ) {
         evl.set_control_flow(ControlFlow::Wait);
-        match event {
-            WindowEvent::CloseRequested => {
-                evl.exit();
-            }
-            _ => {}
+        if event == WindowEvent::CloseRequested {
+            evl.exit();
         }
     }
 

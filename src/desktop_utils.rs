@@ -7,10 +7,10 @@ pub fn alloc_console() {
         use windows_sys::Win32::System::Console::AllocConsole;
         let result = AllocConsole();
         if result != 0 {
-            println!("[alloc_console] AllocConsole() success ");
+            println!("[app::desktop_utils::alloc_console] AllocConsole() success ");
         } else {
             println!(
-                "[alloc_console] Error calling AllocConsole(): {:#x}",
+                "[app::desktop_utils::alloc_console] Error calling AllocConsole(): {:#x}",
                 GetLastError()
             );
         }
@@ -24,10 +24,10 @@ pub fn attach_console() {
         use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
         let result = AttachConsole(ATTACH_PARENT_PROCESS);
         if result != 0 {
-            println!("[attach_console] AttachConsole(ATTACH_PARENT_PROCESS) success ");
+            println!("[app::desktop_utils::attach_console] AttachConsole(ATTACH_PARENT_PROCESS) success ");
         } else {
             println!(
-                "[attach_console] Error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
+                "[app::desktop_utils::attach_console] Error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
                 GetLastError()
             );
         }
@@ -42,7 +42,7 @@ pub fn show_console(visible: bool) {
         let hwnd = GetConsoleWindow();
 
         if hwnd == 0 {
-            println!("[show_console] hWnd is NULL");
+            println!("[app::desktop_utils::show_console] hWnd is NULL");
             return;
         }
 
@@ -120,7 +120,7 @@ pub async fn update_client_if_exist() -> anyhow::Result<()> {
 
     let pending_update = app::ota::pending_update()
         .map_err(|e| {
-            println!("[update_client_if_exist] Error reading pending update record from DB: {e}");
+            println!("[app::desktop_utils::update_client_if_exist] Error reading pending update record from DB: {e}");
         })
         .ok()
         .flatten();
@@ -130,7 +130,7 @@ pub async fn update_client_if_exist() -> anyhow::Result<()> {
         None => return Ok(()),
     };
     println!(
-        "[update_client_if_exist] Found pending update: {}",
+        "[app::desktop_utils::update_client_if_exist] Found pending update: {}",
         &pending_update.version
     );
 

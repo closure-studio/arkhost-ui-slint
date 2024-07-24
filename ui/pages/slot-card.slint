@@ -116,9 +116,8 @@ component SlotRequirementArea inherits VerticalLayout {
             }
             has-last-verify when info.last-verify.update-type == SlotUpdateDraftType.Update: {
                 title: 
-                    @tr("提交条件（验证于上一次提交：") 
-                    + SlotInfoUtils.get-server-display-name(info.last-verify.platform)
-                    + " " + info.last-verify.game-account + @tr("）");
+                    @tr("提交条件（验证于上一次提交：{} {}）", 
+                    SlotInfoUtils.get-server-display-name(info.last-verify.platform), info.last-verify.game-account);
             }
         ]
     }

@@ -1,4 +1,3 @@
-use crate::app::ui::*;
 use async_scoped::TokioScope;
 use tokio::sync::oneshot;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -8,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use super::{
     api_user_model::ApiUserModel, app_state_controller::AppStateController,
     game_controller::GameController, ota_controller::OtaController, sender::Sender,
-    slot_controller::SlotController, ApiOperation,
+    slot_controller::SlotController, ApiOperation, ApiResult,
 };
 
 pub struct SessionController {
@@ -42,10 +41,9 @@ impl SessionController {
         }
     }
 
-    pub async fn login(&self, account: String, password: String) {
+    pub async fn authorize_with_account(&self, account: String, password: String) -> ApiResult<()> {
         let (resp, mut rx) = oneshot::channel();
-        match self
-            .sender
+        self.sender
             .send_api_request(
                 ApiOperation::Login {
                     email: account,
@@ -55,52 +53,28 @@ impl SessionController {
                 &mut rx,
             )
             .await
-        {
-            Ok(()) => {
-                println!(
-                    "[Controller] Logged in with password authorization, running post-login callback...",
-                );
-                self.on_login().await;
-                self.app_state_controller
-                    .exec_wait(|x| x.set_login_state(LoginState::Logged, "登录成功".into()))
-                    .await;
-                self.on_post_login().await;
-            }
-            Err(e) => {
-                self.app_state_controller
-                    .exec(|x| x.set_login_state(LoginState::Errored, format!("{e:?}")));
-            }
-        }
     }
 
-    pub async fn auth(&self) {
-        self.app_state_controller
-            .exec(|x| x.set_login_state(LoginState::LoggingIn, " 自动登录中".into()));
+    pub async fn authorize_with_stored_token(&self) -> ApiResult<()> {
         let (resp, mut rx) = oneshot::channel();
-        match self
-            .sender
+        self.sender
             .send_api_request(ApiOperation::Auth { resp }, &mut rx)
             .await
-        {
-            Ok(()) => {
-                println!(
-                    "[Controller] Logged in with token authorization, running post-login callback..."
-                );
-                self.on_login().await;
-                self.app_state_controller
-                    .exec_wait(|x| x.set_login_state(LoginState::Logged, "登录成功".into()))
-                    .await;
-                self.on_post_login().await;
-            }
-            Err(e) => {
-                self.app_state_controller.exec(|x| {
-                    x.set_login_state(
-                        LoginState::Errored,
-                        format!("自动登录失败，请重试或检查网络环境\n{e:?}"),
-                    )
-                });
-            }
-        }
+    }
+
+    pub async fn create_user_model(&self) {
+        self.api_user_model.user.clear().await;
+        self.game_controller.try_ensure_resources().await;
+        let _ = TokioScope::scope_and_block(|s| {
+            s.spawn(self.fetch_site_config());
+            s.spawn(self.slot_controller.refresh_slots());
+            s.spawn(self.spawn_sse_event_loop());
+            s.spawn(self.ota_controller.check_release_update());
+        });
+    }
+
+    pub async fn on_post_create_user_model(&self) {
+        self.ota_controller.try_auto_update_release().await;
     }
 
     pub async fn spawn_sse_event_loop(&self) {
@@ -126,7 +100,7 @@ impl SessionController {
         });
     }
 
-    pub async fn fetch_site_config(&self) {
+    async fn fetch_site_config(&self) {
         let (resp, mut rx) = oneshot::channel();
         match self
             .sender
@@ -147,20 +121,5 @@ impl SessionController {
                 println!("[Controller] Error fetching site config: {e}");
             }
         }
-    }
-
-    async fn on_login(&self) {
-        self.api_user_model.user.clear().await;
-        self.game_controller.try_ensure_resources().await;
-        let _ = TokioScope::scope_and_block(|s| {
-            s.spawn(self.fetch_site_config());
-            s.spawn(self.slot_controller.refresh_slots());
-            s.spawn(self.spawn_sse_event_loop());
-            s.spawn(self.ota_controller.check_release_update());
-        });
-    }
-
-    async fn on_post_login(&self) {
-        self.ota_controller.try_auto_update_release().await;
     }
 }

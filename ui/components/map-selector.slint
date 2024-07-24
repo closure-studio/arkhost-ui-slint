@@ -16,6 +16,7 @@ import {
 import { GameInfo, BattleMap, GameOptionSaveState, BattleUpdateFields } from "../game-info.slint";
 import { FontGlobals } from "../font-globals.slint";
 import { MockData } from "../mock-data.slint";
+import { Theme } from "../theme.slint";
 
 enum MapOperationType {
     Add,
@@ -180,11 +181,11 @@ export component MapSelector inherits VerticalLayout {
             Rectangle {
                 if tip-active: Rectangle {
                     border-radius: 10px;
-                    background: #0661d0;
+                    background: Theme.accent-color-info;
                     text-area := VerticalLayout {
                         padding: 10px;
                         Text {
-                            text: @tr("作战时，系统将从列表首个关卡开始，跳过当日不开放的关卡，直到找到第一个当日开放的关卡。关卡不开放例如活动关已结束、资源收集关未开启等。 ");
+                            text: @tr("自动代理作战时，仅会选择列表中位置靠前且当日开放的首个关卡进行作战，不会再选择其他关卡。\n资源收集关卡和当期活动关卡需要考虑当日是否开放。 ");
                             font-size: 14px;
                             color: whitesmoke;
                             vertical-alignment: top;

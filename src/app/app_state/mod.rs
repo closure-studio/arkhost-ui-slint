@@ -6,6 +6,7 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
+use raw_window_handle::HasWindowHandle;
 use slint::{Model, ModelRc, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
 use tokio::sync::Notify;
@@ -61,13 +62,20 @@ impl AppState {
         Self { ui }
     }
 
-    pub fn set_login_state(&self, state: LoginState, mut status_text: String) -> AppStateAsyncOp {
+    pub fn show(&self) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
-            if !status_text.is_empty() {
-                status_text.push(' '); // slint word wrap bug
-            }
-            ui.set_login_state(state);
-            ui.set_login_status_text(status_text.into());
+            _ = ui
+                .show()
+                .map_err(|e| println!("[AppState] Unable to show window: {e}"));
+        })
+    }
+
+    #[allow(unused)]
+    pub fn hide(&self) -> AppStateAsyncOp {
+        self.exec_in_event_loop(move |ui| {
+            _ = ui
+                .hide()
+                .map_err(|e| println!("[AppState] Unable to hide window: {e}"));
         })
     }
 
@@ -80,12 +88,6 @@ impl AppState {
     pub fn set_sse_connect_state(&self, state: SseConnectState) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
             ui.set_sse_connect_state(state);
-        })
-    }
-
-    pub fn set_use_auth(&self, account: String, use_auth: bool) -> AppStateAsyncOp {
-        self.exec_in_event_loop(move |ui| {
-            ui.invoke_set_use_auth(account.into(), use_auth);
         })
     }
 
@@ -360,5 +362,127 @@ impl AppState {
             .enumerate()
             .find(|(_i, x)| x.uuid.as_str() == id)
             .take()
+    }
+}
+
+pub struct LoginWindowState {
+    pub login_window: Option<Weak<LoginWindow>>,
+
+    pending_show: bool,
+    pending_state: LoginState,
+    pending_status_text: String,
+    pending_account: String,
+    pending_use_auth: bool,
+}
+
+impl LoginWindowState {
+    pub fn new() -> Self {
+        Self {
+            login_window: None,
+            pending_show: false,
+            pending_state: LoginState::Unlogged,
+            pending_status_text: String::default(),
+            pending_account: String::default(),
+            pending_use_auth: false,
+        }
+    }
+
+    pub fn show(&mut self) {
+        if let Some(login_window) = &self.login_window {
+            _ = login_window.upgrade_in_event_loop(|ui| {
+                _ = ui
+                    .show()
+                    .map_err(|e| println!("[LoginWindowState] Unable to show login window: {e}"));
+
+                #[cfg(feature = "desktop-app")]
+                if let Ok(window_handle) = ui.window().window_handle().window_handle() {
+                    match window_handle.as_raw() {
+                        #[cfg(target_os = "windows")]
+                        raw_window_handle::RawWindowHandle::Win32(
+                            raw_window_handle::Win32WindowHandle { hwnd, .. },
+                        ) => unsafe {
+                            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_MAXIMIZEBOX,
+                            };
+                            SetWindowLongW(
+                                hwnd.get(),
+                                GWL_STYLE,
+                                GetWindowLongW(hwnd.get(), GWL_STYLE) & !WS_MAXIMIZEBOX as i32,
+                            );
+                        },
+                        _ => {}
+                    }
+                }
+            });
+        } else {
+            self.pending_show = true;
+        }
+    }
+
+    pub fn hide(&mut self) {
+        if let Some(login_window) = &self.login_window {
+            _ = login_window.upgrade_in_event_loop(|ui| {
+                _ = ui
+                    .hide()
+                    .map_err(|e| println!("[LoginWindowState] Unable to hide login window: {e}"));
+            });
+        } else {
+            self.pending_show = false;
+        }
+    }
+
+    pub fn set_use_auth(&mut self, account: String, use_auth: bool) {
+        if let Some(login_window) = &self.login_window {
+            _ = login_window.upgrade_in_event_loop(move |ui| {
+                ui.invoke_set_use_auth(slint::SharedString::from(&account), use_auth)
+            });
+        } else {
+            self.pending_account = account;
+            self.pending_use_auth = use_auth;
+        }
+    }
+
+    pub fn set_login_state(&mut self, state: LoginState, mut status_text: String) {
+        if !status_text.is_empty() {
+            status_text.push(' '); // slint word wrap bug
+        }
+        if let Some(login_window) = &self.login_window {
+            _ = login_window.upgrade_in_event_loop(move |ui| {
+                ui.set_login_state(state);
+                ui.set_login_status_text(status_text.into());
+            });
+        } else {
+            self.pending_state = state;
+            self.pending_status_text = status_text;
+        }
+    }
+
+    pub fn assign_login_window(&mut self, login_window: Weak<LoginWindow>) {
+        if self.login_window.is_none() {
+            self.login_window = Some(login_window.clone());
+            _ = login_window.upgrade_in_event_loop({
+                let pending_show = self.pending_show;
+                let pending_state = self.pending_state;
+                let pending_status_text = self.pending_status_text.clone();
+                let pending_account = self.pending_account.clone();
+                let pending_use_auth = self.pending_use_auth;
+
+                move |ui| {
+                    if pending_show {
+                        _ = ui.show().map_err(|e| {
+                            println!("[LoginWindowState] Unable to show login window: {e}")
+                        });
+                    } else {
+                        _ = ui.hide().map_err(|e| {
+                            println!("[LoginWindowState] Unable to hide login window: {e}")
+                        });
+                    }
+
+                    ui.set_login_state(pending_state);
+                    ui.set_login_status_text(pending_status_text.into());
+                    ui.invoke_set_use_auth(pending_account.into(), pending_use_auth);
+                }
+            });
+        }
     }
 }

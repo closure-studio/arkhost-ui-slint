@@ -1,8 +1,8 @@
 import { VerticalBox, HorizontalBox , LineEdit, Button, Palette, Spinner, Switch, ScrollView } from "std-widgets.slint";
 import { ClosureStudioLogoStacked } from "./components/closure-studio-logo.slint";
 import { FontGlobals } from "font-globals.slint";
-import { Callbacks } from "callbacks.slint";
 import { StateGlobals } from "state-globals.slint";
+import { DesktopEditionIcon } from "components/closure-studio-logo.slint";
 
 export enum LoginState {
     Unlogged,
@@ -11,26 +11,32 @@ export enum LoginState {
     Logged
 }
 
-export component LoginWindow {
-    width: 360px;
-    height: 700px;
+export component LoginWindow inherits Window {
+    title: @tr("Closure Studio - 登录");
+    icon: @image-url("images/closure_drone.png");
+    width: 400px;
+    height: 720px;
+    horizontal-stretch: 0;
     vertical-stretch: 0;
-    in-out property <LoginState> login-state: LoginState.Errored;
-    in-out property <string> login-status-text: "登陆失败 ";
+    background: Palette.alternate-background;
+    in-out property <LoginState> login-state: LoginState.Unlogged;
+    in-out property <string> login-status-text: "请求错误：用户名或密码错误\n - 状态码: 200\n - 内部状态码: 0\n - 原始数据: ";
     private property <bool> logging;
     private property <bool> use-auth;
     callback login-requested(string, string);
     callback auth-requested();
-    callback register-requested <=> register.clicked;
-    public function set-use-auth(account: string,use-auth-val: bool){
+    callback open-ext-link(string);
+    callback set-data-saver-mode(bool);
+    public function set-use-auth(account: string, use-auth-val: bool) {
         use-auth = use-auth-val;
-        if use-auth-val {
+        if account != "" {
             account-input.text = account;
-        } else {
+        }
+        if !use-auth-val {
             password-input.text = "";
         }
     }
-    function do-login(){
+    function do-login() {
         if use-auth {
             auth-requested();
         } else {
@@ -38,68 +44,118 @@ export component LoginWindow {
         }
     }
     VerticalLayout {
-        alignment: space-between;
-        VerticalBox {
+        alignment: space-around;
+        padding-left: 20px;
+        padding-right: 20px;
+        VerticalLayout {
+            alignment: center;
+            HorizontalLayout {
+                alignment: start;
+                ClosureStudioLogoStacked {
+                    single-row-size: 63px;
+                    vertical-stretch: 0;
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: 5px;
+                pure function get-header-text() -> string {
+                    if login-state == LoginState.LoggingIn {
+                        @tr("🚀 正在为你准备……")
+                    } else if login-state == LoginState.Errored {
+                        @tr("🔄 出现问题，请再试一遍。")
+                    } else {
+                        @tr("👋 欢迎回来！")
+                    }
+                }
+                Text {
+                    text: get-header-text();
+                    font-size: 22px;
+                    font-weight: 500;
+                    horizontal-alignment: left;
+                    vertical-alignment: top;
+                }
+            }
+
+            height: 300px;
+        }
+
+        VerticalLayout {
             alignment: stretch;
             HorizontalBox {
-                alignment: start;
+                spacing: 12px;
+                alignment: stretch;
+                account-input := LineEdit {
+                    accessible-role: AccessibleRole.button;
+                    enabled: !use-auth && !logging;
+                    height: 42px;
+                    horizontal-alignment: left;
+                    font-size: 15px;
+                    placeholder-text: @tr("用户名");
+                    accepted => {
+                        password-input.focus()
+                    }
+                }
+
                 register := Button {
                     text: @tr("注册…");
-                    icon: Palette.color-scheme == ColorScheme.dark 
-                        ? @image-url("images/ext_link.svg") 
-                        : @image-url("images/ext_link_light.svg");
-                }
-
-                vertical-stretch: 0;
-            }
-
-            ClosureStudioLogoStacked {
-                single-row-size: 60px;
-                vertical-stretch: 0;
-            }
-
-            HorizontalBox {
-                alignment: center;
-                account-input := LineEdit {
-                    enabled: !use-auth && !logging;
-                    width: parent.width - 40px;
-                    height: 42px;
-                    horizontal-alignment: left;
-                    placeholder-text: @tr("账号");
+                    icon: @image-url("images/ext_link.svg");
+                    colorize-icon: true;
+                    clicked => {
+                        open-ext-link("https://closure.ltsc.vip");
+                    }
                 }
 
                 vertical-stretch: 0;
             }
 
             HorizontalBox {
-                alignment: center;
+                alignment: stretch;
                 password-input := LineEdit {
                     enabled: !use-auth && !logging;
-                    width: parent.width - 40px;
-                    height: 42px;
                     horizontal-alignment: left;
                     input-type: InputType.password;
+                    font-size: 15px;
                     placeholder-text: use-auth ? @tr("已记住登录状态") : @tr("密码");
                     accepted => {
                         do-login();
                     }
+                    height: 42px;
                 }
 
                 vertical-stretch: 0;
             }
 
             HorizontalBox {
-                alignment: center;
-                Button {
+                alignment: space-between;
+                padding-left: 12px;
+                Switch {
+                    text: @tr("低数据模式（无图片）");
+                    checked: StateGlobals.data-saver-mode-enabled;
+                    toggled => {
+                        set-data-saver-mode(self.checked);
+                    }
+                    height: 38px;
+                }
+
+                if login-state != LoginState.LoggingIn: Button {
                     primary: true;
                     enabled: !logging && ((account-input.text != "" && password-input.text != "") || use-auth);
                     text: @tr("登录");
-                    width: parent.width - 40px;
                     clicked => {
                         do-login()
                     }
+                    width: 110px;
+                    height: 38px;
                 }
+                if logging: HorizontalLayout {
+                    alignment: center;
+                    Spinner {
+                        indeterminate: true;
+                    }
 
+                    height: 38px;
+                }
                 vertical-stretch: 0;
             }
 
@@ -121,51 +177,29 @@ export component LoginWindow {
             }
             HorizontalBox {
                 alignment: center;
-                Switch {
-                    text: @tr("低数据模式（不加载图片资源）");
-                    checked: StateGlobals.data-saver-mode-enabled;
-                    toggled => {
-                        Callbacks.set-data-saver-mode(self.checked);
-                    }
-                }
-
-                vertical-stretch: 0;
-            }
-
-            HorizontalBox {
-                alignment: center;
                 Rectangle {
-                    border-radius: 5px;
+                    border-radius: 8px;
                     background: login-state == LoginState.Errored ? #dd8800 : #0000;
                     status-scroll := ScrollView {
                         status-area := VerticalLayout {
                             spacing: 10px;
-                            padding: 5px;
+                            padding-top: 5px;
+                            padding-bottom: 5px;
+                            padding-left: 15px;
+                            padding-right: 15px;
                             alignment: center;
                             Text {
                                 vertical-alignment: center;
-                                horizontal-alignment: center;
-                                color: login-state == LoginState.Errored 
-                                    ? whitesmoke 
-                                    : Palette.foreground;
-                                font-size: 13px;
-                                text: login-status-text;
+                                horizontal-alignment: left;
+                                color: login-state == LoginState.Errored ? whitesmoke : Palette.foreground;
+                                font-size: 14px;
+                                text: login-state == LoginState.Errored ? login-status-text : "";
                                 wrap: word-wrap;
                             }
-                            
-                            if logging: HorizontalLayout {
-                                alignment: center;
-                                Spinner {
-                                    indeterminate: true;
-                                    width: 26px;
-                                    height: 26px;
-                                }
-                            }
-                            width: parent.width;
                         }
                     }
 
-                    preferred-width: parent.width - 40px;
+                    preferred-width: root.width - 40px;
                 }
 
                 vertical-stretch: 1;
@@ -173,20 +207,33 @@ export component LoginWindow {
             }
         }
 
-        bottom-text := VerticalBox {
-            alignment: start;
-            Text {
-                text: @tr("可露希尔云托管");
-                horizontal-alignment: center;
+        HorizontalLayout {
+            alignment: space-between;
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: @tr("可露希尔云平台 - D32轻量桌面端");
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    horizontal-alignment: left;
+                }
+
+                Text {
+                    text: @tr("https://arknights.host");
+                    font-family: FontGlobals.alphanumeric-text-sans;
+                    horizontal-alignment: left;
+                }
             }
 
-            Text {
-                text: @tr("https://arknights.host");
-                font-family: FontGlobals.alphanumeric-text-sans;
-                horizontal-alignment: center;
-            }
+            TouchArea {
+                VerticalLayout {
+                    alignment: space-between;
+                    DesktopEditionIcon { }
+                }
 
-            vertical-stretch: 0;
+                clicked => {
+                    open-ext-link("https://github.com/closure-studio/arkhost-ui-slint")
+                }
+            }
         }
     }
 

@@ -30,7 +30,7 @@ component VerifyInfoBar inherits Rectangle {
 
         if verify-item-value != "": Rectangle {
             border-radius: self.height / 2;
-            background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+            background: Theme.accent-color-info;
             verify-item-area := TouchArea {
                 HorizontalLayout {
                     padding-left: 15px;
@@ -79,6 +79,10 @@ component SmsVerifyArea inherits VerticalLayout {
                 open-dialog();
             }
             states [
+                unauthorized when user-info.uuid == "": {
+                    button-enabled: false;
+                    button-text: @tr("请先登录");
+                }
                 busy when requesting: {
                     button-enabled: false;
                     button-text: @tr("…");
@@ -102,15 +106,33 @@ component SmsVerifyArea inherits VerticalLayout {
         spacing: 15px;
         Text {
             font-size: 16px;
-            text: @tr("你正在进行【游戏账号归属认证】！") + "\n" + @tr("🤔 你可能需要花一点时间完整阅读下面的说明：");
+            text: 
+                @tr("你正在进行【游戏账号归属认证】！") +
+                "\n" +
+                @tr("🤔 你可能需要花一点时间阅读下面的说明：");
             color: Palette.foreground;
             wrap: word-wrap;
         }
 
         Text {
             font-size: 14px;
-            text: @tr("☎📩 请在第一个账号栏位添加【手机号】游戏账号，游戏登录成功后，可露希尔将向该号码发送验证短信，输入验证码完成游戏账号归属认证。\n（省流：☎📩=☎🎮）") + "\n" + "\n" + @tr("🔒 完成归属认证后该手机号及其游戏托管将被绑定至可露希尔账号，不支持换绑、解绑操作。🔑 请勿丢失你的可露希尔账号密码，以免无法再次添加托管该游戏账号。") + "\n" + "\n" + @tr("⛔ 如果在启动游戏后的24小时内未完成认证，游戏账号将中止托管。") + "\n" + "\n" + @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请先用你的手机号【在游戏内】注册【新游戏账号】用于归属认证，再继续添加常用账号至另一账号栏位。") + "\n" + "\n" + @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🆘 确认未收到、在归属认证中遇到其他特殊情况，请提交工单或联系管理员。");
-            color: Palette.foreground.transparentize(20%);
+            text: 
+                @tr("ℹ 归属认证用于确认你对注册的游戏账号拥有所有权。归属认证是为了防止平台被滥用，包括脚本注册和大量托管非自有账号。你需要【一个】归属认证账号来正常使用平台的所有功能。") +
+                "\n" +
+                "\n" +    
+                @tr("🔑 归属认证用账号栏位排在第一位（Slot #1）。该账号栏位仅能用于添加 ☎ 手机号游戏账号。请填写能够登录游戏的手机号账号，添加游戏账号后，请前往客户端首屏启动托管，等待2-5分钟确认游戏进入托管状态，期间请不要退出客户端。") +
+                "\n" +
+                "\n" +
+                @tr("📩 当该账号登录成功并进入托管状态时，平台将向对应的手机号发送【可露希尔云平台】开头的验证短信。填写正确验证码后，平台即确认该游戏账号的所有权。你将可以正常使用平台的所有服务，同时解锁余下的通用托管栏位（不要求归属认证或手机号）。") +
+                "\n" +
+                "\n" +
+                @tr("🔒 归属认证完成后，该手机号游戏账号将绑定至平台账号，🔑 请牢记平台用户名和密码，注册其他平台账号无法再次托管该游戏账号。") +
+                "\n"+
+                "\n" +
+                @tr("🚧 如果你的常用游戏账号因死绑号等原因无法接收短信，请用你的手机号在游戏中注册另一游戏账号用于归属认证。") +
+                "\n" +
+                "\n" +
+                @tr("🗑️ 游戏登录成功后长时间未收到短信，请先检查你的骚扰拦截短信文件夹。🆘 确认未收到验证短信、在归属认证中遇到其他特殊情况，请提交工单或联系管理员。");
             wrap: word-wrap;
         }
 
@@ -172,6 +194,10 @@ component QQVerifyArea inherits VerticalLayout {
                 open-dialog();
             }
             states [
+                unauthorized when user-info.uuid == "": {
+                    button-enabled: false;
+                    button-text: @tr("请先登录");
+                }
                 busy when requesting: {
                     button-enabled: false;
                     button-text: @tr("…");
@@ -239,7 +265,8 @@ component QQVerifyArea inherits VerticalLayout {
             alignment: space-between;
             Button {
                 text: @tr("获取加群链接…");
-                icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/ext_link.svg") : @image-url("../images/ext_link_light.svg");
+                icon: @image-url("../images/ext_link.svg");
+                colorize-icon: true;
                 clicked => {
                     Callbacks.open-ext-link(@tr("https://closure.ltsc.vip"));
                 }
@@ -323,7 +350,7 @@ export component UserCard inherits Rectangle {
                 Text {
                     font-size: 20px;
                     font-family: FontGlobals.alphanumeric-text-sans;
-                    text: user-info.nickname;
+                    text: user-info.uuid == "" ? "Dr. Breen" : user-info.nickname;
                     overflow: clip;
                     vertical-alignment: top;
                 }
@@ -337,7 +364,8 @@ export component UserCard inherits Rectangle {
                 Button {
                     enabled: !requesting;
                     text: requesting ? @tr("刷新中") : @tr("刷新");
-                    icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/user_card_refresh.svg") : @image-url("../images/user_card_refresh_light.svg");
+                    icon: @image-url("../images/user_card_refresh.svg");
+                    colorize-icon: true;
                     clicked => {
                         Callbacks.refresh-user-info();
                         if user-info.qq-verify-code-cached != "" {
@@ -406,7 +434,7 @@ export component UserCard inherits Rectangle {
                                 text: @tr("清除 App 数据 [总占用：{} 资源缓存：{}]", StateGlobals.data-disk-usage, StateGlobals.cache-disk-usage);
                             }
                             clean-requested when StateGlobals.clean-data-requested: {
-                                text: @tr("取消清除数据（App 关闭时将清除）");
+                                text: @tr("取消清除数据（App 退出时将清除）");
                             }
                         ]
                         row: 1;

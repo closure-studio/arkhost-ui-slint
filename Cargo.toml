@@ -12,10 +12,12 @@ publish = false
 [features]
 desktop-app = [
     "slint/backend-winit",
+    "slint/raw-window-handle-06",
     "dep:winit",
     "dep:ipc-channel",
     "dep:single-instance",
-    "dep:self-replace"
+    "dep:self-replace",
+    "dep:raw-window-handle"
 ]
 android-app = [
     "slint/backend-android-activity-05",
@@ -38,10 +40,11 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.108"
 serde_repr = "0.1.17"
 wry = { version = "0.41", features = ["os-webview"], default-features = false }
-winit = { version = "0.30", features = ["rwh_05"], optional = true }
+winit = { version = "0.30", features = ["rwh_06"], optional = true }
 ipc-channel = { version = "0.18.0", features = ["async"], optional = true }
 single-instance = { version = "0.3.3", optional = true }
 self-replace = { version = "=1.2.0", optional = true } # 1.3本地实测没有生效
+raw-window-handle = { version = "0.6", optional = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 argh = "0.1.12"
 anyhow = "1.0.75"

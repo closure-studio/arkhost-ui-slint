@@ -12,6 +12,7 @@ import { SlotTierCard } from "slot-tier-card.slint";
 import { SlotTierConsts } from "../slot-tier-consts.slint";
 import { GachaCarouselAutoScroll } from "../components/gacha-carousel.slint";
 import { ClosureStudioLogoSingleRow } from "../components/closure-studio-logo.slint";
+import { Theme } from "../theme.slint";
 
 export enum FetchGamesState {
     NotFetched,
@@ -27,6 +28,7 @@ export enum SseConnectState {
 }
 
 component FetchGamesIndicator inherits Rectangle {
+    in property <UserInfo> user;
     in property <[GameInfo]> game-info-list;
     in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
     private property <string> fetch-games-status-text;
@@ -63,6 +65,10 @@ component FetchGamesIndicator inherits Rectangle {
     }
 
     states [
+        fetching-unauthorized when fetch-games-state == FetchGamesState.Fetching && user.uuid == "": {
+            loading: true;
+            fetch-games-status-text: @tr("正在连接到可露希尔云平台…… ");
+        }
         fetching when fetch-games-state == FetchGamesState.Fetching: {
             loading: true;
             fetch-games-status-text: @tr("正在加载账号列表…… ");
@@ -71,7 +77,11 @@ component FetchGamesIndicator inherits Rectangle {
             loading: false;
             fetch-games-status-text: @tr("这里似乎没有游戏账号 ");
         }
-        retrying when fetch-games-state == FetchGamesState.Retrying: {
+        retrying-unauthorized when fetch-games-state == FetchGamesState.Retrying && user.uuid == "": {
+            loading: false;
+            fetch-games-status-text: @tr("加载账号列表似乎不太顺利，账号是否已经正常登录？ ");
+        }
+        retrying-fault when fetch-games-state == FetchGamesState.Retrying: {
             loading: true;
             fetch-games-status-text: @tr("加载账号列表似乎不太顺利…… ");
         }
@@ -162,19 +172,19 @@ export component GameInfoPage {
                     }
                     states [
                         idle when StateGlobals.update-state == ReleaseUpdateState.Idle: {
-                            text: @tr("🆕 可露希尔客户端有新版本可用 - ") + StateGlobals.update-version;
+                            text: @tr("🆕 可露希尔客户端有新版本可用 - {}", StateGlobals.update-version);
                             has-action: true;
-                            action-text: "[" + update-action-text() + "：" + StateGlobals.update-size + "]";
+                            action-text: @tr("[{}: {}]", update-action-text(), StateGlobals.update-size);
                         }
                         downloading when StateGlobals.update-state == ReleaseUpdateState.Downloading: {
-                            text: @tr("⏳ 正在") + update-action-text() + @tr("…  ") + StateGlobals.update-downloaded-size + "/" + StateGlobals.update-size;
+                            text: @tr("⏳ 正在{}…  {}/{}", update-action-text(), StateGlobals.update-downloaded-size, StateGlobals.update-size);
                             has-action: false;
                             has-progress: true;
                             progress: StateGlobals.update-progress;
                             indeterminate: StateGlobals.update-indeterminate;
                         }
                         ready when StateGlobals.update-state == ReleaseUpdateState.Ready: {
-                            text: @tr("✅ 更新下载成功！关闭客户端后将自动开始更新。");
+                            text: @tr("✅ 更新下载成功！退出客户端后将自动开始更新。");
                             has-action: false;
                         }
                     ]
@@ -211,7 +221,7 @@ export component GameInfoPage {
 
                     HorizontalLayout {
                         spacing: 10px;
-                        if is-wide: Rectangle {
+                        if user.uuid != "" && is-wide: Rectangle {
                             border-radius: 10px;
                             // 史
                             clip: true;
@@ -240,7 +250,8 @@ export component GameInfoPage {
                                         Button {
                                             primary: true;
                                             text: @tr("工单系统… ");
-                                            icon: Palette.color-scheme == ColorScheme.dark ? @image-url("../images/ext_link_light.svg") : @image-url("../images/ext_link.svg");
+                                            icon: @image-url("../images/ext_link.svg");
+                                            colorize-icon: true;
                                             clicked => {
                                                 Callbacks.open-ext-link("https://closure.ltsc.vip/ticket")
                                             }
@@ -251,7 +262,7 @@ export component GameInfoPage {
 
                                     Rectangle {
                                         border-radius: min(10px, self.width / 2);
-                                        background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+                                        background: Theme.accent-color-info;
                                         if self.width > 0px: VerticalLayout {
                                             padding-left: 10px;
                                             alignment: center;
@@ -427,6 +438,7 @@ export component GameInfoPage {
                     }
                 }
                 if fetch-games-state != FetchGamesState.NotFetched && game-info-list.length == 0: FetchGamesIndicator {
+                    user: user;
                     game-info-list: game-info-list;
                     fetch-games-state: fetch-games-state;
                     height: 100px;

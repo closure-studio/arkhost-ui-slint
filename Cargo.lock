@@ -296,6 +296,7 @@ dependencies = [
  "notify-rust",
  "open",
  "openssl",
+ "raw-window-handle 0.6.2",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
@@ -5235,7 +5236,6 @@ dependencies = [
  "log",
  "ndk-sys 0.6.0+11769913",
  "num_enum 0.7.1",
- "raw-window-handle 0.5.2",
  "raw-window-handle 0.6.2",
  "thiserror",
 ]
@@ -7490,6 +7490,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pin-weak",
+ "raw-window-handle 0.6.2",
  "slint-macros",
  "vtable",
 ]
@@ -9402,7 +9403,6 @@ dependencies = [
  "orbclient",
  "percent-encoding",
  "pin-project",
- "raw-window-handle 0.5.2",
  "raw-window-handle 0.6.2",
  "redox_syscall 0.4.1",
  "rustix 0.38.25",

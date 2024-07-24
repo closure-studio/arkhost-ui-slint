@@ -108,7 +108,7 @@ export component SlotTierCard inherits Rectangle {
             Text {
                 font-size: 15px;
                 font-weight: FontGlobals.emphasis-font-weight;
-                text: "你是可露希尔旗舰店【" + data.tier-name + "】级会员！";
+                text: @tr("你是可露希尔旗舰店【{}】级会员！", data.tier-name);
                 color: accent-color;
                 animate color { duration: 0.25s; easing: ease; }
 

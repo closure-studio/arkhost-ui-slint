@@ -30,6 +30,7 @@ export component ClosureStudioLogoSingleRow inherits HorizontalBox {
                 font-size: single-row-size * 85%;
                 height: single-row-size;
                 text: "CLOSURE STUDIO";
+                color: Palette.alternate-foreground;
                 vertical-alignment: center;
             }
         }
@@ -46,21 +47,23 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
 
         Text {
             font-family: FontGlobals.closure-studio-logo;
-            font-size: single-row-size * 85%;
+            font-size: single-row-size * 90%;
             height: single-row-size;
             text: "CLOSURE";
+            color: Palette.alternate-foreground;
             vertical-alignment: center;
         }
 
         HorizontalLayout {
             alignment: start;
-            spacing: single-row-size * 3%;
+            spacing: 3px;
 
             Text {
                 font-family: FontGlobals.closure-studio-logo;
-                font-size: single-row-size * 85%;
+                font-size: single-row-size * 90%;
                 height: single-row-size;
                 text: "STUDIO";
+                color: Palette.alternate-foreground;
                 vertical-alignment: center;
             }
 
@@ -70,61 +73,61 @@ export component ClosureStudioLogoStacked inherits HorizontalBox {
                 Image {
                     source: logo;
     
-                    width: single-row-size * 85%;
-                    height: single-row-size * 85%;
+                    width: single-row-size * 90%;
+                    height: single-row-size * 90%;
                 }
             }
         }
+    }
+}
+
+export component DesktopEditionIcon inherits HorizontalLayout {
+    padding: 5px;
+    alignment: space-around;
+
+    Rectangle {
+        height: 22px;
+        width: 140px;
+        border-radius: 8px;
 
         HorizontalLayout {
-            padding: 5px;
+            padding-left: 5px;
+            padding-right: 5px;
             alignment: space-around;
 
-            Rectangle {
-                height: 22px;
-                width: 140px;
-                border-radius: 8px;
+            Text {
+                font-size: 15px;
+                font-family: FontGlobals.closure-studio-logo;
+                color: Palette.alternate-foreground.transparentize(20%);
+                text: "D32 ";
+                vertical-alignment: center;
+            }
 
-                HorizontalLayout {
-                    padding-left: 5px;
-                    padding-right: 5px;
-                    alignment: space-around;
-
-                    Text {
-                        font-size: 15px;
-                        font-family: FontGlobals.closure-studio-logo;
-                        color: Palette.foreground.transparentize(20%);
-                        text: "D32 ";
-                        vertical-alignment: center;
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
+            VerticalLayout {
+                alignment: center;
+                
+                Rectangle {
+                    Image {
+                        source: @image-url("../images/D32_Steel.png");
                         
-                        Rectangle {
-                            Image {
-                                source: @image-url("../images/D32_Steel.png");
-                                
-                                width: 36px;
-                                height: 36px;
-                            }
-
-                            width: 32px;
-                            height: 18px;
-                        }
+                        width: 36px;
+                        height: 36px;
                     }
 
-                    Text {
-                        font-size: 15px;
-                        font-family: FontGlobals.closure-studio-logo;
-                        color: Palette.foreground.transparentize(20%);
-                        text: " EDITION";
-                        vertical-alignment: center;
-                    }
+                    width: 32px;
+                    height: 18px;
                 }
+            }
 
-                background: Palette.alternate-background;
+            Text {
+                font-size: 15px;
+                font-family: FontGlobals.closure-studio-logo;
+                color: Palette.alternate-foreground.transparentize(20%);
+                text: " EDITION";
+                vertical-alignment: center;
             }
         }
+
+        background: Palette.control-background.transparentize(50%);
     }
 }

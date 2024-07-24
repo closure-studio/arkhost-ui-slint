@@ -51,13 +51,12 @@ struct GameResourceEntry {
 
 pub struct GameController {
     game_resource_map: RwLock<HashMap<String, Arc<GameResourceEntry>>>,
-    #[allow(unused)] // TODO: 关卡相关
     stage_data: RwLock<Option<StageTable>>,
     stage_search_tree: RwLock<levenshtein_distance::Trie<Arc<String>>>,
     char_pack_summaries: RwLock<Option<CharPackSummaryTable>>,
     refreshing: AtomicBool,
     current_last_gacha_record_ts: RwLock<chrono::DateTime<chrono::Utc>>,
-    db_cache_manager: DBCacheManager,
+    cache_manager: Box<dyn CacheManager>,
 
     api_user_model: Arc<ApiUserModel>,
     app_state_controller: Arc<AppStateController>,
@@ -85,7 +84,7 @@ impl GameController {
             char_pack_summaries: RwLock::new(None),
             refreshing: AtomicBool::new(false),
             current_last_gacha_record_ts: RwLock::new(chrono::DateTime::<chrono::Utc>::MIN_UTC),
-            db_cache_manager: DBCacheManager::new(),
+            cache_manager: Box::new(DBCacheManager::new()),
 
             api_user_model,
             app_state_controller,
@@ -685,36 +684,39 @@ impl GameController {
     }
 
     pub async fn try_ensure_resources(&self) {
-        let has_stage_data = self.stage_data.read().await.is_some();
-        let has_char_pack_summary = self.char_pack_summaries.read().await.is_some();
+        if self.stage_data.read().await.is_some() && self.char_pack_summaries.read().await.is_some()
+        {
+            return;
+        }
+
+        let mut stage_data_lock = self.stage_data.write().await;
+        let mut char_pack_summary_lock = self.char_pack_summaries.write().await;
 
         _ = TokioScope::scope_and_block(|s| {
-            s.spawn(async {
-                if !has_stage_data {
+            if stage_data_lock.is_none() {
+                s.spawn(async {
                     let path =
                         arkhost_api::consts::asset::assets::gamedata("excel/stage_table.json");
                     let stage_data = self.load_json_table::<StageTable>(path, None).await;
                     if let Some(stage_data) = stage_data {
                         self.build_stage_search_tree(&stage_data).await;
-                        _ = self.stage_data.write().await.insert(stage_data);
+                        _ = stage_data_lock.insert(stage_data);
                     }
-                }
-            });
-            s.spawn(async {
-                if !self.config_controller.data_saver_mode_enabled() && !has_char_pack_summary {
+                });
+            }
+
+            if !self.config_controller.data_saver_mode_enabled() && char_pack_summary_lock.is_none()
+            {
+                s.spawn(async {
                     let path = arkhost_api::consts::asset::assets::charpack("summary.json");
                     let char_pack_summary = self
                         .load_json_table::<CharPackSummaryTable>(path, None)
                         .await;
                     if let Some(char_pack_summary) = char_pack_summary {
-                        _ = self
-                            .char_pack_summaries
-                            .write()
-                            .await
-                            .insert(char_pack_summary);
+                        _ = char_pack_summary_lock.insert(char_pack_summary);
                     }
-                }
-            });
+                });
+            }
         });
     }
 
@@ -950,7 +952,7 @@ impl GameController {
             if let Some(cached_urls) = &cached_urls {
                 for cached_url in cached_urls {
                     _ = self
-                        .db_cache_manager
+                        .cache_manager
                         .delete(&format!("GET:{cached_url}"))
                         .await
                         .map_err(|e| {
@@ -959,7 +961,11 @@ impl GameController {
                 }
             }
         }
-        println!("[Controller] Loading {} battle screenshots", urls.len());
+        println!(
+            "[Controller] Loading {} battle screenshots; cached: {}",
+            urls.len(),
+            cache_valid
+        );
 
         let mut image_data_list = urls
             .iter()

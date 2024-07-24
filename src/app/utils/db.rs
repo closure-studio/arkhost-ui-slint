@@ -29,7 +29,7 @@ pub fn env_or_none() -> &'static RwLock<Option<heed::Env>> {
             let env = try_open_env(&path)
                 .unwrap_or_else(
                     || panic!("加载数据库失败！请尝试：\n1. 首次发生请关闭所有应用实例后重试\n2. 检查数据库路径是否可读写是否正确后重试\n3. 删除数据库目录\n数据库路径：{}", path.display()));
-            let env = verify_current_schema_version(env)
+            let env = verify_schema_version_v1(env)
                 .unwrap_or_else(
                     |e| panic!("校验数据库格式失败！\n{}\n 请尝试：\n1. 首次发生请关闭所有应用实例后重试\n2. 删除数据库目录\n数据库路径：{}", e, path.display()));
 
@@ -168,7 +168,7 @@ fn try_open_env(path: &std::path::Path) -> Option<heed::Env> {
     .ok()
 }
 
-fn verify_current_schema_version(env: heed::Env) -> Result<heed::Env> {
+fn verify_schema_version_v1(env: heed::Env) -> Result<heed::Env> {
     let current_schema_version = &consts::schema_info_v1::CURRENT_SCHEMA_VERSION;
     let mut wtxn = env.write_txn()?;
     let schema_info_db: heed::Database<Str, Str> =

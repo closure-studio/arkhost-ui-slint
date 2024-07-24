@@ -46,9 +46,8 @@ component StartGameButton inherits GameOperationShortcutButton {
 
     type: ButtonType.StartGame;
     primary: true;
-    icon: Palette.color-scheme == ColorScheme.dark  // primary Button 的文字颜色与默认文字颜色相反
-        ? @image-url("../images/game_card_shortcut_start_light.svg")
-        : @image-url("../images/game_card_shortcut_start.svg");
+    icon: @image-url("../images/game_card_shortcut_start.svg");
+    colorize-icon: true;
     text: !compact 
         ? @tr("启动") 
         : "";
@@ -58,9 +57,8 @@ component StopGameButton inherits GameOperationShortcutButton {
     in property <bool> compact: false;
 
     type: ButtonType.StopGame;
-    icon: Palette.color-scheme == ColorScheme.dark 
-        ? @image-url("../images/game_card_shortcut_stop.svg")
-        : @image-url("../images/game_card_shortcut_stop_light.svg");
+    icon: @image-url("../images/game_card_shortcut_stop.svg");
+    colorize-icon: true;
     text: !compact 
         ? @tr("停止") 
         : "";
@@ -68,11 +66,10 @@ component StopGameButton inherits GameOperationShortcutButton {
 
 // component RestartGameButton inherits GameOperationShortcutButton {
 //     in property <bool> compact: false;
-//    
+   
 //     type: ButtonType.RestartGame;
-//     icon: Palette.color-scheme == ColorScheme.dark
-//         ? @image-url("../images/game_card_shortcut_restart.svg")
-//         : @image-url("../images/game_card_shortcut_restart_light.svg");
+//     icon: @image-url("../images/game_card_shortcut_restart.svg");
+//     colorize-icon: true;
 //     text: !compact 
 //         ? @tr("重启") 
 //         : "";

@@ -10,23 +10,17 @@ import { ClosureStudioLogoSingleRow } from "components/closure-studio-logo.slint
 import { SlotPage } from "pages/slot-page.slint";
 import { FontGlobals } from "font-globals.slint";
 import { StateGlobals } from "state-globals.slint";
-export { StateGlobals }
+export { StateGlobals, LoginWindow }
 
 export component AppWindow inherits Window {
     title: @tr("Closure Studio");
     icon: @image-url("images/closure_drone.png");
 
-    in property <[GameInfo]> game-info-list;
-    in property <FetchGamesState> fetch-games-state;
-    in property <SseConnectState> sse-connect-state;
-    in property <[SlotInfo]> slot-info-list;
+    in property <[GameInfo]> game-info-list: [];
+    in property <FetchGamesState> fetch-games-state: FetchGamesState.Fetching;
+    in property <SseConnectState> sse-connect-state: SseConnectState.Connected;
+    in property <[SlotInfo]> slot-info-list: [];
     in property <UserInfo> user-info;
-    in-out property <LoginState> login-state;
-    in-out property <string> login-status-text;
-
-    callback login-requested <=> login-window.login-requested;
-    callback auth-requested <=> login-window.auth-requested;
-    callback register-requested <=> login-window.register-requested;
 
     callback start-game <=> Callbacks.start-game;
     callback stop-game <=> Callbacks.stop-game;
@@ -62,22 +56,11 @@ export component AppWindow inherits Window {
 
     callback confirm-gacha-records <=> Callbacks.confirm-gacha-records;
 
-    public function set-use-auth(account: string, use-auth-val: bool) {
-        login-window.set-use-auth(account, use-auth-val);
-    }
-
-    public function do-return-to-login-page() {
-        login-state = LoginState.Unlogged;
-        login-status-text = "";
-    }
-
     preferred-width: 1280px;
     preferred-height: 830px;
     default-font-weight: 350;
 
     VerticalLayout {
-        visible: login-state == LoginState.Logged;
-
         page-tab := TabWidget {
             Tab {
                 title: @tr("Dashboard");
@@ -115,12 +98,6 @@ export component AppWindow inherits Window {
                 }
             }
         }
-    }
-
-    login-window := LoginWindow {
-        visible: login-state != LoginState.Logged;
-        login-state: login-state;
-        login-status-text: login-status-text;
     }
 
     if user-info.is-admin: Rectangle {

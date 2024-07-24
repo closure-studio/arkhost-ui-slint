@@ -45,7 +45,10 @@ use arkhost_api::clients::{
 use asset_worker::AssetWorker;
 #[allow(unused)]
 use auth_worker::AuthWorker;
-use std::sync::{Arc, RwLock};
+use std::{
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -113,7 +116,8 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         tx_auth_command.clone(),
         tx_asset_command.clone(),
     ));
-    let _ui_main_thread_context = ui_context.clone().attach(&ui);
+    let login_window_ref = Rc::new(std::sync::OnceLock::new());
+    let ui_main_thread_context = ui_context.clone().attach(&ui, login_window_ref.clone());
     ui_context.config_controller.sync_to_ui();
 
     #[cfg(target_os = "windows")]
@@ -167,19 +171,63 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         });
     }
 
-    if let Some(state) = user_state_data_or_null {
-        let app_state = ui_context.app_state.lock().unwrap();
-        if state.is_expired() {
-            app_state
-                .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into())
-                .exec();
-            app_state.set_use_auth(String::new(), false).exec();
+    let login_window_context = &ui_main_thread_context.login_window_context;
+    {
+        let mut show_login_window = false;
+        if let Some(state) = user_state_data_or_null {
+            if state.is_expired() {
+                let mut login_window_state =
+                    login_window_context.login_window_state.lock().unwrap();
+                login_window_state
+                    .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into());
+                login_window_state.set_use_auth(state.account, false);
+                show_login_window = true;
+            } else {
+                tokio::spawn({
+                    let ui_context = ui_context.clone();
+                    async move {
+                        ui_context.session_controller.create_user_model().await;
+                        ui_context
+                            .session_controller
+                            .on_post_create_user_model()
+                            .await;
+                    }
+                });
+
+                if let Err(e) = ui_context
+                    .session_controller
+                    .authorize_with_stored_token()
+                    .await
+                {
+                    println!("[app::run] Refresh token failed: {e}");
+                    let mut login_window_state =
+                        login_window_context.login_window_state.lock().unwrap();
+                    login_window_state
+                        .set_login_state(LoginState::Unlogged, "登录凭据已失效，请重新登录".into());
+                    login_window_state.set_use_auth(String::default(), false);
+                    show_login_window = true;
+                } else {
+                    println!("[app::run] Refresh token succeeded");
+                    login_window_context
+                        .login_window_state
+                        .lock()
+                        .unwrap()
+                        .set_use_auth(state.account, true);
+                }
+            }
         } else {
-            app_state.set_use_auth(state.account, true).exec();
-            let ui_context = ui_context.clone();
-            tokio::spawn(async move { ui_context.session_controller.auth().await });
+            show_login_window = true;
+        }
+
+        if show_login_window {
+            login_window_context
+                .load_login_window()
+                .lock()
+                .unwrap()
+                .show();
         }
     }
+
     ui.show()?;
     slint::run_event_loop()?;
 
@@ -193,7 +241,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
                 join_worker("asset_worker", asset_worker_join_handle))
         } => {},
         _ = tokio::time::sleep(consts::WORKER_JOIN_TIMEOUT) => {
-            utils::notification::toast("可露希尔客户端非正常退出", None, "退出花的时间过长，已强制停止。如果频繁遇到请反馈问题。", None);
+            utils::notification::toast("可露希尔客户端非正常退出", None, "退出耗时过长，已强制停止。如果频繁遇到请反馈问题。", None);
             let err_info = format!("[app::run] Timed out joining workers! ({:?})", consts::WORKER_JOIN_TIMEOUT);
             println!("{err_info}");
             return Err(slint::PlatformError::Other(err_info));

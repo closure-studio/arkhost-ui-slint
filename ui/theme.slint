@@ -4,4 +4,6 @@ export global Theme {
     out property <brush> control-group-background: Palette.color-scheme == ColorScheme.light
         ? Palette.control-background.with-alpha(35%)
         : Palette.alternate-background.darker(40%);
+
+    out property <brush> accent-color-info: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
 }

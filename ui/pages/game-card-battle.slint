@@ -52,6 +52,8 @@ export component GameCardBattle inherits HorizontalLayout {
                 padding-top: 7px;
                 padding-bottom: 7px;
                 Button {
+                    icon: @image-url("../images/icon_battle.png");
+                    colorize-icon: true;
                     text: @tr("选择作战关卡…");
                     clicked => {
                         select-map();
@@ -64,7 +66,7 @@ export component GameCardBattle inherits HorizontalLayout {
                     spacing: 10px;
                     for map in info.selected-maps: Rectangle {
                         border-radius: self.height / 2;
-                        background: @linear-gradient(15deg, #416f9c 0%, #2f669c 100%);
+                        background: Theme.accent-color-info;
                         HorizontalLayout {
                             padding-left: 15px;
                             padding-right: 15px;

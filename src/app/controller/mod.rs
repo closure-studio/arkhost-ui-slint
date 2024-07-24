@@ -4,6 +4,7 @@ pub mod config_controller;
 pub mod game_controller;
 pub mod game_operation_controller;
 pub mod image_controller;
+pub mod login_window_context;
 pub mod ota_controller;
 pub mod sender;
 pub mod session_controller;
@@ -22,14 +23,16 @@ use self::slot_controller::SlotController;
 use self::user_controller::UserController;
 use self::{app_state_controller::AppStateController, session_controller::SessionController};
 use super::app_state::mapping::{GameOptionsMapping, SlotUpdateDraftMapping};
-use super::app_state::AppState;
+use super::app_state::{AppState, LoginWindowState};
 use super::auth_worker::AuthContext;
 use super::ui::*;
 use super::utils::ext_link;
 use arkhost_api::models::api_quota::user_tier_availability_rank;
+use login_window_context::LoginWindowContext;
 use slint::{Model, SharedString};
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex, OnceLock};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -64,6 +67,7 @@ where
 pub struct UIContext {
     pub api_user_model: Arc<ApiUserModel>,
     pub app_state: Arc<Mutex<AppState>>,
+    pub login_window_state: Arc<Mutex<LoginWindowState>>,
     pub app_state_controller: Arc<AppStateController>,
     pub config_controller: Arc<ConfigController>,
     pub image_controller: Arc<ImageController>,
@@ -77,6 +81,7 @@ pub struct UIContext {
 
 pub struct UIMainThreadContext {
     pub refresh_game_timer: slint::Timer,
+    pub login_window_context: Rc<LoginWindowContext>,
 }
 
 impl UIContext {
@@ -88,6 +93,7 @@ impl UIContext {
         tx_asset_worker: mpsc::Sender<AssetCommand>,
     ) -> Self {
         let app_state = Arc::new(Mutex::new(app_state));
+        let login_window_state = Arc::new(Mutex::new(LoginWindowState::new()));
         let app_state_controller = Arc::new(AppStateController {
             app_state: app_state.clone(),
         });
@@ -137,6 +143,7 @@ impl UIContext {
         Self {
             api_user_model,
             app_state,
+            login_window_state,
             app_state_controller,
             image_controller,
             config_controller,
@@ -149,40 +156,22 @@ impl UIContext {
         }
     }
 
-    pub fn attach(self: Arc<Self>, app: &AppWindow) -> UIMainThreadContext {
-        app.on_register_requested(|| {
-            ext_link::open_ext_link("https://closure.ltsc.vip");
-        });
+    pub fn attach(
+        self: Arc<Self>,
+        app: &AppWindow,
+        login_window_ref: Rc<OnceLock<LoginWindow>>,
+    ) -> UIMainThreadContext {
+        let login_window_context = Rc::new(LoginWindowContext::new(
+            login_window_ref,
+            self.login_window_state.clone(),
+            self.app_state_controller.clone(),
+            self.session_controller.clone(),
+            self.config_controller.clone(),
+        ));
+
         app.on_open_ext_link(|str| {
             ext_link::open_ext_link(&str);
         });
-        {
-            let app_weak = app.as_weak();
-            let this = self.clone();
-            app.on_login_requested(move |account, password| {
-                let app = app_weak.clone().unwrap();
-
-                app.set_login_status_text(" 正在登录".into());
-                app.set_login_state(LoginState::LoggingIn);
-
-                let this = this.clone();
-                tokio::spawn(async move {
-                    this.session_controller
-                        .login(account.into(), password.into())
-                        .await;
-                });
-            });
-        }
-
-        {
-            let this = self.clone();
-            app.on_auth_requested(move || {
-                let this = this.clone();
-                tokio::spawn(async move {
-                    this.session_controller.auth().await;
-                });
-            });
-        }
 
         {
             let this = self.clone();
@@ -404,9 +393,12 @@ impl UIContext {
         }
 
         {
-            let app_weak = app.as_weak();
+            let login_window_context = login_window_context.clone();
             app.on_return_to_login_page(move || {
-                app_weak.unwrap().invoke_do_return_to_login_page();
+                let login_window_state = login_window_context.load_login_window();
+                let mut login_window_state = login_window_state.lock().unwrap();
+                login_window_state.set_login_state(LoginState::Unlogged, "".into());
+                login_window_state.show();
             });
         }
 
@@ -544,7 +536,7 @@ impl UIContext {
                     let this = this.clone();
                     slint::invoke_from_event_loop(move || {
                         let app = app_weak.unwrap();
-                        if app.get_login_state() != LoginState::Logged {
+                        if app.get_game_info_list().row_count() == 0 {
                             return;
                         }
 
@@ -561,6 +553,9 @@ impl UIContext {
             timer
         };
 
-        UIMainThreadContext { refresh_game_timer }
+        UIMainThreadContext {
+            refresh_game_timer,
+            login_window_context,
+        }
     }
 }
