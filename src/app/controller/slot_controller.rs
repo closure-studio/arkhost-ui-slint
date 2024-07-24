@@ -3,9 +3,7 @@ use std::sync::{atomic::Ordering, Arc};
 use anyhow::anyhow;
 use arkhost_api::clients::common::ResponseError;
 use arkhost_api::models::api_passport::UserPermissions;
-use arkhost_api::models::api_quota::{
-    SlotRuleValidationResult, UpdateSlotAccountRequest, UpdateSlotAccountResponse,
-};
+use arkhost_api::models::api_quota::{UpdateSlotAccountRequest, UpdateSlotAccountResponse};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -183,7 +181,7 @@ impl SlotController {
                 let status_text = if available {
                     "".to_owned()
                 } else {
-                    let e = ResponseError::<SlotRuleValidationResult> {
+                    let e = ResponseError {
                         status_code: 0,
                         internal_status_code: result.internal_code,
                         internal_message: result.internal_message,

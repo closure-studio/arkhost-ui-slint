@@ -71,7 +71,7 @@ impl GameOperationController {
                         return anyhow::Ok(());
                     }
                     Err(e) => {
-                        if e.downcast_ref::<ResponseError<()>>().is_some_and(|x| {
+                        if e.downcast_ref::<ResponseError>().is_some_and(|x| {
                             x.internal_status_code.is_some_and(|x| {
                                 x == arkhost_api::consts::error_code::CAPTCHA_ERROR
                             })

@@ -18,6 +18,11 @@ pub struct LaunchArgs {
     /// ARKHOST_APP_OVERRIDE_ASSET_SERVER=<asset_server>
     pub asset_server: Option<String>,
 
+    #[argh(option)]
+    /// 指定用户Token，等同于设置环境变量
+    /// ARKHOST_APP_USER_TOKEN=<user_token>
+    pub user_token: Option<String>,
+
     #[argh(subcommand)]
     pub launch_spec: Option<LaunchSpec>,
 }

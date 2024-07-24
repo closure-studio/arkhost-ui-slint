@@ -73,6 +73,9 @@ async fn main() -> anyhow::Result<()> {
                         asset_server.into(),
                     ))
                 }
+                if let Some(ref user_token) = launch_args.user_token {
+                    env.push((app::env::consts::USER_TOKEN.into(), user_token.into()))
+                }
 
                 let mut app_window = spawn_executable(
                     current_exe.as_os_str(),

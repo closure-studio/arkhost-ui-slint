@@ -39,12 +39,13 @@ use self::{
 use api_worker::Worker as ApiWorker;
 use arkhost_api::clients::{
     asset::AssetClient,
-    common::{UserState, UserStateDataSource},
+    common::{ResponseError, UserState, UserStateDataSource, UserStateMemStorage},
     id_server::AuthClient,
 };
 use asset_worker::AssetWorker;
 #[allow(unused)]
 use auth_worker::AuthWorker;
+use futures::FutureExt;
 use std::{
     rc::Rc,
     sync::{Arc, RwLock},
@@ -63,12 +64,9 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         utils::app_user_model::set_to_default_id();
     }
 
-    let mut user_state = UserStateDBStore::new();
-    _ = user_state
-        .load_from_db()
-        .map_err(|e| println!("[app::run] Error loading user state from DB {e}"));
-    let user_state_data_or_null = user_state.user_state_data();
-    let auth_client = create_auth_client(Arc::new(RwLock::new(user_state)));
+    let user_state = get_user_state();
+    let user_state_data_or_null = user_state.read().unwrap().user_state_data();
+    let auth_client = create_auth_client(user_state);
 
     let stop = CancellationToken::new();
     let _guard = stop.clone().drop_guard();
@@ -172,60 +170,110 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     }
 
     let login_window_context = &ui_main_thread_context.login_window_context;
-    {
-        let mut show_login_window = false;
-        if let Some(state) = user_state_data_or_null {
-            if state.is_expired() {
-                let mut login_window_state =
-                    login_window_context.login_window_state.lock().unwrap();
-                login_window_state
-                    .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into());
-                login_window_state.set_use_auth(state.account, false);
-                show_login_window = true;
-            } else {
-                tokio::spawn({
-                    let ui_context = ui_context.clone();
-                    async move {
-                        ui_context.session_controller.create_user_model().await;
-                        ui_context
-                            .session_controller
-                            .on_post_create_user_model()
-                            .await;
-                    }
-                });
+    let mut show_login_window = false;
+    if let Some(state) = user_state_data_or_null {
+        login_window_context
+            .login_window_state
+            .lock()
+            .unwrap()
+            .set_use_auth(state.account.clone(), true);
 
-                if let Err(e) = ui_context
-                    .session_controller
-                    .authorize_with_stored_token()
-                    .await
-                {
-                    println!("[app::run] Refresh token failed: {e}");
-                    let mut login_window_state =
-                        login_window_context.login_window_state.lock().unwrap();
-                    login_window_state
-                        .set_login_state(LoginState::Unlogged, "登录凭据已失效，请重新登录".into());
-                    login_window_state.set_use_auth(String::default(), false);
-                    show_login_window = true;
-                } else {
-                    println!("[app::run] Refresh token succeeded");
-                    login_window_context
-                        .login_window_state
-                        .lock()
-                        .unwrap()
-                        .set_use_auth(state.account, true);
-                }
-            }
-        } else {
+        if state.is_expired() {
+            let mut login_window_state = login_window_context.login_window_state.lock().unwrap();
+            login_window_state
+                .set_login_state(LoginState::Unlogged, "登录已过期，请重新登录".into());
+            login_window_state.set_use_auth(state.account.clone(), false);
             show_login_window = true;
-        }
+        } else {
+            // 后台获取User Model
+            tokio::spawn({
+                let ui_context = ui_context.clone();
+                async move {
+                    ui_context.session_controller.create_user_model().await;
+                    ui_context
+                        .session_controller
+                        .on_post_create_user_model()
+                        .await;
+                }
+            });
 
-        if show_login_window {
-            login_window_context
-                .load_login_window()
-                .lock()
-                .unwrap()
-                .show();
+            // 后台刷新Token
+            tokio::spawn({
+                let login_window_state = login_window_context.login_window_state.clone();
+                let ui_context = ui_context.clone();
+                let state = state.clone();
+
+                async move {
+                    let mut refresh_token = ui_context
+                        .session_controller
+                        .authorize_with_stored_token()
+                        .boxed()
+                        .fuse();
+
+                    let mut refresh_token_result = None;
+                    tokio::select! {
+                        result = &mut refresh_token => refresh_token_result = Some(result),
+                        _ = tokio::time::sleep(consts::BACKGROUND_REFRESH_TOKEN_TIMEOUT) => {
+                            // 后台刷新Token过久，将登录窗口提至前台
+                            login_window_state
+                                .lock()
+                                .unwrap()
+                                .set_login_state(LoginState::LoggingIn, "自动登录中……".into());
+                            ui_context
+                                .app_state_controller
+                                .exec(|x| x.exec_in_event_loop(|x| x.invoke_show_login_page()));
+                        }
+                    }
+
+                    let refresh_token_result = match refresh_token_result {
+                        Some(x) => x,
+                        None => refresh_token.await, // 继续等待
+                    };
+
+                    if let Err(e) = refresh_token_result {
+                        println!("[app::run] Refresh token failed: {e}");
+                        let mut login_window_state = login_window_state.lock().unwrap();
+                        match e.downcast_ref::<ResponseError>() {
+                            Some(err_info) if err_info.status_code == 401 => {
+                                // token无效
+                                login_window_state.set_login_state(
+                                    LoginState::Unlogged,
+                                    "登录凭据已失效，请重新登录".into(),
+                                );
+                                login_window_state.set_use_auth(state.account, false);
+                            }
+                            Some(_) => {
+                                // 请求错误，状态码 != 401，如Bad Gateway等
+                                login_window_state
+                                    .set_login_state(LoginState::Errored, format!("{e}"));
+                            }
+                            None => {
+                                // 其他错误如网络错误
+                                login_window_state
+                                    .set_login_state(LoginState::Errored, format!("{e}"));
+                            }
+                        }
+                        ui_context
+                            .app_state_controller
+                            .exec(|x| x.exec_in_event_loop(|x| x.invoke_show_login_page()));
+                    } else {
+                        println!("[app::run] Refresh token succeeded");
+                        let mut login_window_state = login_window_state.lock().unwrap();
+                        login_window_state.hide();
+                    }
+                }
+            });
         }
+    } else {
+        show_login_window = true;
+    }
+
+    if show_login_window {
+        login_window_context
+            .load_login_window()
+            .lock()
+            .unwrap()
+            .show();
     }
 
     ui.show()?;
@@ -248,6 +296,19 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         }
     };
     Ok(())
+}
+
+fn get_user_state() -> Arc<RwLock<dyn UserState>> {
+    match env::user_token() {
+        Some(token) => Arc::new(RwLock::new(UserStateMemStorage::new(Some(token.into())))),
+        None => {
+            let mut user_state = UserStateDBStore::new();
+            _ = user_state
+                .load_from_db()
+                .map_err(|e| println!("[app::run] Error loading user state from DB {e}"));
+            Arc::new(RwLock::new(user_state))
+        }
+    }
 }
 
 fn create_auth_client(user_state: Arc<RwLock<dyn UserState>>) -> AuthClient {
@@ -329,4 +390,5 @@ mod consts {
     pub const AUTH_CLIENT_MAX_RETRIES: u32 = 3;
     pub const ASSET_CLIENT_MAX_RETRIES: u32 = 2;
     pub const WORKER_JOIN_TIMEOUT: Duration = Duration::from_secs(20);
+    pub const BACKGROUND_REFRESH_TOKEN_TIMEOUT: Duration = Duration::from_secs(2);
 }

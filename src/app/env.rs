@@ -27,9 +27,18 @@ pub fn override_asset_server() -> Option<&'static str> {
         .map(|x| x.as_str())
 }
 
+pub fn user_token() -> Option<&'static str> {
+    static USER_TOKEN: OnceLock<Option<String>> = OnceLock::new();
+    USER_TOKEN
+        .get_or_init(|| std::env::var(consts::USER_TOKEN).ok())
+        .as_ref()
+        .map(|x| x.as_str())
+}
+
 pub mod consts {
     pub const DATA_DIR: &str = "ARKHOST_APP_DATA_DIR";
     pub const ATTACH_CONSOLE: &str = "ARKHOST_APP_ATTACH_CONSOLE";
     pub const FORCE_UPDATE: &str = "ARKHOST_APP_FORCE_UPDATE";
     pub const OVERRIDE_ASSET_SERVER: &str = "ARKHOST_APP_OVERRIDE_ASSET_SERVER";
+    pub const USER_TOKEN: &str = "ARKHOST_APP_USER_TOKEN";
 }

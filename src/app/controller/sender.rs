@@ -1,7 +1,7 @@
 use crate::app::auth_worker::AuthContext;
 
 use super::api_user_model::ApiUserModel;
-use super::{ApiCommand, ApiError, ApiOperation, ApiResult, AssetCommand, AssetResult};
+use super::{ApiCommand, ApiOperation, ApiResult, ApiWorkerError, AssetCommand, AssetResult};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -22,7 +22,7 @@ impl Sender {
                 op,
             })
             .await
-            .map_err(ApiError::CommandSendError::<ApiCommand>)?;
+            .map_err(ApiWorkerError::CommandSendError::<ApiCommand>)?;
 
         Ok(())
     }
@@ -37,14 +37,14 @@ impl Sender {
     {
         self.send_api_command(op).await?;
 
-        rx.await.map_err(ApiError::<T>::RespRecvError)?
+        rx.await.map_err(ApiWorkerError::<T>::RespRecvError)?
     }
 
     pub async fn send_asset_command(&self, command: AssetCommand) -> AssetResult<()> {
         self.tx_asset_worker
             .send(command)
             .await
-            .map_err(ApiError::CommandSendError::<AssetCommand>)?;
+            .map_err(ApiWorkerError::CommandSendError::<AssetCommand>)?;
 
         Ok(())
     }
@@ -59,6 +59,6 @@ impl Sender {
     {
         self.send_asset_command(command).await?;
 
-        rx.await.map_err(ApiError::<T>::RespRecvError)?
+        rx.await.map_err(ApiWorkerError::<T>::RespRecvError)?
     }
 }

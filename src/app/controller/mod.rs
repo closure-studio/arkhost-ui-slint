@@ -54,7 +54,7 @@ pub enum RefreshLogsCondition {
 }
 
 #[derive(Error, Debug)]
-pub enum ApiError<T>
+pub enum ApiWorkerError<T>
 where
     T: 'static + Send + Sync + Debug,
 {
@@ -399,6 +399,14 @@ impl UIContext {
                 let mut login_window_state = login_window_state.lock().unwrap();
                 login_window_state.set_login_state(LoginState::Unlogged, "".into());
                 login_window_state.show();
+            });
+        }
+
+        {
+            let login_window_context = login_window_context.clone();
+            app.on_show_login_page(move || {
+                let login_window_state = login_window_context.load_login_window();
+                login_window_state.lock().unwrap().show();
             });
         }
 

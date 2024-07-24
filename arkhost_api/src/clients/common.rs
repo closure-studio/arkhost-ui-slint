@@ -6,21 +6,10 @@ use base64::Engine;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json;
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug};
 use thiserror::Error;
 
 pub type ApiResult<T> = anyhow::Result<T>;
-
-#[derive(Debug)]
-pub struct ResponseErrorInfo {
-    pub status_code: u16,
-    pub internal_status_code: Option<i32>,
-    pub internal_message: Option<String>,
-}
-
-pub trait ResponseErrorInfoSource {
-    fn error_info(&self) -> ResponseErrorInfo;
-}
 
 #[derive(Error, Debug)]
 pub enum UnauthorizedError {
@@ -31,36 +20,19 @@ pub enum UnauthorizedError {
 }
 
 #[derive(Default, Error, Debug)]
-#[error("请求错误{}\n- 状态码: {status_code}{}{}{}{}",
+#[error("请求错误{}\n- 状态码: {status_code}{}{}{}",
     .internal_message.as_ref().map_or("".into(), |x| format!("：{x}")),
     .internal_status_code.as_ref().map_or("".into(), |x| format!("\n- 内部代码: {x}")),
     .raw_data.as_ref().map_or("".into(), |x| format!("\n- 原始数据:\n{x}")),
-    .raw_response.as_ref().map_or("".into(), |x| format!("\n- 原始数据:\n{x:?}")),
     .source_error.as_ref().map_or("".into(), |x| format!("\n- 错误源（若非网络问题等外部因素，请提交Bug）\n{:?}", *x))
     )]
-pub struct ResponseError<TRes>
-where
-    TRes: Debug,
-{
+pub struct ResponseError {
     pub status_code: u16,
     pub raw_data: Option<String>,
-    pub raw_response: Option<TRes>,
+    pub raw_response: Option<Box<dyn Any + Send + Sync>>,
     pub internal_status_code: Option<i32>,
     pub internal_message: Option<String>,
     pub source_error: Option<anyhow::Error>,
-}
-
-impl<TRes> ResponseErrorInfoSource for ResponseError<TRes>
-where
-    TRes: Debug,
-{
-    fn error_info(&self) -> ResponseErrorInfo {
-        ResponseErrorInfo {
-            status_code: self.status_code,
-            internal_status_code: self.internal_status_code,
-            internal_message: self.internal_message.clone(),
-        }
-    }
 }
 
 pub async fn try_response_json<T>(response: reqwest::Response) -> anyhow::Result<T>
@@ -71,7 +43,7 @@ where
     let json_str = response.text().await?;
     match serde_json::de::from_str::<T>(&json_str) {
         Ok(data) => Ok(data),
-        Err(serde_err) => Err(ResponseError::<T> {
+        Err(serde_err) => Err(ResponseError {
             status_code: status_code.as_u16(),
             internal_status_code: None,
             internal_message: None,
@@ -86,9 +58,9 @@ where
 pub fn try_response_data<T>(
     status_code: StatusCode,
     resp: impl ResponseWrapper<T>,
-) -> Result<T, ResponseError<T>>
+) -> Result<T, ResponseError>
 where
-    T: Clone + Debug + Default,
+    T: 'static + Clone + Debug + Send + Sync + Default,
 {
     map_try_response_data(status_code, resp, |x| Ok(x))
 }
@@ -97,21 +69,21 @@ pub fn map_try_response_data<T, R>(
     status_code: StatusCode,
     resp: impl ResponseWrapper<T>,
     op: impl FnOnce(T) -> Result<R, T>,
-) -> Result<R, ResponseError<T>>
+) -> Result<R, ResponseError>
 where
-    T: Clone + Debug + Default,
+    T: 'static + Clone + Debug + Send + Sync + Default,
 {
-    fn make_err<T: Clone + Debug>(
+    fn make_err<T: 'static + Clone + Debug + Send + Sync>(
         status_code: StatusCode,
         data: Option<T>,
         internal_code: Option<i32>,
         internal_message: Option<String>,
-    ) -> ResponseError<T> {
+    ) -> ResponseError {
         ResponseError {
             status_code: status_code.as_u16(),
             internal_status_code: internal_code,
             internal_message,
-            raw_response: data,
+            raw_response: data.map::<Box<dyn Any + Send + Sync>, _>(|x| Box::new(x)),
             raw_data: None,
             source_error: None,
         }
