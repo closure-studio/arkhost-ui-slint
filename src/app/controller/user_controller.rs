@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
-use tokio::sync::oneshot;
-
-use crate::app::utils::notification;
-
 use super::{
     api_user_model::ApiUserModel, app_state_controller::AppStateController, sender::Sender,
     ApiOperation,
 };
+use crate::app::utils::notification;
+use log::warn;
+use std::sync::Arc;
+use tokio::sync::oneshot;
 
 pub struct UserController {
     #[allow(unused)] // reserved
@@ -36,7 +34,7 @@ impl UserController {
             .send_api_request(ApiOperation::SubmitSmsVerifyCode { code, resp }, &mut rx)
             .await;
         if let Err(e) = res {
-            println!("[Controller] Error submitting SMS verify code: {e}");
+            warn!("error submitting SMS verify code: {e}");
             notification::toast("提交验证码失败", None, &format!("{e}"), None);
         } else {
             notification::toast(
@@ -65,7 +63,7 @@ impl UserController {
                 });
             }
             Err(e) => {
-                println!("[Controller] Error fetching QQ verify code: {e}");
+                warn!("error fetching QQ verify code: {e}");
                 notification::toast("获取QQ验证码失败", None, &format!("{e}"), None);
             }
         }

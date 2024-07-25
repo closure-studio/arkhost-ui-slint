@@ -1,6 +1,6 @@
-use std::time::Duration;
-
+use log::warn;
 use notify_rust::Notification;
+use std::time::Duration;
 
 pub fn toast(summary: &str, subtitle: Option<&str>, body: &str, duration: Option<Duration>) {
     let mut notification = Notification::new();
@@ -22,7 +22,7 @@ pub fn toast(summary: &str, subtitle: Option<&str>, body: &str, duration: Option
 
 fn log_on_show_failed<T>(result: Result<T, notify_rust::error::Error>) {
     if let Err(e) = result {
-        println!("[Notification] Error showing notification: {e}");
+        warn!("error showing notification: {e}");
     }
 }
 

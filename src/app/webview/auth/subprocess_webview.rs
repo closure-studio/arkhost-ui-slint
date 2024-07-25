@@ -8,6 +8,7 @@ use crate::app::webview::auth::consts;
 use anyhow::anyhow;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
+use log::{debug, error, info, trace, warn};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
@@ -33,7 +34,7 @@ impl auth::AuthListener for Listener {
             .send_event(AuthenticatorMessage::Result { result });
 
         if let Err(e) = res {
-            println!("[WebViewSubprocess] Error sending event to EventLoop: {e}")
+            error!("AuthListener: error sending event to EventLoop: {e}")
         }
     }
 }
@@ -73,10 +74,7 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
 
         // create webview
         let user_data_dir = data_dir::data_dir().join(consts::WEBVIEW_USER_DATA_DIR);
-        println!(
-            "[WebViewSubprocess] User data directory: {}",
-            user_data_dir.display()
-        );
+        debug!("user data directory: {}", user_data_dir.display());
         let mut web_context = WebContext::new(Some(user_data_dir));
 
         let webview = self
@@ -107,7 +105,7 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
 
     fn user_event(&mut self, evl: &ActiveEventLoop, ev: AuthenticatorMessage) {
         evl.set_control_flow(ControlFlow::Wait);
-        println!("[WebViewSubprocess] AuthenticatorEvent {ev:?}");
+        trace!("user_event: {ev:?}");
         match ev {
             AuthenticatorMessage::Ping => {
                 _ = self.tx_host.send(AuthenticatorMessage::Acknowledged);
@@ -115,21 +113,24 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
             AuthenticatorMessage::SetVisible { x, y, visible } => {
                 self.window.as_ref().unwrap().set_visible(visible);
                 if visible {
-                    self.window.as_ref().unwrap().set_outer_position(LogicalPosition::new(x, y));
+                    self.window
+                        .as_ref()
+                        .unwrap()
+                        .set_outer_position(LogicalPosition::new(x, y));
                 }
                 _ = self.tx_host.send(AuthenticatorMessage::Acknowledged);
             }
             AuthenticatorMessage::PerformAction { action } => {
                 let preform_res = self.authenticator.auth_resolver.preform(action.clone());
                 if let Err(err) = preform_res {
-                    println!("[WebViewSubprocess] Error preforming auth action: '{action:?}'; Err: {err}");
+                    error!("error preforming auth action: '{action:?}'; Err: {err}");
                 }
                 _ = self.tx_host.send(AuthenticatorMessage::Acknowledged);
             }
             AuthenticatorMessage::Result { .. } => {
                 let send_res = self.tx_host.send(ev);
                 if let Err(e) = send_res {
-                    println!("[WebViewSubprocess] Unable to send auth result, Err: {e}");
+                    error!("unable to send auth result, Err: {e}");
                 }
             }
             AuthenticatorMessage::CloseRequested => {
@@ -140,11 +141,11 @@ impl ApplicationHandler<AuthenticatorMessage> for AuthenticatorApp {
             AuthenticatorMessage::ReloadRequested => {
                 let res = self.authenticator.reload();
                 if let Err(e) = res {
-                    println!("[WebViewSubprocess] Unable to reload auth page, Err: {e}");
+                    error!("unable to reload auth page, Err: {e}");
                 }
                 _ = self.tx_host.send(AuthenticatorMessage::Acknowledged);
             }
-            _ => println!("[WebViewSubprocess] Error listening AuthenticatorEvent: handler not implemented for {ev:?}"),
+            _ => error!("error listening AuthenticatorEvent: handler not implemented for {ev:?}"),
         }
     }
 
@@ -180,14 +181,14 @@ fn connect_to_host_process(server_name: String) -> anyhow::Result<(TxHost, RxHos
         IpcSender<IpcSender<AuthenticatorMessage>>,
         IpcReceiver<IpcSender<AuthenticatorMessage>>,
     ) = ipc::channel()?;
-    println!("[WebViewSubprocess] Sending inverse side senders to host {server_name}");
+    debug!("sending inverse side senders to host {server_name}");
 
     let mut retries = 3;
     loop {
         match IpcSender::connect(server_name.clone()) {
             Ok(sender) => break Ok(sender),
             Err(e) => {
-                println!("[WebViewSubprocess] failed attempting to connect, retrying...\n{e}");
+                warn!("failed attempt to connect, retrying...\n{e}");
             }
         }
 
@@ -200,7 +201,7 @@ fn connect_to_host_process(server_name: String) -> anyhow::Result<(TxHost, RxHos
     }?
     .send((rx_host_sender, tx_host_sender))?;
 
-    println!("[WebViewSubprocess] Receiving host TX receiver from host");
+    debug!("receiving host TX receiver from host");
     let tx_host: IpcSender<AuthenticatorMessage> = tx_host_receiver.recv()?;
     Ok((tx_host, rx_host))
 }
@@ -210,7 +211,7 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
         .build()
         .unwrap();
 
-    println!("[WebViewSubprocess] Launching authenticator WebView");
+    info!("launching authenticator WebView");
     let authenticator = auth::Authenticator::new(
         auth::AuthParams::ArkHostAuth { user: account },
         Rc::new(Box::new(Listener {
@@ -230,25 +231,23 @@ fn launch_webview(tx_host: TxHost, rx_host: RxHost, account: String) -> anyhow::
                     }
 
                     if let Err(e) = proxy.send_event(event) {
-                        println!("[WebViewSubprocess] Closing Authenticator on EventLoop send failed: {e:?}");
+                        error!("closing Authenticator on EventLoop send failed: {e:?}");
                         break;
                     }
                 }
                 Err(e) => {
                     match e {
                         ipc::IpcError::Disconnected => {
-                            println!("[WebViewSubprocess] Closing Authenticator on host_tx_receiver Disconnected")
+                            info!("closing Authenticator on host_tx_receiver Disconnected")
                         }
-                        _ => println!(
-                            "[WebViewSubprocess] Closing Authenticator on host_tx_receiver recv failed: {e:?}"
-                        ),
+                        _ => error!("closing Authenticator on host_tx_receiver recv failed: {e:?}"),
                     }
                     break;
                 }
             }
         }
         if !close_requested {
-            println!("[WebViewSubprocess] Closing Authenticator from recv thread");
+            info!("closing Authenticator from recv thread");
             _ = proxy.send_event(AuthenticatorMessage::CloseRequested);
         }
     });

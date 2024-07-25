@@ -1,14 +1,13 @@
-use async_scoped::TokioScope;
-use tokio::sync::oneshot;
-use tokio_util::sync::{CancellationToken, DropGuard};
-
-use std::sync::{Arc, Mutex};
-
 use super::{
     api_user_model::ApiUserModel, app_state_controller::AppStateController,
     game_controller::GameController, ota_controller::OtaController, sender::Sender,
     slot_controller::SlotController, ApiOperation, ApiResult,
 };
+use async_scoped::TokioScope;
+use log::{debug, warn};
+use std::sync::{Arc, Mutex};
+use tokio::sync::oneshot;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 pub struct SessionController {
     pub api_user_model: Arc<ApiUserModel>,
@@ -86,7 +85,7 @@ impl SessionController {
             .replace(stop_connection_token.clone().drop_guard())
             .is_some()
         {
-            println!("[Controller] Terminated connections in previous session");
+            debug!("terminated connections in previous session");
         }
 
         let game_controller = self.game_controller.clone();
@@ -95,7 +94,7 @@ impl SessionController {
                 .run_sse_event_loop(stop_connection_token.clone())
                 .await
             {
-                println!("[Controller] Games SSE connection terminated with error: {e:?}");
+                warn!("games SSE connection terminated with error: {e:?}");
             }
         });
     }
@@ -118,7 +117,7 @@ impl SessionController {
                 })
             }),
             Err(e) => {
-                println!("[Controller] Error fetching site config: {e}");
+                warn!("error fetching site config: {e}");
             }
         }
     }

@@ -46,6 +46,7 @@ use asset_worker::AssetWorker;
 #[allow(unused)]
 use auth_worker::AuthWorker;
 use futures::FutureExt;
+use log::{debug, error, info, warn};
 use std::{
     rc::Rc,
     sync::{Arc, RwLock},
@@ -121,7 +122,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     #[cfg(target_os = "windows")]
     let default_webview_installation_found: bool = {
         let ver = utils::webview2::test_installation_ver();
-        println!("[app::run] WebView2 installation found: {ver:?}");
+        debug!("run: WebView2 installation found: {ver:?}");
         ver.is_some()
     };
     #[cfg(not(target_os = "windows"))]
@@ -156,11 +157,11 @@ pub async fn run() -> Result<(), slint::PlatformError> {
             Ok(Ok(())) => true,
             Ok(Err(AuthError::LaunchWebView)) | Ok(Err(AuthError::ProcessExited(_))) => false,
             Ok(Err(e)) => {
-                println!("[app::run] Unknown launch error checking webview availability: {e}");
+                warn!("run: unknown launch error checking webview availability: {e}");
                 false
             }
             Err(e) => {
-                println!("[app::run] Unknown error checking webview availability: {e}");
+                warn!("run: unknown error checking webview availability: {e}");
                 false
             }
         };
@@ -231,7 +232,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
                     };
 
                     if let Err(e) = refresh_token_result {
-                        println!("[app::run] Refresh token failed: {e}");
+                        warn!("run: refresh token failed: {e}");
                         let mut login_window_state = login_window_state.lock().unwrap();
                         match e.downcast_ref::<ResponseError>() {
                             Some(err_info) if err_info.status_code == 401 => {
@@ -257,7 +258,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
                             .app_state_controller
                             .exec(|x| x.exec_in_event_loop(|x| x.invoke_show_login_page()));
                     } else {
-                        println!("[app::run] Refresh token succeeded");
+                        info!("run: refresh token succeeded");
                         let mut login_window_state = login_window_state.lock().unwrap();
                         login_window_state.hide();
                     }
@@ -291,8 +292,8 @@ pub async fn run() -> Result<(), slint::PlatformError> {
         } => {},
         _ = tokio::time::sleep(consts::WORKER_JOIN_TIMEOUT) => {
             utils::notification::toast("可露希尔客户端非正常退出", None, "退出耗时过长，已强制停止。如果频繁遇到请反馈问题。", None);
-            let err_info = format!("[app::run] Timed out joining workers! ({:?})", consts::WORKER_JOIN_TIMEOUT);
-            println!("{err_info}");
+            let err_info = format!("run: Timed out joining workers! ({:?})", consts::WORKER_JOIN_TIMEOUT);
+            error!("{err_info}");
             return Err(slint::PlatformError::Other(err_info));
         }
     };
@@ -306,7 +307,7 @@ fn get_user_state() -> Arc<RwLock<dyn UserState>> {
             let mut user_state = UserStateDBStore::new();
             _ = user_state
                 .load_from_db()
-                .map_err(|e| println!("[app::run] Error loading user state from DB {e}"));
+                .map_err(|e| error!("get_user_state: error loading user state from DB {e}"));
             Arc::new(RwLock::new(user_state))
         }
     }
@@ -375,10 +376,10 @@ fn create_asset_client() -> AssetClient {
 async fn join_worker(worker_name: &str, join_handle: JoinHandle<()>) {
     match join_handle.await {
         Ok(_) => {
-            println!("[app::run] Joined worker '{worker_name}'");
+            debug!("join_worker: joined worker '{worker_name}'");
         }
         Err(e) => {
-            println!("[app::run] Error joining worker '{worker_name}': {e}");
+            error!("join_worker: error joining worker '{worker_name}': {e}");
         }
     }
 }

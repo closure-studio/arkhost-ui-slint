@@ -1,6 +1,8 @@
 use super::data_dir::data_dir_create_all;
 use heed::types::*;
 use heed::Result;
+use log::debug;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -46,12 +48,12 @@ pub fn database<K: 'static, D: 'static>(name: Option<&str>) -> Result<heed::Data
 }
 
 pub fn shutdown() {
-    println!("[DB] Shutting down Env");
+    info!("shutting down Env");
     let self_delete_requested = HANDLE_SELF_DELETE.load(Ordering::Relaxed)
         && match self_delete_requested() {
             Ok(val) => val,
             Err(e) => {
-                println!("[DB] Error reading self delete flag: {e}");
+                error!("error reading self delete flag: {e}");
                 false
             }
         };
@@ -68,7 +70,7 @@ pub fn shutdown() {
 
     if self_delete_requested {
         let path = env_path();
-        println!("[DB] Deleting DB: {path:?}");
+        info!("deleting DB: {path:?}");
         std::fs::remove_dir_all(path).expect("清除 App 数据失败！");
         super::notification::toast("已清除 App 数据", None, "", None);
     }
@@ -161,10 +163,10 @@ fn try_open_env(path: &std::path::Path) -> Option<heed::Env> {
             .open(path)
     }
     .map(|db| {
-        println!("[DB] Opened Env at {path:?}");
+        info!("opened Env at {path:?}");
         db
     })
-    .map_err(|e| println!("[DB] Error opening LMDB Env at {path:?}: {e}"))
+    .map_err(|e| error!("error opening LMDB Env at {path:?}: {e}"))
     .ok()
 }
 
@@ -180,10 +182,10 @@ fn verify_schema_version_v1(env: heed::Env) -> Result<heed::Env> {
         .and_then(|ver| serde_json::de::from_str::<semver::Version>(ver).ok());
 
     if let Some(current_version) = &current_version {
-        println!("[DB] Schema version found: {current_version}");
+        debug!("schema version found: {current_version}");
     }
     if !current_version.is_some_and(|ver| ver == consts::schema_info_v1::CURRENT_SCHEMA_VERSION) {
-        println!("[DB] Dropping DBs on schema version mismatch");
+        info!("dropping DBs on schema version mismatch");
         drop_dbs(&env, schema_info_db, &mut wtxn)?;
 
         schema_info_db.put(
@@ -201,7 +203,7 @@ fn verify_schema_version_v1(env: heed::Env) -> Result<heed::Env> {
     track_db_in_schema(schema_info_db, consts::db::OTA_RELEASE, &mut wtxn)?;
     wtxn.commit()?;
 
-    println!("[DB] Verified schema version: {}", current_schema_version);
+    debug!("verified schema version: {}", current_schema_version);
     Ok(env)
 }
 
@@ -222,11 +224,11 @@ fn drop_dbs(
     for db_name in db_names {
         match env.open_database::<Bytes, Bytes>(wtxn, Some(&db_name)) {
             Ok(Some(db)) => {
-                println!("[DB] Dropping {db_name}");
+                debug!("dropping {db_name}");
                 db.clear(wtxn)?;
             }
             Err(e) => {
-                println!("[DB] Unable to open DB '{db_name}' and drop: {e}");
+                error!("unable to open DB '{db_name}' and drop: {e}");
             }
             _ => {}
         };

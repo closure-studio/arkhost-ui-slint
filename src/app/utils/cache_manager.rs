@@ -1,7 +1,7 @@
-use http_cache::{CacheManager, HttpResponse, Result};
-
 use super::db;
+use http_cache::{CacheManager, HttpResponse, Result};
 use http_cache_semantics::CachePolicy;
+use log::trace;
 use serde::{Deserialize, Serialize};
 
 pub struct DBCacheManager {
@@ -39,7 +39,14 @@ impl CacheManager for DBCacheManager {
         let rtxn = env.read_txn().map_err(into_box_error)?;
         self.db
             .get(&rtxn, cache_key)
-            .map(|x| x.map(|x| (x.response, x.policy)))
+            .map(|x| {
+                trace!(
+                    "retrieving '{cache_key}' found: {}, body size: {}B",
+                    x.is_some(),
+                    x.as_ref().map_or(0usize, |x| x.response.body.len())
+                );
+                x.map(|x| (x.response, x.policy))
+            })
             .map_err(into_box_error)
     }
 
@@ -49,6 +56,7 @@ impl CacheManager for DBCacheManager {
         response: HttpResponse,
         policy: CachePolicy,
     ) -> Result<HttpResponse> {
+        trace!("storing '{cache_key}', body size: {}B", response.body.len());
         let store = Store {
             cache_key: cache_key.to_owned(),
             response,
@@ -65,6 +73,7 @@ impl CacheManager for DBCacheManager {
     }
 
     async fn delete(&self, cache_key: &str) -> Result<()> {
+        trace!("removing '{cache_key}'");
         let env = db::env();
         let mut wtxn = env.write_txn().map_err(into_box_error)?;
         self.db

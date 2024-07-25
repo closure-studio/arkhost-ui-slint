@@ -1,7 +1,7 @@
-use arkhost_api::clients::common::UserState;
-use serde::{Deserialize, Serialize};
-
 use super::db;
+use arkhost_api::clients::common::UserState;
+use log::{debug, error};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct UserStateDBStore {
@@ -56,7 +56,7 @@ impl UserState for UserStateDBStore {
     fn set_login_state(&mut self, jwt: String) {
         self.jwt = Some(jwt);
         if let Err(e) = self.save_to_db() {
-            println!("[UserStateDBStore] Unable to write user state: {e}");
+            error!("unable to write user state: {e}");
         }
     }
 
@@ -67,9 +67,9 @@ impl UserState for UserStateDBStore {
     fn erase_login_state(&mut self) {
         self.jwt = None;
         if let Err(e) = self.save_to_db() {
-            println!("[UserStateDBStore] Unable to write user state: {e}");
+            error!("unable to write user state: {e}");
         } else {
-            println!("[UserStateDBStore] User state has been written to DB");
+            debug!("user state has been written to DB");
         }
     }
 }

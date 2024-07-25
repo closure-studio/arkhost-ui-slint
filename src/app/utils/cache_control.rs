@@ -1,6 +1,6 @@
-use std::sync::{Arc, OnceLock};
-
 use http_cache::{CacheMode, CacheModeFn};
+use log::trace;
+use std::sync::{Arc, OnceLock};
 
 pub fn default_cache_mode_fn() -> CacheModeFn {
     static DEFAULT_CACHE_MODE_FN: OnceLock<CacheModeFn> = OnceLock::new();
@@ -8,11 +8,13 @@ pub fn default_cache_mode_fn() -> CacheModeFn {
         .get_or_init(|| {
             Arc::new(|req| {
                 if matches!(req.method.as_str(), "HEAD" | "OPTIONS") {
+                    trace!("NoStore for: {} {}", req.method, req.uri);
                     return CacheMode::NoStore;
                 }
 
                 // TODO: 其他方式识别资源文件类型（MIME type等）
                 if req.uri.path().ends_with(".webp") || req.uri.path().ends_with(".png") {
+                    trace!("ForceCache for: {} {}", req.method, req.uri);
                     return CacheMode::ForceCache;
                 }
                 let matches_ota_file = {
@@ -26,8 +28,10 @@ pub fn default_cache_mode_fn() -> CacheModeFn {
                     // TODO: 其他方式识别OTA更新文件
                 };
                 if matches_ota_file {
+                    trace!("NoStore for OTA File: {} {}", req.method, req.uri);
                     CacheMode::NoStore
                 } else {
+                    trace!("Default for: {} {}", req.method, req.uri);
                     CacheMode::Default
                 }
             })

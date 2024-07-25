@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use tokio::sync::RwLockReadGuard;
-
 use crate::app::api_user_model::{ApiUser, GameMap, SlotMap};
+use std::sync::Arc;
+use tokio::sync::RwLockReadGuard;
 
 pub struct ApiUserModel {
     pub user: Arc<ApiUser>,

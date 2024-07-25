@@ -6,6 +6,7 @@ use self::{
     model::{CharIllust, ImageData},
 };
 use super::ui::*;
+use log::{debug, error};
 use raw_window_handle::HasWindowHandle;
 use slint::{Model, ModelRc, VecModel, Weak};
 use std::{rc::Rc, sync::Arc};
@@ -64,18 +65,14 @@ impl AppState {
 
     pub fn show(&self) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
-            _ = ui
-                .show()
-                .map_err(|e| println!("[AppState] Unable to show window: {e}"));
+            _ = ui.show().map_err(|e| error!("unable to show window: {e}"));
         })
     }
 
     #[allow(unused)]
     pub fn hide(&self) -> AppStateAsyncOp {
         self.exec_in_event_loop(move |ui| {
-            _ = ui
-                .hide()
-                .map_err(|e| println!("[AppState] Unable to hide window: {e}"));
+            _ = ui.hide().map_err(|e| error!("unable to hide window: {e}"));
         })
     }
 
@@ -213,7 +210,7 @@ impl AppState {
                 .map(|(_, _, mapping)| mapping.create_game_info())
                 .collect();
             ui.set_game_info_list(Rc::new(VecModel::from(game_info_list)).into());
-            println!("[AppState] Recreated rows on game list changed");
+            debug!("recreated rows on game list changed");
         })
     }
 
@@ -243,7 +240,7 @@ impl AppState {
             match Self::find_game_by_id(&game_info_list, &id) {
                 Some((i, game_info)) => func(game_info_list, i, game_info),
                 None => {
-                    println!("[AppState] Game not found: {id:?}");
+                    error!("game not found: {id:?}");
                 }
             }
         })
@@ -295,7 +292,7 @@ impl AppState {
                 .map(|(_, _, mapping)| mapping.create_slot_info())
                 .collect();
             ui.set_slot_info_list(Rc::from(VecModel::from(slot_info_list)).into());
-            println!("[AppState] Recreated rows on slot list changed");
+            debug!("recreated rows on slot list changed");
         })
     }
 
@@ -318,7 +315,7 @@ impl AppState {
                     func(slot_info_list, i, slot_info);
                 }
                 None => {
-                    println!("[AppState] Slot not found: {id:?}");
+                    error!("slot not found: {id:?}");
                 }
             }
         })
@@ -392,7 +389,7 @@ impl LoginWindowState {
             _ = login_window.upgrade_in_event_loop(|ui| {
                 _ = ui
                     .show()
-                    .map_err(|e| println!("[LoginWindowState] Unable to show login window: {e}"));
+                    .map_err(|e| error!("unable to show login window: {e}"));
 
                 #[cfg(feature = "desktop-app")]
                 if let Ok(window_handle) = ui.window().window_handle().window_handle() {
@@ -424,7 +421,7 @@ impl LoginWindowState {
             _ = login_window.upgrade_in_event_loop(|ui| {
                 _ = ui
                     .hide()
-                    .map_err(|e| println!("[LoginWindowState] Unable to hide login window: {e}"));
+                    .map_err(|e| error!("unable to hide login window: {e}"));
             });
         } else {
             self.pending_show = false;
@@ -469,13 +466,13 @@ impl LoginWindowState {
 
                 move |ui| {
                     if pending_show {
-                        _ = ui.show().map_err(|e| {
-                            println!("[LoginWindowState] Unable to show login window: {e}")
-                        });
+                        _ = ui
+                            .show()
+                            .map_err(|e| error!("unable to show login window: {e}"));
                     } else {
-                        _ = ui.hide().map_err(|e| {
-                            println!("[LoginWindowState] Unable to hide login window: {e}")
-                        });
+                        _ = ui
+                            .hide()
+                            .map_err(|e| error!("unable to hide login window: {e}"));
                     }
 
                     ui.set_login_state(pending_state);

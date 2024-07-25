@@ -13,6 +13,8 @@ use app::utils::subprocess::spawn_executable;
 #[cfg(feature = "desktop-app")]
 use desktop_utils::*;
 
+use log::info;
+
 async fn launch_app_window(_launch_args: &LaunchAppWindowArgs) -> Result<(), slint::PlatformError> {
     app::run().await
 }
@@ -20,6 +22,7 @@ async fn launch_app_window(_launch_args: &LaunchAppWindowArgs) -> Result<(), sli
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let launch_args: LaunchArgs = argh::from_env();
+    env_logger::init();
     let _cleanup_guard = app::utils::db::CleanupGuard::new();
 
     match &launch_args.launch_spec {
@@ -49,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
                 show_console(false);
             }
 
-            println!(
+            info!(
                 "\n### arkhost-ui-slint {} ###\n",
                 app::utils::app_metadata::CARGO_PKG_VERSION.unwrap_or("not found")
             );
@@ -87,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                 )?;
 
                 let exit_status = app_window.wait().await?;
-                println!("\n### AppWindow process exited with status '{exit_status}' ###\n");
+                info!("\n### AppWindow process exited with status '{exit_status}' ###\n");
 
                 if exit_status.success() {
                     if let Err(e) = update_client_if_exist().await {

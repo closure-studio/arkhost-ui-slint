@@ -1,23 +1,21 @@
-use std::sync::{atomic::Ordering, Arc};
-
-use anyhow::anyhow;
-use arkhost_api::clients::common::ResponseError;
-use arkhost_api::models::api_passport::UserPermissions;
-use arkhost_api::models::api_quota::{UpdateSlotAccountRequest, UpdateSlotAccountResponse};
-use tokio::sync::{mpsc, oneshot};
-use tokio_util::sync::CancellationToken;
-
-use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
-use crate::app::auth_worker::AuthContext;
-use crate::app::controller::AuthCommand;
-use crate::app::ui::{SlotUpdateRequestState, UserIdApiRequestState};
-use crate::app::utils::notification;
-
 use super::AuthResult;
 use super::{
     api_user_model::ApiUserModel, app_state_controller::AppStateController, sender::Sender,
     ApiOperation,
 };
+use crate::app::app_state::mapping::{SlotInfoMapping, UserInfoMapping};
+use crate::app::auth_worker::AuthContext;
+use crate::app::controller::AuthCommand;
+use crate::app::ui::{SlotUpdateRequestState, UserIdApiRequestState};
+use crate::app::utils::notification;
+use anyhow::anyhow;
+use arkhost_api::clients::common::ResponseError;
+use arkhost_api::models::api_passport::UserPermissions;
+use arkhost_api::models::api_quota::{UpdateSlotAccountRequest, UpdateSlotAccountResponse};
+use log::warn;
+use std::sync::{atomic::Ordering, Arc};
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 pub struct SlotController {
     api_user_model: Arc<ApiUserModel>,
@@ -94,7 +92,7 @@ impl SlotController {
                     self.submit_slot_model_to_ui().await;
                 }
                 Err(e) => {
-                    println!("[Controller] Error retrieving Registry API user {e}");
+                    warn!("error retrieving Registry API user {e}");
                     notification::toast("获取用户信息失败", None, &format!("{e}"), None);
                 }
             }
@@ -150,7 +148,7 @@ impl SlotController {
                     Ok(res) => {
                         return anyhow::Ok(res);
                     }
-                    Err(e) => println!("[Controller] failed attempting to update slot {id}: {e:?}"),
+                    Err(e) => warn!("failed attempting to update slot {id}: {e:?}"),
                 }
             }
 

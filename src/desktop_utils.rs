@@ -1,3 +1,5 @@
+use log::{debug, error, info, warn};
+
 use crate::app;
 
 pub fn alloc_console() {
@@ -7,10 +9,10 @@ pub fn alloc_console() {
         use windows_sys::Win32::System::Console::AllocConsole;
         let result = AllocConsole();
         if result != 0 {
-            println!("[app::desktop_utils::alloc_console] AllocConsole() success ");
+            debug!("alloc_console: allocConsole() success ");
         } else {
-            println!(
-                "[app::desktop_utils::alloc_console] Error calling AllocConsole(): {:#x}",
+            warn!(
+                "alloc_console: error calling AllocConsole(): {:#x}",
                 GetLastError()
             );
         }
@@ -24,10 +26,10 @@ pub fn attach_console() {
         use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
         let result = AttachConsole(ATTACH_PARENT_PROCESS);
         if result != 0 {
-            println!("[app::desktop_utils::attach_console] AttachConsole(ATTACH_PARENT_PROCESS) success ");
+            debug!("attach_console: attachConsole(ATTACH_PARENT_PROCESS) success ");
         } else {
-            println!(
-                "[app::desktop_utils::attach_console] Error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
+            warn!(
+                "attach_console: error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
                 GetLastError()
             );
         }
@@ -42,7 +44,7 @@ pub fn show_console(visible: bool) {
         let hwnd = GetConsoleWindow();
 
         if hwnd == 0 {
-            println!("[app::desktop_utils::show_console] hWnd is NULL");
+            warn!("show_console: invalid hWnd from GetConsoleWindow()");
             return;
         }
 
@@ -120,7 +122,7 @@ pub async fn update_client_if_exist() -> anyhow::Result<()> {
 
     let pending_update = app::ota::pending_update()
         .map_err(|e| {
-            println!("[app::desktop_utils::update_client_if_exist] Error reading pending update record from DB: {e}");
+            error!("update_client_if_exist: error reading pending update record from DB: {e}");
         })
         .ok()
         .flatten();
@@ -129,9 +131,13 @@ pub async fn update_client_if_exist() -> anyhow::Result<()> {
         Some(pending_update) => pending_update,
         None => return Ok(()),
     };
-    println!(
-        "[app::desktop_utils::update_client_if_exist] Found pending update: {}",
+    info!(
+        "update_client_if_exist: found pending update: {}",
         &pending_update.version
+    );
+    info!(
+        "update_client_if_exist: blob: {:?}",
+        &pending_update.binary.blob
     );
 
     let file_path = match &pending_update.binary.blob {

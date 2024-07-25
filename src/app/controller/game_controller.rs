@@ -1,3 +1,9 @@
+use super::{
+    api_user_model::ApiUserModel, app_state_controller::AppStateController,
+    config_controller::ConfigController, game_operation_controller::GameOperationController,
+    image_controller::ImageController, sender::Sender, slot_controller::SlotController,
+    ApiOperation, AssetCommand,
+};
 use crate::app::{
     api_user_model,
     api_worker::RetrieveLogSpec,
@@ -20,11 +26,9 @@ use arkhost_api::models::api_arkhost::{self, GameConfigFields, GameSseEvent, Gam
 use async_scoped::TokioScope;
 use futures_util::TryStreamExt;
 use http_cache::CacheManager;
+use log::{debug, error, warn};
 use serde::Deserialize;
 use slint::{Model, ModelRc, VecModel};
-use tokio::sync::{oneshot, RwLock};
-use tokio_util::sync::CancellationToken;
-
 use std::{
     cmp,
     collections::{BTreeMap, HashMap},
@@ -34,13 +38,8 @@ use std::{
         Arc,
     },
 };
-
-use super::{
-    api_user_model::ApiUserModel, app_state_controller::AppStateController,
-    config_controller::ConfigController, game_operation_controller::GameOperationController,
-    image_controller::ImageController, sender::Sender, slot_controller::SlotController,
-    ApiOperation, AssetCommand,
-};
+use tokio::sync::{oneshot, RwLock};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Default, Debug)]
 struct GameResourceEntry {
@@ -124,7 +123,7 @@ impl GameController {
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Fetched));
             }
             Err(e) => {
-                println!("[Controller] Error retrieving games {e}");
+                warn!("error retrieving games {e}");
                 self.app_state_controller
                     .exec(|x| x.set_fetch_games_state(FetchGamesState::Retrying));
             }
@@ -157,7 +156,7 @@ impl GameController {
                     match ev_next {
                         Ok(Some(ev)) => match ev {
                             GameSseEvent::Game(games) => {
-                                println!("[Controller] Games SSE connection received {} games", games.len());
+                                debug!("games SSE connection received {} games", games.len());
 
                                 self.api_user_model.user.handle_retrieve_games_result(games).await;
                                 if self.api_user_model.user.update_slot_sync_state().await {
@@ -173,25 +172,25 @@ impl GameController {
                                 }
                             },
                             GameSseEvent::Ssr(ssr_list) => {
-                                println!("[Controller] Games SSE connection received {} ssr records", ssr_list.len());
+                                debug!("games SSE connection received {} ssr records", ssr_list.len());
                                 if !self.config_controller.data_saver_mode_enabled() {
                                     self.on_gacha_records(ssr_list).await;
                                 }
                             },
                             GameSseEvent::Close => {
-                                println!("[Controller] Games SSE connection closed on occupied");
+                                debug!("games SSE connection closed on occupied");
                                 self.app_state_controller
                                     .exec(|x| x.set_sse_connect_state(SseConnectState::DisconnectedOccupiedElsewhere));
                                 break;
                             },
                             GameSseEvent::Unrecognized { ev: ev_type } => {
-                                println!("[Controller] Unrecognized SSE event: {ev_type}");
+                                warn!("unrecognized SSE event: {ev_type}");
                             },
                             GameSseEvent::Malformed { ev: ev_type, data, err } => {
-                                println!("[Controller] Malformed SSE event: {ev_type}\n- Err: {err}\n- Data:\n{data}");
+                                warn!("malformed SSE event: {ev_type}\n- Err: {err}\n- Data:\n{data}");
                             },
                             GameSseEvent::Reconnect(e) => {
-                                println!("[Controller] SSE Client is recovering on error: {e}");
+                                warn!("SSE Client is recovering on error: {e}");
                                 tokio::time::sleep(recover_interval).await;
                                 recover_interval = std::cmp::max(
                                     recover_interval * consts::SSE_RECOVER_INTERVAL_BASE,
@@ -199,13 +198,13 @@ impl GameController {
                             }
                         },
                         Ok(None) => {
-                            println!("[Controller] Unexpected empty event in game SSE connection");
+                            warn!("unexpected empty event in game SSE connection");
                             /* 处理None? */
                         },
                         Err(e) => {
                             self.app_state_controller
                                 .exec(|x| x.set_sse_connect_state(SseConnectState::Disconnected));
-                            println!("[Controller] Error in game SSE connection: {e:?}");
+                            error!("error in game SSE connection: {e:?}");
                             break;
                         }
                     }
@@ -214,8 +213,8 @@ impl GameController {
             _ = stop.cancelled() => {},
         };
 
-        println!(
-            "[Controller] Games SSE connection terminated with stop signal raised: {}",
+        debug!(
+            "games SSE connection terminated with stop signal raised: {}",
             stop.is_cancelled()
         );
         Ok(())
@@ -263,10 +262,7 @@ impl GameController {
                         )
                         .await;
                     if let Err(e) = result {
-                        println!(
-                            "[Controller] Error retrieving detail for game '{}' {}",
-                            account, e
-                        );
+                        warn!("error retrieving detail for game '{}' {}", account, e);
                     }
                 });
             }
@@ -370,7 +366,7 @@ impl GameController {
         {
             Ok(_) => {}
             Err(e) => {
-                println!("[Controller] Error update game settings {e}");
+                warn!("error update game settings {e}");
                 notification::toast(
                     &format!("{account} 更新托管设置失败"),
                     None,
@@ -409,7 +405,7 @@ impl GameController {
                     .exec(|x| x.update_game_view(id, Some(mapping), true));
             }
             Err(e) => {
-                println!("[Controller] error retrieving logs for game with id {id}: {e}");
+                warn!("error retrieving logs for game with id {id}: {e}");
                 notification::toast(&format!("{id} 获取日志失败"), None, &format!("{e}"), None);
                 self.app_state_controller
                     .exec(|x| x.update_game_view(id, None, true));
@@ -725,6 +721,7 @@ impl GameController {
             .set_last_ssr_record_ts(*self.current_last_gacha_record_ts.read().await);
         self.app_state_controller
             .exec(|x| x.state_globals(|x| x.set_show_gacha_records(false)));
+        debug!("confirmed gacha records")
     }
 
     pub async fn on_gacha_records(&self, mut records: Vec<api_arkhost::SsrRecord>) {
@@ -794,10 +791,7 @@ impl GameController {
             set
         };
 
-        println!(
-            "[Controller] Loaded {} SSR record avatars",
-            char_avatar_map.len()
-        );
+        debug!("loaded {} SSR record avatars", char_avatar_map.len());
 
         if char_avatar_map.is_empty() {
             return;
@@ -864,20 +858,14 @@ impl GameController {
         let game_ref = match game_map.get(game_id) {
             Some(game) => game,
             None => {
-                return println!(
-                "[Controller] load_battle_screenshots: unable to find game {game_id} in game map"
-            )
+                return warn!("load_battle_screenshots: unable to find game {game_id} in game map")
             }
         };
 
         let game = game_ref.game.read().await;
         let details = match &game.details {
             Some(details) => details,
-            None => {
-                return println!(
-                    "[Controller] load_battle_screenshots: unable to read details of {game_id}"
-                )
-            }
+            None => return warn!("load_battle_screenshots: unable to read details of {game_id}"),
         };
 
         self.load_battle_screenshots_conditional(game_id, details, true)
@@ -955,14 +943,12 @@ impl GameController {
                         .cache_manager
                         .delete(&format!("GET:{cached_url}"))
                         .await
-                        .map_err(|e| {
-                            println!("[Controller] Failed to remove cached URL: {cached_url} {e}")
-                        });
+                        .map_err(|e| error!("failed to remove cached URL: {cached_url} {e}"));
                 }
             }
         }
-        println!(
-            "[Controller] Loading {} battle screenshots; cached: {}",
+        debug!(
+            "loading {} battle screenshots; cached: {}",
             urls.len(),
             cache_valid
         );
@@ -1031,7 +1017,7 @@ impl GameController {
         {
             Ok(res) => Some(res),
             Err(e) => {
-                println!("[GameController] Error loading resource '{path}' {e:?}");
+                warn!("load_json_table: error loading resource '{path}' {e:?}");
                 None
             }
         }
@@ -1108,7 +1094,7 @@ impl GameController {
             }
         }
 
-        println!("[Controller] Inserted {entries} entries into stage search tree");
+        debug!("inserted {entries} entries into stage search tree");
     }
 
     fn battle_screenshot_urls(game: &api_arkhost::GameDetails) -> Vec<url::Url> {

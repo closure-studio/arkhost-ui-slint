@@ -19,6 +19,7 @@ use futures_util::future::Fuse;
 use futures_util::future::FusedFuture;
 use futures_util::FutureExt;
 use ipc_channel::ipc::IpcOneShotServer;
+use log::info;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
 
@@ -242,7 +243,7 @@ impl IpcAuthWorker {
                 connection,
                 poller: async move {
                     let exit_status = process.wait().await.ok();
-                    println!("[IpcAuthWorker] Auth process exited with status {exit_status:?}");
+                    info!("auth process exited with status {exit_status:?}");
                     exit_status
                 }
                 .boxed()

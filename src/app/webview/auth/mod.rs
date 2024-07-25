@@ -3,13 +3,13 @@ pub mod consts;
 /// 用于在桌面端创建WebView子进程
 pub mod subprocess_webview;
 
+use crate::app::auth::{AuthAction, AuthResult};
+use log::{error, info, trace};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 use thiserror::Error;
 use wry::{http::HeaderMap, PageLoadEvent, WebView, WebViewBuilder};
-
-use crate::app::auth::{AuthAction, AuthResult};
 
 #[derive(Error, Debug)]
 pub enum AuthenticatorError {
@@ -99,7 +99,7 @@ impl AuthResolver {
                     action,
                 };
                 let params_json = serde_json::ser::to_string(&params)?;
-                println!("[AuthWebView] Sent message to auth page: {}", &params_json);
+                trace!("sent message to auth page: {}", &params_json);
                 webview.evaluate_script(&[
                     "{", 
                         "let params = ", &params_json, ";", 
@@ -126,7 +126,7 @@ impl AuthResolver {
                 }
             }
         } {
-            println!("[AuthResolver] Error preforming action from on_next_action_ready: {e}");
+            error!("on_next_action_ready: error preforming action: {e}");
         }
     }
 }
@@ -172,11 +172,11 @@ impl Authenticator {
                         auth_resolver_ref.settle_auth(&id);
                         auth_listener_ref.on_result(result);
                     },
-                    AuthPageMessage::Log { content } => println!("[AuthWebView] {content}"),
-                    AuthPageMessage::ScriptInit { } => println!("[AuthWebView] Script init"),
+                    AuthPageMessage::Log { content } => info!("AuthPageMessage::Log: {content}"),
+                    AuthPageMessage::ScriptInit { } => info!("AuthPageMessage: script initialization finished"),
                 },
                 Err(e) => {
-                    println!("[AuthWebView] Error: cannot deserialize auth page message: '{message}', error: {e}")
+                    error!("AuthPageMessage: cannot deserialize auth page message: '{message}', error: {e}")
                 }
             }
         });
@@ -196,7 +196,7 @@ impl Authenticator {
                         state = "finished";
                     }
                 }
-                println!("[AuthWebView] Page load {state}; URL: {url}",);
+                info!("page load {state}; URL: {url}",);
                 auth_resolver_ref.on_page_loaded(ev);
             });
         }

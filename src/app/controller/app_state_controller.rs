@@ -1,6 +1,5 @@
-use std::sync::{Arc, Mutex, MutexGuard};
-
 use crate::app::app_state::{AppState, AppStateAsyncOp};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub struct AppStateController {
     pub app_state: Arc<Mutex<AppState>>,

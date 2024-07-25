@@ -28,6 +28,7 @@ use super::auth_worker::AuthContext;
 use super::ui::*;
 use super::utils::ext_link;
 use arkhost_api::models::api_quota::user_tier_availability_rank;
+use log::error;
 use login_window_context::LoginWindowContext;
 use slint::{Model, SharedString};
 use std::fmt::Debug;
@@ -307,7 +308,7 @@ impl UIContext {
                         this.slot_controller.update_slot(id, update_request).await;
                     });
                 } else {
-                    println!("[Controller] Unprocessable update draft: {update_draft:?}; please file a bug");
+                    error!("unprocessable update draft: {update_draft:?}; please file a bug");
                 }
             })
         }
@@ -511,7 +512,7 @@ impl UIContext {
                 _ = this
                     .config_controller
                     .set_clean_data(val)
-                    .map_err(|e| println!("[Controller] error cleaning cache: {e}"));
+                    .map_err(|e| error!("error cleaning cache: {e}"));
             })
         }
 

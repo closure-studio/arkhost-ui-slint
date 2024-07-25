@@ -1,10 +1,8 @@
-use std::sync::{Arc, RwLock};
-
-use chrono::{DateTime, Utc};
-
-use crate::app::{app_state::model::UserConfig, utils::db};
-
 use super::app_state_controller::AppStateController;
+use crate::app::{app_state::model::UserConfig, utils::db};
+use chrono::{DateTime, Utc};
+use log::error;
+use std::sync::{Arc, RwLock};
 
 pub struct ConfigController {
     app_state_controller: Arc<AppStateController>,
@@ -125,7 +123,7 @@ impl ConfigController {
         let mut config = self.config.write().unwrap();
         ops(&mut config);
         _ = self.sync_to_db(&config).map_err(|err| {
-            println!("[Controller] Cannot save config to DB: {err}");
+            error!("cannot save config to DB: {err}");
         });
     }
 

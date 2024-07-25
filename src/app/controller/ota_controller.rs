@@ -1,25 +1,23 @@
+use super::app_state_controller::AppStateController;
+use super::{AssetCommand, Sender};
+use crate::app::ota::ReleaseRecord;
+use crate::app::utils::{app_metadata, data_dir, notification};
+use crate::app::{self, asset_worker, ui};
+use anyhow::bail;
+use arkhost_ota;
+use futures::TryFutureExt;
+use log::{debug, info, warn};
+use sha2::Digest;
 use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, io};
-
-use anyhow::bail;
-use arkhost_ota;
-use futures::TryFutureExt;
-use sha2::Digest;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{oneshot, Mutex};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-
-use crate::app::ota::ReleaseRecord;
-use crate::app::utils::{app_metadata, data_dir, notification};
-use crate::app::{self, asset_worker, ui};
-
-use super::app_state_controller::AppStateController;
-use super::{AssetCommand, Sender};
 
 pub struct OtaController {
     app_state_controller: Arc<AppStateController>,
@@ -85,12 +83,12 @@ impl OtaController {
                 .await
             {
                 Ok(None) => {
-                    println!("[OTA] No updates from branch '{branch}'.");
+                    info!("no updates from branch '{branch}'.");
                     return;
                 }
                 Ok(Some((release, download_size, _))) => break (mode, release, download_size),
                 Err(e) => {
-                    println!("[OTA] Unable to check update from branch '{branch}' with type {mode:?}: {e}");
+                    warn!("unable to check update from branch '{branch}' with type {mode:?}: {e}");
                     continue;
                 }
             }
@@ -121,7 +119,7 @@ impl OtaController {
             })
         });
         let update_state = if let Err(e) = self.update_release_inner().await {
-            println!("[OTA] Error updating release: {e}");
+            warn!("error updating release: {e}");
             ui::ReleaseUpdateState::Idle
         } else {
             ui::ReleaseUpdateState::Ready
@@ -197,7 +195,7 @@ impl OtaController {
             }
             asset_worker::ReleaseUpdateType::FullDownload => target_file_path.clone(),
         };
-        println!("[OTA] Download file path: {}", download_file_path.display());
+        debug!("download file path: {}", download_file_path.display());
 
         let download_url = Url::parse(
             app::env::override_asset_server().unwrap_or(arkhost_api::consts::asset::API_BASE_URL),
@@ -213,8 +211,8 @@ impl OtaController {
             )
             .await?;
         } else {
-            println!(
-                "[OTA] Skipping downloading on existing tmp file hash matches target hash: {}",
+            debug!(
+                "skipping downloading on existing tmp file hash matches target hash: {}",
                 download_file_path.display()
             );
         }
@@ -283,7 +281,7 @@ impl OtaController {
                             &format!("下载失败！请重试\n{e}"),
                             None,
                         );
-                        println!("[OTA] Download failed: error on sending request: {e}");
+                        warn!("download failed: error on sending request: {e}");
                         e
                     })?;
 
@@ -305,7 +303,7 @@ impl OtaController {
                             ),
                             None,
                         );
-                        println!("[OTA] Download failed: error on read operation: {e}");
+                        warn!("download failed: error on read operation: {e}");
                         e
                     })?;
                 Ok((tot_bytes_read, download_reader.hasher.finalize()))
@@ -338,8 +336,8 @@ impl OtaController {
             },
         };
 
-        println!(
-            "[OTA] Download finished. {} read",
+        info!(
+            "download finished. {} bytes read",
             humansize::format_size(bytes_read, humansize::DECIMAL)
         );
 

@@ -1,14 +1,12 @@
-use slint::ComponentHandle;
-
-use crate::app::app_state::LoginWindowState;
-use crate::app::LoginState;
-use crate::app::{ui::LoginWindow, utils::ext_link};
-use std::rc::Rc;
-use std::sync::{Arc, Mutex, OnceLock};
-
 use super::app_state_controller::AppStateController;
 use super::config_controller::ConfigController;
 use super::session_controller::SessionController;
+use crate::app::app_state::LoginWindowState;
+use crate::app::LoginState;
+use crate::app::{ui::LoginWindow, utils::ext_link};
+use slint::ComponentHandle;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex, OnceLock};
 
 pub struct LoginWindowContext {
     pub login_window_ref: Rc<OnceLock<LoginWindow>>,

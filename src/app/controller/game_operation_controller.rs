@@ -1,22 +1,21 @@
-use crate::app::auth::AuthResult;
-use crate::app::auth_worker::AuthContext;
-use crate::app::ui::*;
-use crate::app::utils::notification;
-use arkhost_api::clients::common::ResponseError;
-use arkhost_api::models::api_arkhost;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::sync::Mutex;
-
-use anyhow::anyhow;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
-
 use super::app_state_controller::AppStateController;
 use super::sender::Sender;
 use super::ApiOperation;
 use super::AuthCommand;
+use crate::app::auth::AuthResult;
+use crate::app::auth_worker::AuthContext;
+use crate::app::ui::*;
+use crate::app::utils::notification;
+use anyhow::anyhow;
+use arkhost_api::clients::common::ResponseError;
+use arkhost_api::models::api_arkhost;
+use log::{trace, warn};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 
 pub struct GameOperationController {
     app_state_controller: Arc<AppStateController>,
@@ -76,9 +75,9 @@ impl GameOperationController {
                                 x == arkhost_api::consts::error_code::CAPTCHA_ERROR
                             })
                         }) {
-                            println!("[Controller] captcha failed starting game {account}");
+                            warn!("captcha failed starting game {account}");
                         } else {
-                            println!("[Controller] Unexpected error starting game {account}: {e}");
+                            warn!("unexpected error starting game {account}: {e}");
                             notification::toast(
                                 &format!("{account} 启动托管时出现意外错误"),
                                 None,
@@ -102,7 +101,7 @@ impl GameOperationController {
         let result = invoke_auth(account.clone()).await;
 
         if result.is_err() {
-            println!("[Controller] all attempts to start game {account} failed");
+            warn!("all attempts to start game {account} failed");
         }
         self.app_state_controller
             .exec(|x| x.set_game_request_state(account.clone(), GameOperationRequestState::Idle));
@@ -121,7 +120,7 @@ impl GameOperationController {
             )
             .await
         {
-            println!("[Controller] Error stopping game {e}");
+            warn!("error stopping game {e}");
             notification::toast(
                 &format!("{account} 停止托管时出现意外错误"),
                 None,
@@ -196,7 +195,7 @@ impl GameOperationController {
         }) {
             Ok(captcha_info) => captcha_info,
             Err(e) => {
-                println!("[Controller] Error performing game captcha (invoking authenticator) {e}");
+                warn!("error performing game captcha (invoking authenticator) {e}");
                 notification::toast(
                     &format!("{account} 进行登录滑块验证失败"),
                     None,
@@ -211,7 +210,7 @@ impl GameOperationController {
             }
         };
 
-        println!("[Controller] Captcha result: {captcha_info:?}");
+        trace!("captcha result: {captcha_info:?}");
         let (resp, mut rx) = oneshot::channel();
         if let Err(e) = self
             .sender
@@ -225,7 +224,7 @@ impl GameOperationController {
             )
             .await
         {
-            println!("[Controller] Error performing game captcha (updating game config) {e}");
+            warn!("error performing game captcha (updating game config) {e}");
             notification::toast(
                 &format!("{account} 提交登录滑块验证结果失败"),
                 None,

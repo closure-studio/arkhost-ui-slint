@@ -1,3 +1,6 @@
+use arkhost_ota;
+use log::trace;
+use sha2::Digest;
 use std::{
     env,
     fs::File,
@@ -5,15 +8,12 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use sha2::Digest;
-
-use arkhost_ota;
-
 pub const CARGO_PKG_VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 pub const RELEASE_UPDATE_BRANCH: &str = arkhost_ota::consts::DEFAULT_BRANCH;
 
 #[cfg(feature = "desktop-app")]
 pub fn executable_hash<T: digest::Digest>(mut hasher: T) -> io::Result<digest::Output<T>> {
+    trace!("calculating executable hash");
     let current_exe = File::open(env::current_exe()?)?;
     let mut reader = BufReader::new(current_exe);
     let mut buf;

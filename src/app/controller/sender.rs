@@ -1,7 +1,6 @@
-use crate::app::auth_worker::AuthContext;
-
 use super::api_user_model::ApiUserModel;
 use super::{ApiCommand, ApiOperation, ApiResult, ApiWorkerError, AssetCommand, AssetResult};
+use crate::app::auth_worker::AuthContext;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;

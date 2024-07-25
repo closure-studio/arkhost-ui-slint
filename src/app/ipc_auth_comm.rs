@@ -4,6 +4,7 @@ use crate::app::auth;
 use futures_util::StreamExt;
 use ipc_channel::asynch::IpcStream;
 use ipc_channel::ipc::{self, IpcOneShotServer, IpcReceiver, IpcSender};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -60,13 +61,14 @@ impl AuthenticatorConnection {
     pub fn accept(
         ipc_server: IpcOneShotServer<AuthenticatorServerSideChannel>,
     ) -> anyhow::Result<AuthenticatorConnection> {
+        debug!("accepting Authenticator connection");
         let (_, (tx_client_sender, rx_client_sender_sender)) = ipc_server.accept()?;
         let (rx_client_sender, rx_client_receiver): (
             IpcSender<AuthenticatorMessage>,
             IpcReceiver<AuthenticatorMessage>,
         ) = ipc::channel()?;
         rx_client_sender_sender.send(rx_client_sender)?;
-        println!("[AuthenticatorConnection] Accepted Authenticator connection");
+        debug!("accepted Authenticator connection");
         Ok(Self {
             tx_client_sender,
             rx_client_receiver: rx_client_receiver.to_stream(),

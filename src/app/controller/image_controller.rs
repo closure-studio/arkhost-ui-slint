@@ -1,17 +1,15 @@
+use super::{sender::Sender, AssetCommand};
 use crate::app::{
     api_user_model,
     app_state::model::{AssetPath, ImageData, ImageDataRaw, ImageDataRef},
     asset_worker::AssetRef,
 };
-
+use anyhow::anyhow;
 use arkhost_api::models::api_arkhost::Avatar;
 use image::ImageFormat;
-use tokio::sync::{oneshot, RwLock};
-
+use log::warn;
 use std::{collections::HashSet, sync::Arc};
-
-use super::{sender::Sender, AssetCommand};
-use anyhow::anyhow;
+use tokio::sync::{oneshot, RwLock};
 
 pub struct ImageController {
     sender: Arc<Sender>,
@@ -137,7 +135,7 @@ impl ImageController {
                         .write()
                         .await
                         .insert(image_data.asset_path.inner_path().to_owned());
-                    println!("[Controller] Error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_data, e);
+                    warn!("error loading image (further errors from this URL will be suppressed): {:?} {:?}", image_data, e);
                 }
             }
         }
