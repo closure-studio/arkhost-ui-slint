@@ -64,11 +64,7 @@ async fn main() {
         .binaries
         .iter()
         .find_map(|x| {
-            if x.path
-                .file_stem()
-                .map(|x| x == consts::BINARY_TARGET)
-                .is_some_and(|x| x)
-            {
+            if x.unit.target.name() == consts::BINARY_TARGET {
                 Some(x.path.clone())
             } else {
                 None
