@@ -41,10 +41,7 @@ async fn main() -> anyhow::Result<()> {
                 instance
             };
 
-            #[cfg(any(
-                feature = "desktop-app",
-                all(feature = "desktop-app", debug_assertions)
-            ))]
+            #[cfg(feature = "desktop-app")]
             if matches!(launch_args.attach_console, Some(true)) || app::env::attach_console() {
                 attach_console();
             } else {
@@ -79,6 +76,8 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(ref user_token) = launch_args.user_token {
                     env.push((app::env::consts::USER_TOKEN.into(), user_token.into()))
                 }
+                // 设置 App Window env_logger
+                env.push(("RUST_LOG".into(), "info,closure_studio=debug".into()));
 
                 let mut app_window = spawn_executable(
                     current_exe.as_os_str(),

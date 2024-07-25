@@ -78,35 +78,16 @@ impl AssetWorker {
         }
     }
 
-    pub async fn run(&mut self, mut recv: mpsc::Receiver<Command>, stop: CancellationToken) {
+    pub async fn run(self: Arc<Self>, mut recv: mpsc::Receiver<Command>, stop: CancellationToken) {
         tokio::select! {
             _ = async {
                 while let Some(cmd) = recv.recv().await {
-                    match cmd {
-                        Command::LoadAsset {
-                            cache_key,
-                            path,
-                            resp,
-                        } => _ = resp.send(self.load_asset(cache_key, &path).await),
-                        Command::LoadImageRgba8 {
-                            cache_key,
-                            path,
-                            src_format,
-                            resp,
-                        } => _ = resp.send(self.load_image_rgba8(cache_key, &path, src_format).await),
-                        Command::RetrieveCache { cache_key, resp } => {
-                            _ = resp.send(self.read_cache_by_key(&Some(cache_key)).await)
+                    tokio::spawn({
+                        let this = self.clone();
+                        async move {
+                            this.exec_command(cmd).await;
                         }
-                        Command::DeleteCache { cache_key } => {
-                            self.delete_cache_by_key(&Some(cache_key)).await
-                        }
-                        Command::CheckReleaseUpdate { branch, mode, resp } => {
-                            _ = resp.send(self.check_release_update(branch.as_ref().map_or(arkhost_ota::consts::DEFAULT_BRANCH, |x| x), mode).await)
-                        },
-                        Command::DownloadReleaseUpdate { branch, mode, resp } => {
-                            _ = resp.send(self.download_release_update(branch.as_ref().map_or(arkhost_ota::consts::DEFAULT_BRANCH, |x| x), mode).await)
-                        },
-                    }
+                    });
                 }
             } => {},
             _ = stop.cancelled() => {}
@@ -265,5 +246,47 @@ impl AssetWorker {
 
         let response = self.asset_client.get_content_response(&path, |x| x).await?;
         Ok((release, download_size, path, response))
+    }
+
+    async fn exec_command(&self, cmd: Command) {
+        match cmd {
+            Command::LoadAsset {
+                cache_key,
+                path,
+                resp,
+            } => _ = resp.send(self.load_asset(cache_key, &path).await),
+            Command::LoadImageRgba8 {
+                cache_key,
+                path,
+                src_format,
+                resp,
+            } => _ = resp.send(self.load_image_rgba8(cache_key, &path, src_format).await),
+            Command::RetrieveCache { cache_key, resp } => {
+                _ = resp.send(self.read_cache_by_key(&Some(cache_key)).await)
+            }
+            Command::DeleteCache { cache_key } => self.delete_cache_by_key(&Some(cache_key)).await,
+            Command::CheckReleaseUpdate { branch, mode, resp } => {
+                _ = resp.send(
+                    self.check_release_update(
+                        branch
+                            .as_ref()
+                            .map_or(arkhost_ota::consts::DEFAULT_BRANCH, |x| x),
+                        mode,
+                    )
+                    .await,
+                )
+            }
+            Command::DownloadReleaseUpdate { branch, mode, resp } => {
+                _ = resp.send(
+                    self.download_release_update(
+                        branch
+                            .as_ref()
+                            .map_or(arkhost_ota::consts::DEFAULT_BRANCH, |x| x),
+                        mode,
+                    )
+                    .await,
+                )
+            }
+        }
     }
 }

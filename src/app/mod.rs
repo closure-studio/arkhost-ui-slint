@@ -72,7 +72,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     let stop = CancellationToken::new();
     let _guard = stop.clone().drop_guard();
 
-    let mut api_worker = ApiWorker::new(auth_client);
+    let api_worker = Arc::new(ApiWorker::new(auth_client));
     let (tx_api_command, rx_api_command) = mpsc::channel(32);
     let api_worker_join_handle = tokio::spawn({
         let stop = stop.clone();
@@ -98,7 +98,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     });
 
     let asset_client = create_asset_client();
-    let mut asset_worker = AssetWorker::new(asset_client);
+    let asset_worker = Arc::new(AssetWorker::new(asset_client));
     let (tx_asset_command, rx_asset_command) = mpsc::channel(32);
     let asset_worker_join_handle = tokio::spawn({
         let stop = stop.clone();

@@ -135,11 +135,16 @@ impl Worker {
         }
     }
 
-    pub async fn run(&mut self, mut recv: mpsc::Receiver<Command>, stop: CancellationToken) {
+    pub async fn run(self: Arc<Self>, mut recv: mpsc::Receiver<Command>, stop: CancellationToken) {
         tokio::select! {
             _ = async {
                 while let Some(cmd) = recv.recv().await {
-                    self.exec_command(cmd).await;
+                    tokio::spawn({
+                        let this = self.clone();
+                        async move {
+                            this.exec_command(cmd).await;
+                        }
+                    });
                 }
             } => {},
             _ = stop.cancelled() => {}
