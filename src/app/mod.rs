@@ -280,6 +280,7 @@ pub async fn run() -> Result<(), slint::PlatformError> {
     slint::run_event_loop()?;
 
     // join workers with timeout
+    ui_main_thread_context.refresh_game_timer.stop();
     stop.cancel();
     tokio::select! {
         _ = async move {
