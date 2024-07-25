@@ -18,7 +18,7 @@ pub fn default_cache_mode_fn() -> CacheModeFn {
                 let matches_ota_file = {
                     // OTA 更新文件URL： http://asset.server.com/foo/bar.txt/{hash}
                     let mut split = req.uri.path().rsplitn(2, '/');
-                    !matches!(
+                    matches!(
                     (split.next(), split.next()), 
                         (Some(hash_versioned_file), Some(hash_version_dir)) if
                             (hash_version_dir.ends_with(".exe")
