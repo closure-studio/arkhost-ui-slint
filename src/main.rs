@@ -77,7 +77,9 @@ async fn main() -> anyhow::Result<()> {
                     env.push((app::env::consts::USER_TOKEN.into(), user_token.into()))
                 }
                 // 设置 App Window env_logger
-                env.push(("RUST_LOG".into(), "info,closure_studio=debug".into()));
+                if std::env::var("RUST_LOG").is_err() {
+                    env.push(("RUST_LOG".into(), "info,closure_studio=debug".into()));
+                }
 
                 let mut app_window = spawn_executable(
                     current_exe.as_os_str(),

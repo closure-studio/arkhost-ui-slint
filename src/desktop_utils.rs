@@ -9,7 +9,7 @@ pub fn alloc_console() {
         use windows_sys::Win32::System::Console::AllocConsole;
         let result = AllocConsole();
         if result != 0 {
-            debug!("alloc_console: allocConsole() success ");
+            debug!("alloc_console: AllocConsole() success ");
         } else {
             warn!(
                 "alloc_console: error calling AllocConsole(): {:#x}",
@@ -26,7 +26,7 @@ pub fn attach_console() {
         use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
         let result = AttachConsole(ATTACH_PARENT_PROCESS);
         if result != 0 {
-            debug!("attach_console: attachConsole(ATTACH_PARENT_PROCESS) success ");
+            debug!("attach_console: AttachConsole(ATTACH_PARENT_PROCESS) success ");
         } else {
             warn!(
                 "attach_console: error calling AttachConsole(ATTACH_PARENT_PROCESS): {:#x}",
