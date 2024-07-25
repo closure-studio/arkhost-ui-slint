@@ -261,7 +261,7 @@ pub mod consts {
         pub const SCHEMA_VERSION_KEY: &str = "__schema:version";
         pub const DATABASE_INDEX_PREFIX: &str = "__db_index:";
         pub const SELF_DELETE_REQUESTED: &str = "__self_delete_requested";
-        pub static CURRENT_SCHEMA_VERSION: semver::Version = semver::Version::new(1, 0, 0);
+        pub static CURRENT_SCHEMA_VERSION: semver::Version = semver::Version::new(1, 1, 0);
     }
 
     pub mod user_state {
