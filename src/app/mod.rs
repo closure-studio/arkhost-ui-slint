@@ -235,21 +235,16 @@ pub async fn run() -> Result<(), slint::PlatformError> {
                         warn!("run: refresh token failed: {e}");
                         let mut login_window_state = login_window_state.lock().unwrap();
                         match e.downcast_ref::<ResponseError>() {
+                            // token无效
                             Some(err_info) if err_info.status_code == 401 => {
-                                // token无效
                                 login_window_state.set_login_state(
                                     LoginState::Unlogged,
                                     "登录凭据已失效，请重新登录".into(),
                                 );
                                 login_window_state.set_use_auth(state.account, false);
                             }
-                            Some(_) => {
-                                // 请求错误，状态码 != 401，如Bad Gateway等
-                                login_window_state
-                                    .set_login_state(LoginState::Errored, format!("{e}"));
-                            }
-                            None => {
-                                // 其他错误如网络错误
+                            // 请求错误，状态码 != 401，如Bad Gateway等 | 其他错误如网络错误
+                            Some(_) | None => {
                                 login_window_state
                                     .set_login_state(LoginState::Errored, format!("{e}"));
                             }
