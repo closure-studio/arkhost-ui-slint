@@ -187,8 +187,12 @@ pub fn headers() -> reqwest::header::HeaderMap {
 }
 
 pub fn client_builder() -> reqwest::ClientBuilder {
-    reqwest::ClientBuilder::new()
-        .min_tls_version(reqwest::tls::Version::TLS_1_2)
-        .max_tls_version(reqwest::tls::Version::TLS_1_3)
-        .http1_only()
+    let mut builder = reqwest::ClientBuilder::new();
+
+    #[cfg(feature = "reqwest-rustls-tls")]
+    {
+        builder = builder.min_tls_version(reqwest::tls::Version::TLS_1_3);
+    }
+
+    builder
 }

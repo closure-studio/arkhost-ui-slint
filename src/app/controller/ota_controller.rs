@@ -509,9 +509,7 @@ fn blocking_client() -> reqwest::blocking::Client {
 
     reqwest::blocking::ClientBuilder::new()
         .default_headers(headers)
-        .min_tls_version(reqwest::tls::Version::TLS_1_2)
-        .max_tls_version(reqwest::tls::Version::TLS_1_3)
-        .http1_only()
+        .min_tls_version(reqwest::tls::Version::TLS_1_3)
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
