@@ -11,8 +11,6 @@ anyhow = "1"
 bitflags = "2.5"
 chrono = "0.4"
 futures = "0.3"
-# TODO: 可选TLS
-# 国内节点在reqwest的default-tls下会发生连接错误（TLS版本问题）
 reqwest = { version = "0.12", features = ["json"], default-features = false }
 reqwest-middleware = { version = "0.3", features = ["json"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
@@ -22,5 +20,5 @@ serde_json = "1.0"
 serde_repr = "0.1"
 bytes = "1.5"
 base64 = "0.22"
-eventsource-client = { version = "0.12", default-features = false }
+eventsource-client = { version = "0.13", default-features = false }
 hyper-rustls = { version = "0.24", features = ["webpki-roots"] }

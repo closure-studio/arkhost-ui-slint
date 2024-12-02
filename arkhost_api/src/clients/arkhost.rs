@@ -172,6 +172,7 @@ impl EventSourceClient {
         let stream = client.stream().filter_map(|res| async {
             match res {
                 Ok(ev) => match ev {
+                    es::SSE::Connected(_) => Some(Ok(GameSseEvent::Connected)),
                     es::SSE::Event(ev) => Some(Ok(Self::try_parse_ev(&ev).unwrap_or_else(|err| {
                         GameSseEvent::Malformed {
                             ev: ev.event_type,

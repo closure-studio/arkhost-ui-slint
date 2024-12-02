@@ -73,6 +73,7 @@ pub enum GameSseEvent {
         data: String,
         err: anyhow::Error,
     },
+    Connected,
     Reconnect(anyhow::Error),
     Close,
 }

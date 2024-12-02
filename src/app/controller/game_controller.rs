@@ -140,9 +140,6 @@ impl GameController {
             .send_api_command(ApiOperation::ConnectGameEventSource { resp })
             .await?;
 
-        self.app_state_controller
-            .exec(|x| x.set_sse_connect_state(SseConnectState::Connected));
-
         let mut stream = rx.await??;
         let mut recover_interval = consts::SSE_RECOVER_INITIAL_INTERVAL;
         tokio::select! {
@@ -155,6 +152,10 @@ impl GameController {
                     }
                     match ev_next {
                         Ok(Some(ev)) => match ev {
+                            GameSseEvent::Connected => {
+                                self.app_state_controller
+                                    .exec(|x| x.set_sse_connect_state(SseConnectState::Connected));
+                            },
                             GameSseEvent::Game(games) => {
                                 debug!("games SSE connection received {} games", games.len());
 
