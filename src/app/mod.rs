@@ -379,7 +379,7 @@ async fn join_worker(worker_name: &str, join_handle: JoinHandle<()>) {
     }
 }
 
-mod consts {
+pub(crate) mod consts {
     use std::time::Duration;
 
     pub const AUTH_CLIENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);

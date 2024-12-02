@@ -12,7 +12,6 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 use std::{env, io};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{oneshot, Mutex};
@@ -516,7 +515,7 @@ fn blocking_client() -> reqwest::blocking::Client {
         .use_rustls_tls()
         .gzip(true)
         .brotli(true)
-        .connect_timeout(Duration::from_secs(8))
+        .connect_timeout(crate::app::consts::ASSET_CLIENT_CONNECT_TIMEOUT)
         .build()
         .unwrap()
 }
