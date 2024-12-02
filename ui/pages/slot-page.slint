@@ -56,7 +56,7 @@ export component SlotPage {
                         text: @tr("✅ 归属认证已经完成，你可以继续添加更多托管账号了。");
                         has-action: false;
                     }
-                    slot-tier-card := SlotTierCard {
+                    if user-info.uuid != "" : SlotTierCard {
                         data: SlotTierConsts.get-tier-card-data(user-info.tier);
                         on-upgrade-tier(next-tier) => {
                             if next-tier == UserTier.SmsVerified {
