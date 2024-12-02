@@ -61,7 +61,6 @@ pub mod quota {
 
 pub mod asset {
     pub const API_BASE_URL: &str = "https://assets.ltsc.vip/";
-    pub const REFERER_URL: &str = "https://arknights.host";
 
     pub mod assets {
         pub fn avatar(avatar_type: &str, id: &str) -> String {

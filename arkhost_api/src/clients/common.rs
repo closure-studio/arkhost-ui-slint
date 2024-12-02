@@ -188,6 +188,7 @@ pub fn headers() -> reqwest::header::HeaderMap {
 
 pub fn client_builder() -> reqwest::ClientBuilder {
     let mut builder = reqwest::ClientBuilder::new();
+    builder = builder.referer(false);
 
     #[cfg(feature = "reqwest-rustls-tls")]
     {

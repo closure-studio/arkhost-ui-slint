@@ -18,11 +18,7 @@ impl AssetClient {
 
     pub fn default_client_builder() -> reqwest::ClientBuilder {
         let client_builder = common::client_builder();
-        let mut headers = common::headers();
-        headers.insert(
-            reqwest::header::REFERER,
-            reqwest::header::HeaderValue::from_static(crate::consts::asset::REFERER_URL),
-        );
+        let headers = common::headers();
         client_builder.default_headers(headers)
     }
 

@@ -501,14 +501,11 @@ async fn download_file_exists(
 }
 
 fn blocking_client() -> reqwest::blocking::Client {
-    let mut headers = arkhost_api::clients::common::headers();
-    headers.insert(
-        reqwest::header::REFERER,
-        reqwest::header::HeaderValue::from_static(arkhost_api::consts::asset::REFERER_URL),
-    );
+    let headers = arkhost_api::clients::common::headers();
 
     reqwest::blocking::ClientBuilder::new()
         .default_headers(headers)
+        .referer(false)
         .min_tls_version(reqwest::tls::Version::TLS_1_3)
         .use_rustls_tls()
         .gzip(true)
