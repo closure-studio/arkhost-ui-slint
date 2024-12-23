@@ -269,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "arkhost-ui-slint"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "argh",

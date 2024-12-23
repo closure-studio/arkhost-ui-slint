@@ -3,7 +3,7 @@ members = ["arkhost_api", "arkhost_ota", "publish_tool"]
 
 [package]
 name = "arkhost-ui-slint"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["WG <wg138940@outlook.com>"]
 edition = "2021"
 build = "build.rs"
