@@ -19,6 +19,10 @@ global GameOperationUtil {
             return false;
         }
 
+        if info.game-state == GameState.WrongPassword {
+            return false;
+        } 
+
         info.game-state == GameState.Faulted || info.game-state == GameState.Stopped
     }
 

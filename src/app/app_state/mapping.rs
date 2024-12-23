@@ -53,6 +53,7 @@ impl GameInfoMapping {
         // 邮箱能码但是不完全能码
         game_info.doctor_serial = utils::redact_account(&self.game.info.status.account).into();
         game_info.game_state = match self.game.info.status.code {
+            _ if self.game.info.status.password.is_none() => GameState::WrongPassword,
             api_arkhost::GameStatus::Captcha => GameState::Captcha,
             api_arkhost::GameStatus::LoginFailed => GameState::Faulted,
             api_arkhost::GameStatus::Pending => GameState::Stopped,

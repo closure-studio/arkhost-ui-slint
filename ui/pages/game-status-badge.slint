@@ -43,6 +43,12 @@ component GameStatusBadgeBase inherits Rectangle {
             status-icon: @image-url("../images/game_status_captcha.svg");
             status-icon-blinking: true;
         }
+        wrong-password when info.game-state == GameState.WrongPassword: {
+            status-color: @linear-gradient(15deg, #88939e 0%, #959ba0 100%);
+            status-text: @tr("请重新提交游戏账密");
+            status-icon: @image-url("../images/game_status_captcha.svg");
+            status-icon-blinking: true;
+        }
     ]
 }
 

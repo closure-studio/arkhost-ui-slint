@@ -102,6 +102,7 @@ pub struct GameInfo {
 #[serde(rename_all = "snake_case")]
 pub struct Status {
     pub account: String,
+    pub password: Option<String>,
     pub platform: u32,
     pub uuid: String,
     pub code: GameStatus,
