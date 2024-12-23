@@ -17,6 +17,15 @@ pub fn default_cache_mode_fn() -> CacheModeFn {
                     trace!("ForceCache for: {} {}", req.method, req.uri);
                     return CacheMode::ForceCache;
                 }
+
+                // 识别是否为OTA Index 文件
+                let matches_ota_index = req.uri.path().ends_with(arkhost_ota::consts::url::asset::ui_ota_v1::INDEX)
+                    || req.uri.path().ends_with(arkhost_ota::consts::url::asset::ui_ota_v1::INDEX_SIG);
+                if matches_ota_index {
+                    trace!("NoStore for OTA Index: {} {}", req.method, req.uri);
+                    return CacheMode::NoStore;
+                }
+
                 let matches_ota_file = {
                     // OTA 更新文件URL： http://asset.server.com/foo/bar.txt/{hash}
                     let mut split = req.uri.path().rsplitn(2, '/');
